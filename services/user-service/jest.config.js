@@ -8,4 +8,6 @@ module.exports = {
   },
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
   setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
+  // Set test environment variables
+  setupFiles: ["<rootDir>/tests/jest.setup.js"],
 };
