@@ -1,0 +1,125 @@
+version: "3.8"
+
+services:
+  # PostgreSQL - Database for services
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: echo_user
+      POSTGRES_PASSWORD: echo_password
+      POSTGRES_DB: echo_main
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U echo_user -d echo_main"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis - For event bus, caching, and sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # MinIO - S3-compatible storage for files
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # API Gateway Service
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - USER_SERVICE_URL=http://user-service:8001
+      - MESSAGE_SERVICE_URL=http://message-service:8002
+      - AI_SERVICE_URL=http://ai-service:8003
+    depends_on:
+      - redis
+      - user-service
+      - message-service
+      - ai-service
+    restart: unless-stopped
+
+  # User Service - Handles authentication, user profiles
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=development
+      - PORT=8001
+      - DATABASE_URL=postgresql://user_service_user:user_service_password@postgres:5432/users_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-jwt-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # Message Service - Handles messaging, channels, real-time communication
+  message-service:
+    build: ./services/message-service
+    ports:
+      - "8002:8002"
+    environment:
+      - NODE_ENV=development
+      - PORT=8002
+      - DATABASE_URL=postgresql://message_service_user:message_service_password@postgres:5432/messages_db
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    restart: unless-stopped
+
+  # AI Service - Handles AI features, embeddings, analysis
+  ai-service:
+    build: ./services/ai-service
+    ports:
+      - "8003:8003"
+    environment:
+      - ENVIRONMENT=development
+      - PORT=8003
+      - DATABASE_URL=postgresql://ai_service_user:ai_service_password@postgres:5432/ai_db
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-} # Set via .env file
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

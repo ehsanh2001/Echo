@@ -1,0 +1,2 @@
+# This file ensures the production Kubernetes directory is tracked by Git
+# Production Kubernetes manifests will be added here

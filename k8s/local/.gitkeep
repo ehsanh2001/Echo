@@ -1,0 +1,2 @@
+# This file ensures the local Kubernetes directory is tracked by Git
+# Local development Kubernetes manifests will be added here

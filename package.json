@@ -1,0 +1,38 @@
+{
+  "name": "echo-workspace",
+  "version": "1.0.0",
+  "description": "Echo messaging platform workspace",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:services && npm run install:frontend",
+    "install:services": "npm install --workspace=services/api-gateway && npm install --workspace=services/user-service && npm install --workspace=services/message-service",
+    "install:frontend": "npm install --workspace=frontend",
+    "dev:all": "concurrently \"npm run dev:gateway\" \"npm run dev:user\" \"npm run dev:message\" \"npm run dev:ai\" \"npm run dev:frontend\"",
+    "dev:gateway": "npm run dev --workspace=services/api-gateway",
+    "dev:user": "npm run dev --workspace=services/user-service",
+    "dev:message": "npm run dev --workspace=services/message-service",
+    "dev:ai": "cd services/ai-service && python -m uvicorn main:app --reload --port 8004",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build:all": "npm run build:services && npm run build:frontend",
+    "build:services": "npm run build --workspace=services/api-gateway && npm run build --workspace=services/user-service && npm run build --workspace=services/message-service",
+    "build:frontend": "npm run build --workspace=frontend",
+    "test:all": "npm run test --workspace=services/api-gateway && npm run test --workspace=services/user-service && npm run test --workspace=services/message-service && npm run test --workspace=frontend",
+    "lint:all": "npm run lint --workspace=services/api-gateway && npm run lint --workspace=services/user-service && npm run lint --workspace=services/message-service && npm run lint --workspace=frontend",
+    "docker:build": "./scripts/build-images.sh",
+    "k8s:deploy": "kubectl apply -f k8s/local/",
+    "k8s:delete": "kubectl delete -f k8s/local/",
+    "minikube:start": "minikube start --driver=docker",
+    "minikube:stop": "minikube stop"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
