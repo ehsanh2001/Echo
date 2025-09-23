@@ -23,7 +23,6 @@ describe("UserService", () => {
     username: "testuser",
     password: "password123",
     display_name: "Test User",
-    timezone: "UTC",
   };
 
   beforeEach(() => {
@@ -53,7 +52,6 @@ describe("UserService", () => {
       expect(result.email).toBe(validUserData.email);
       expect(result.username).toBe(validUserData.username);
       expect(result.display_name).toBe(validUserData.display_name);
-      expect(result.timezone).toBe(validUserData.timezone);
       expect(result.status).toBeDefined();
       expect(result.created_at).toBeDefined();
 
@@ -102,7 +100,6 @@ describe("UserService", () => {
       username: "testuser",
       password: "password123",
       display_name: "Test User",
-      timezone: "UTC",
     };
 
     beforeEach(() => {

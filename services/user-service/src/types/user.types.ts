@@ -8,7 +8,6 @@ export interface User {
   displayName: string;
   avatarUrl: string | null;
   status: "ONLINE" | "OFFLINE" | "AWAY" | "BUSY";
-  timezone: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -19,7 +18,6 @@ export interface CreateUserRequest {
   password: string;
   username: string;
   display_name: string;
-  timezone?: string;
 }
 
 export interface CreateUserResponse {
@@ -28,7 +26,6 @@ export interface CreateUserResponse {
   username: string;
   display_name: string;
   status: "ONLINE" | "OFFLINE" | "AWAY" | "BUSY";
-  timezone: string;
   created_at: Date;
 }
 

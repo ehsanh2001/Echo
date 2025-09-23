@@ -44,8 +44,7 @@ class UserService {
    *   email: "john@example.com",
    *   password: "securePassword123",
    *   username: "johndoe",
-   *   display_name: "John Doe",
-   *   timezone: "America/New_York"
+   *   display_name: "John Doe"
    * });
    * ```
    */
@@ -124,7 +123,6 @@ class UserService {
         passwordHash,
         username: userData.username.toLowerCase().trim(),
         displayName: userData.display_name.trim(),
-        timezone: userData.timezone || "UTC",
         status: "OFFLINE",
         isActive: true,
       },
@@ -146,7 +144,6 @@ class UserService {
       username: user.username,
       display_name: user.displayName,
       status: user.status,
-      timezone: user.timezone,
       created_at: user.createdAt,
     };
   }

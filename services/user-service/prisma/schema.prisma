@@ -18,7 +18,6 @@ model User {
   displayName  String    @map("display_name") @db.VarChar(100)
   avatarUrl    String?   @map("avatar_url")
   status       Status    @default(OFFLINE)
-  timezone     String    @default("UTC")
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
