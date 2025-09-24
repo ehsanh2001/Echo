@@ -20,16 +20,10 @@ model User {
   avatarUrl    String?   @map("avatar_url")
   lastSeen     DateTime? @map("last_seen")
   deletedAt    DateTime? @map("deleted_at")
-  roles        Roles[]  @default([member])
+  roles        String[]  @default(["user"])
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
-}
-
-enum Roles{
-  member
-  admin
-  @@map("roles_enum")
 }
