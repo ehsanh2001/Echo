@@ -5,18 +5,27 @@ import bcrypt from "bcryptjs";
 
 describe("UserService.registerUser", () => {
   beforeEach(async () => {
-    // Clean up all test data - delete all users to ensure clean test state
-    await prisma.user.deleteMany({});
+    // Clean up only reg test data - delete users with reg_ prefix
+    await prisma.user.deleteMany({
+      where: {
+        username: { startsWith: "reg_" },
+      },
+    });
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    // Clean up only users with reg_ prefix
+    await prisma.user.deleteMany({
+      where: {
+        username: { startsWith: "reg_" },
+      },
+    });
   });
 
   it("should successfully register a new user", async () => {
     const userData = {
       email: "test@example.com",
-      username: "testuser",
+      username: "reg_testuser",
       password: "testpassword123",
       bio: "Test bio",
     };
@@ -53,7 +62,7 @@ describe("UserService.registerUser", () => {
   it("should register user without bio (optional field)", async () => {
     const userData = {
       email: "test2@example.com",
-      username: "testuser2",
+      username: "reg_testuser2",
       password: "testpassword123",
     };
 
@@ -70,7 +79,7 @@ describe("UserService.registerUser", () => {
   it("should throw error when email already exists", async () => {
     const userData = {
       email: "duplicate@example.com",
-      username: "user1",
+      username: "reg_user1",
       password: "password123",
     };
 
@@ -80,7 +89,7 @@ describe("UserService.registerUser", () => {
     // Try to create second user with same email
     const duplicateData = {
       email: "duplicate@example.com", // Same email
-      username: "user2", // Different username
+      username: "reg_user2", // Different username
       password: "password123",
     };
 
@@ -103,9 +112,16 @@ describe("UserService.registerUser", () => {
   });
 
   it("should throw error when username already exists", async () => {
+    // Clean up any leftover users with these specific emails first
+    await prisma.user.deleteMany({
+      where: {
+        OR: [{ email: "user1@example.com" }, { email: "user2@example.com" }],
+      },
+    });
+
     const userData = {
       email: "user1@example.com",
-      username: "duplicateuser",
+      username: "reg_duplicateuser",
       password: "password123",
     };
 
@@ -115,7 +131,7 @@ describe("UserService.registerUser", () => {
     // Try to create second user with same username
     const duplicateData = {
       email: "user2@example.com", // Different email
-      username: "duplicateuser", // Same username
+      username: "reg_duplicateuser", // Same username
       password: "password123",
     };
 

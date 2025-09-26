@@ -13,11 +13,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Final cleanup
-  await prisma.user.deleteMany({});
-
-  // Clean up Redis tokens
-  await redisService.clearAllRefreshTokens();
+  // Final cleanup - only clean up connections, individual tests handle their own data cleanup
 
   // Cleanup connections after all tests
   await redisService.disconnect();
