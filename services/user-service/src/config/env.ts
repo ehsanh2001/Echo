@@ -94,8 +94,12 @@ export const config = {
   // JWT Configuration
   jwt: {
     secret: getRequiredEnv("JWT_SECRET"),
-    accessTokenExpiry: getOptionalEnv("JWT_ACCESS_TOKEN_EXPIRY", "15m"),
-    refreshTokenExpiry: getOptionalEnv("JWT_REFRESH_TOKEN_EXPIRY", "7d"),
+    accessTokenExpirySeconds: parseInt(
+      getOptionalEnv("JWT_ACCESS_TOKEN_EXPIRY_SECONDS", "900")
+    ), // 15 minutes
+    refreshTokenExpirySeconds: parseInt(
+      getOptionalEnv("JWT_REFRESH_TOKEN_EXPIRY_SECONDS", "604800")
+    ), // 7 days
   },
 
   // Redis Configuration
