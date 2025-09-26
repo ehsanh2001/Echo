@@ -1,257 +1,229 @@
-import bcrypt from "bcrypt";
-import { config } from "../config/env";
+import bcrypt from "bcryptjs";
 import { prisma } from "../config/prisma";
-import type { User, CreateUserRequest, CreateUserResponse } from "../types";
+import { User, UserProfile } from "../types/user.types";
+import { RegisterRequest } from "../types/auth.types";
+import { UserServiceError } from "../types/error.types";
 
 /**
- * Custom error class for user service operations
+ * User management service for CRUD operations
  *
- * @class UserServiceError
- * @extends {Error}
- */
-export class UserServiceError extends Error {
-  /**
-   * Creates an instance of UserServiceError
-   *
-   * @param {string} message - The error message
-   * @param {string} code - The error code for programmatic identification
-   * @memberof UserServiceError
-   */
-  constructor(message: string, public code: string) {
-    super(message);
-    this.name = "UserServiceError";
-  }
-}
-
-/**
- * Service class for user-related operations
- * Handles user registration, authentication, and profile management
+ * Provides comprehensive user management functionality including user registration,
+ * profile management, and user data operations. Integrates with Prisma for database
+ * operations and handles user data validation and transformation.
  *
- * @class UserService
+ * Features:
+ * - Secure user registration with email and username uniqueness validation
+ * - Password hashing with bcrypt
+ * - User profile formatting for API responses
+ * - User existence validation
+ *
+ * Future features:
+ * - User profile updates
+ * - User deletion/deactivation
+ * - User search and listing
+ * - User role management
+ *
+ * ```
  */
-class UserService {
+export class UserService {
   /**
-   * Creates a new user account in the system
+   * Registers a new user in the system
    *
-   * @param {CreateUserRequest} userData - User registration data
-   * @returns {Promise<CreateUserResponse>} The created user data (excluding sensitive information)
-   * @throws {UserServiceError} When email/username already exists, password processing fails, or database errors occur
-   * @memberof UserService
+   * Creates a new user account with email and username uniqueness validation and secure
+   * password hashing. Returns the user profile without sensitive information.
+   *
+   * @param data - User registration data containing email, password, and username
+   * @returns Promise resolving to the created user's profile
+   *
+   * @throws {UserServiceError} When email already exists (EMAIL_EXISTS)
+   * @throws {UserServiceError} When username already exists (USERNAME_EXISTS)
+   * @throws {UserServiceError} When database operation fails (REGISTRATION_FAILED)
    *
    * @example
    * ```typescript
-   * const newUser = await userService.createUser({
-   *   email: "john@example.com",
-   *   password: "securePassword123",
-   *   username: "johndoe",
-   *   display_name: "John Doe"
+   * const profile = await UserService.registerUser({
+   *   email: 'john@example.com',
+   *   password: 'securePassword123',
+   *   username: 'johndoe',
+   *   bio: 'Software developer'
    * });
+   * // Returns: { id, email, username, displayName, bio, avatarUrl, createdAt, lastSeen, roles }
    * ```
    */
-  async createUser(userData: CreateUserRequest): Promise<CreateUserResponse> {
+  static async registerUser(data: RegisterRequest): Promise<UserProfile> {
     try {
-      await this.validateUserUniqueness(userData);
-      const passwordHash = await this.hashPassword(userData.password);
-      const user = await this.createUserInDatabase(userData, passwordHash);
-      return this.formatUserResponse(user);
+      await this.checkUserExistance(data);
+      const passwordHash = await bcrypt.hash(data.password, 12);
+      const user = await this.createUser(data, passwordHash);
+
+      console.log(`User registered: ${data.email} (${user.id})`);
+
+      return this.formatUserProfile(user);
     } catch (error) {
-      throw this.handleCreateUserError(error);
-    }
-  }
-
-  /**
-   * Validates that email and username are unique in the system
-   *
-   * @private
-   * @param {CreateUserRequest} userData - User data to validate
-   * @returns {Promise<void>} Resolves if validation passes
-   * @throws {UserServiceError} With code "EMAIL_EXISTS" if email is already registered
-   * @throws {UserServiceError} With code "USERNAME_EXISTS" if username is already taken
-   * @memberof UserService
-   */
-  private async validateUserUniqueness(
-    userData: CreateUserRequest
-  ): Promise<void> {
-    const existingEmail = await this.findByEmail(userData.email);
-    if (existingEmail) {
-      throw new UserServiceError("Email already registered", "EMAIL_EXISTS");
-    }
-
-    const existingUsername = await this.findByUsername(userData.username);
-    if (existingUsername) {
-      throw new UserServiceError("Username already taken", "USERNAME_EXISTS");
-    }
-  }
-
-  /**
-   * Securely hashes a password using bcrypt
-   *
-   * @private
-   * @param {string} password - Plain text password to hash
-   * @returns {Promise<string>} The hashed password
-   * @throws {UserServiceError} With code "PASSWORD_ERROR" if hashing fails
-   * @memberof UserService
-   */
-  private async hashPassword(password: string): Promise<string> {
-    try {
-      return await bcrypt.hash(password, config.bcrypt.saltRounds);
-    } catch (error) {
+      if (error instanceof UserServiceError) {
+        throw error;
+      }
       throw new UserServiceError(
-        "Password processing failed",
-        "PASSWORD_ERROR"
+        "Registration failed",
+        "REGISTRATION_FAILED",
+        500
       );
     }
   }
 
   /**
-   * Creates a new user record in the database
+   * Creates a new user in the database
    *
-   * @private
-   * @param {CreateUserRequest} userData - User registration data
-   * @param {string} passwordHash - The hashed password
-   * @returns {Promise<User>} The created user record from database
-   * @throws {Error} Database constraint violations or connection errors
-   * @memberof UserService
+   * Inserts a new user record with the provided data and hashed password.
+   * Sets default values for optional fields and assigns default user role.
+   *
+   * @param data - User registration data
+   * @param passwordHash - Bcrypt hashed password
+   * @returns Promise resolving to created user entity
+   *
+   * @example
+   * ```typescript
+   * const user = await this.createUser(registrationData, hashedPassword);
+   * ```
    */
-  private async createUserInDatabase(
-    userData: CreateUserRequest,
-    passwordHash: string
-  ): Promise<User> {
+  private static async createUser(data: RegisterRequest, passwordHash: string) {
     return await prisma.user.create({
       data: {
-        email: userData.email.toLowerCase().trim(),
+        email: data.email,
         passwordHash,
-        username: userData.username.toLowerCase().trim(),
-        displayName: userData.display_name.trim(),
-        status: "OFFLINE",
+        username: data.username,
+        displayName: data.username, // Default display name to username
+        bio: data.bio || null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"], // Default role
         isActive: true,
       },
     });
   }
 
   /**
-   * Formats user data for API response, excluding sensitive information
+   * Validates user uniqueness constraints
    *
-   * @private
-   * @param {User} user - The user record from database
-   * @returns {CreateUserResponse} Formatted user data safe for API response
-   * @memberof UserService
+   * Checks that the email and username are not already taken by existing users.
+   * Throws appropriate errors if duplicates are found.
+   *
+   * @param user - User data to validate
+   *
+   * @throws {UserServiceError} When email already exists (EMAIL_EXISTS)
+   * @throws {UserServiceError} When username already exists (USERNAME_EXISTS)
+   *
+   * @example
+   * ```typescript
+   * await this.checkUserExistance({
+   *   email: 'john@example.com',
+   *   username: 'johndoe',
+   *   password: 'password123'
+   * });
+   * ```
    */
-  private formatUserResponse(user: User): CreateUserResponse {
+  private static async checkUserExistance(user: RegisterRequest) {
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: user.email }, { username: user.username }],
+        deletedAt: null,
+      },
+    });
+
+    if (existingUser) {
+      if (existingUser.email === user.email) {
+        throw new UserServiceError("Email already exists", "EMAIL_EXISTS", 400);
+      }
+      if (existingUser.username === user.username) {
+        throw new UserServiceError(
+          "Username already exists",
+          "USERNAME_EXISTS",
+          400
+        );
+      }
+    }
+  }
+
+  /**
+   * Finds active user by ID
+   *
+   * Retrieves user entity ensuring they are not deleted and are active.
+   * This is a utility method that can be used by other services.
+   *
+   * @param userId - User's unique identifier
+   * @returns Promise resolving to user entity
+   *
+   * @throws {UserServiceError} When user is not found (USER_NOT_FOUND)
+   *
+   * @example
+   * ```typescript
+   * const user = await UserService.findActiveUser('user123');
+   * ```
+   */
+  static async findActiveUser(userId: string): Promise<User> {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
+    }
+
+    return user;
+  }
+
+  /**
+   * Gets user profile by ID
+   *
+   * Retrieves and formats user profile information for public consumption.
+   *
+   * @param userId - User's unique identifier
+   * @returns Promise resolving to formatted user profile
+   *
+   * @throws {UserServiceError} When user is not found (USER_NOT_FOUND)
+   *
+   * @example
+   * ```typescript
+   * const profile = await UserService.getUserProfile('user123');
+   * // Returns: { id, email, username, displayName, bio, avatarUrl, createdAt, lastSeen, roles }
+   * ```
+   */
+  static async getUserProfile(userId: string): Promise<UserProfile> {
+    const user = await this.findActiveUser(userId);
+    return this.formatUserProfile(user);
+  }
+
+  /**
+   * Formats user data for API response
+   *
+   * Transforms internal user object to public user profile format,
+   * excluding sensitive information like password hash.
+   *
+   * @param user - Internal user object from database
+   * @returns Formatted user profile for API responses
+   *
+   * @example
+   * ```typescript
+   * const profile = this.formatUserProfile(user);
+   * // Returns: { id, email, username, displayName, bio, avatarUrl, createdAt, lastSeen, roles }
+   * ```
+   */
+  static formatUserProfile(user: User): UserProfile {
     return {
       id: user.id,
       email: user.email,
       username: user.username,
-      display_name: user.displayName,
-      status: user.status,
-      created_at: user.createdAt,
+      displayName: user.displayName,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+      lastSeen: user.lastSeen,
+      roles: user.roles,
     };
   }
-
-  /**
-   * Centralized error handling for createUser method
-   * Converts various error types into appropriate UserServiceError instances
-   *
-   * @private
-   * @param {unknown} error - The error to handle and convert
-   * @returns {never} This method always throws, never returns
-   * @throws {UserServiceError} With appropriate error code and message based on error type:
-   *   - "EMAIL_EXISTS": Email already registered
-   *   - "USERNAME_EXISTS": Username already taken
-   *   - "USER_EXISTS": Generic user already exists
-   *   - "PASSWORD_ERROR": Password processing failed
-   *   - "DATABASE_ERROR": Generic database error
-   * @memberof UserService
-   */
-  private handleCreateUserError(error: unknown): never {
-    // Re-throw our custom errors
-    if (error instanceof UserServiceError) {
-      throw error;
-    }
-
-    // Handle Prisma-specific errors
-    if (error && typeof error === "object" && "code" in error) {
-      const prismaError = error as {
-        code: string;
-        meta?: { target?: string[] };
-      };
-      // P2002 is unique constraint violation
-      if (prismaError.code === "P2002") {
-        const field = prismaError.meta?.target;
-        if (field?.includes("email")) {
-          throw new UserServiceError(
-            "Email already registered",
-            "EMAIL_EXISTS"
-          );
-        }
-        if (field?.includes("username")) {
-          throw new UserServiceError(
-            "Username already taken",
-            "USERNAME_EXISTS"
-          );
-        }
-        throw new UserServiceError("User already exists", "USER_EXISTS");
-      }
-    }
-
-    // Handle bcrypt errors
-    if (error instanceof Error && error.message.includes("bcrypt")) {
-      throw new UserServiceError(
-        "Password processing failed",
-        "PASSWORD_ERROR"
-      );
-    }
-
-    // Generic database error
-    console.error("Unexpected error in createUser:", error);
-    throw new UserServiceError("Failed to create user", "DATABASE_ERROR");
-  }
-
-  /**
-   * Finds a user by email address
-   *
-   * @param {string} email - Email address to search for
-   * @returns {Promise<User | null>} User record if found, null otherwise
-   * @memberof UserService
-   *
-   * @example
-   * ```typescript
-   * const user = await userService.findByEmail("john@example.com");
-   * if (user) {
-   *   console.log(`Found user: ${user.username}`);
-   * }
-   * ```
-   */
-  async findByEmail(email: string): Promise<User | null> {
-    return prisma.user.findFirst({
-      where: {
-        email: email.toLowerCase().trim(),
-      },
-    });
-  }
-
-  /**
-   * Finds a user by username
-   *
-   * @param {string} username - Username to search for
-   * @returns {Promise<User | null>} User record if found, null otherwise
-   * @memberof UserService
-   *
-   * @example
-   * ```typescript
-   * const user = await userService.findByUsername("johndoe");
-   * if (user) {
-   *   console.log(`Found user: ${user.email}`);
-   * }
-   * ```
-   */
-  async findByUsername(username: string): Promise<User | null> {
-    return prisma.user.findFirst({
-      where: {
-        username: username.toLowerCase().trim(),
-      },
-    });
-  }
 }
-
-export default new UserService();
