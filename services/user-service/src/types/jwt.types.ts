@@ -6,6 +6,11 @@
  */
 
 /**
+ * JWT token types
+ */
+export type TokenType = "access" | "refresh";
+
+/**
  * JWT token payload for token generation
  *
  * Contains user information embedded in JWT tokens for authentication
@@ -16,6 +21,7 @@ export interface TokenPayload {
   userId: string;
   email: string;
   roles: string[];
+  type: TokenType;
 }
 
 /**
@@ -29,6 +35,7 @@ export interface JwtPayload {
   userId: string;
   email: string;
   roles: string[];
+  type: TokenType;
   iat: number;
   exp: number;
 }

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { JWTService } from "../utils/jwt";
-import { JwtPayload } from "../types/jwt.types";
+import { JwtPayload, TokenType } from "../types/jwt.types";
 import { UserServiceError } from "../types/error.types";
 
 /**
@@ -57,10 +57,12 @@ const extractBearerToken = (authHeader: string | undefined): string | null => {
  * Validates JWT token and extracts user information
  *
  * @param authHeader - Authorization header value
+ * @param expectedType - Expected token type ('access' or 'refresh')
  * @returns Validation result with user info or error
  */
 const validateJwtToken = (
-  authHeader: string | undefined
+  authHeader: string | undefined,
+  expectedType: TokenType = "access"
 ): TokenValidationResult => {
   // Check for missing auth header
   if (!authHeader) {
@@ -99,8 +101,8 @@ const validateJwtToken = (
   }
 
   try {
-    // Verify the JWT token
-    const payload = JWTService.verifyToken(token) as JwtPayload;
+    // Verify the JWT token with type validation
+    const payload = JWTService.verifyToken(token, expectedType) as JwtPayload;
 
     return {
       success: true,
@@ -113,7 +115,7 @@ const validateJwtToken = (
   } catch (error: any) {
     return {
       success: false,
-      error: getJwtError(error),
+      error: getJwtError(error, expectedType),
     };
   }
 };
@@ -122,15 +124,19 @@ const validateJwtToken = (
  * Maps JWT errors to standardized error responses
  *
  * @param error - JWT verification error
+ * @param tokenType - Expected token type for contextual error messages
  * @returns Standardized error object
  */
 const getJwtError = (
-  error: any
+  error: any,
+  tokenType: TokenType = "access"
 ): { status: number; message: string; code: string } => {
   if (error.message === "TOKEN_EXPIRED") {
     return {
       status: 401,
-      message: "Access token has expired",
+      message: `${
+        tokenType === "access" ? "Access" : "Refresh"
+      } token has expired`,
       code: "TOKEN_EXPIRED",
     };
   }
@@ -138,8 +144,16 @@ const getJwtError = (
   if (error.message === "INVALID_TOKEN") {
     return {
       status: 401,
-      message: "Invalid access token",
+      message: `Invalid ${tokenType} token`,
       code: "INVALID_TOKEN",
+    };
+  }
+
+  if (error.message === "INVALID_TOKEN_TYPE") {
+    return {
+      status: 401,
+      message: `Token type mismatch. Expected ${tokenType} token`,
+      code: "INVALID_TOKEN_TYPE",
     };
   }
 
@@ -170,7 +184,7 @@ const sendAuthError = (
 };
 
 /**
- * JWT Authentication middleware
+ * JWT Authentication middleware for access tokens
  *
  * Validates JWT access tokens from the Authorization header and attaches
  * user information to the request object for use in protected routes.
@@ -191,7 +205,10 @@ export const jwtAuth = (
   res: Response,
   next: NextFunction
 ): void => {
-  const validationResult = validateJwtToken(req.headers.authorization);
+  const validationResult = validateJwtToken(
+    req.headers.authorization,
+    "access"
+  );
 
   if (!validationResult.success) {
     sendAuthError(res, validationResult.error!);
@@ -204,30 +221,36 @@ export const jwtAuth = (
 };
 
 /**
- * Optional JWT Authentication middleware
+ * JWT Authentication middleware for refresh tokens
  *
- * Similar to jwtAuth but doesn't fail if no token is provided.
- * Useful for endpoints that work for both authenticated and anonymous users.
+ * Validates JWT refresh tokens from the Authorization header and attaches
+ * user information to the request object. Used specifically for the refresh endpoint.
  *
- * Transforms a regular Request into an AuthenticatedRequest by adding user info or undefined.
+ * Transforms a regular Request into an AuthenticatedRequest by adding user info.
  *
  * @example
  * ```typescript
- * // User info will be available if token is provided, null otherwise
- * router.get('/public-profile/:id', optionalJwtAuth, ProfileController.getProfile);
+ * // Apply to refresh endpoint
+ * router.post('/auth/refresh', jwtRefreshAuth, AuthController.refresh);
  * ```
  */
-export const optionalJwtAuth = (
+export const jwtRefreshAuth = (
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  const validationResult = validateJwtToken(req.headers.authorization);
+  const validationResult = validateJwtToken(
+    req.headers.authorization,
+    "refresh"
+  );
 
-  // Transform Request to AuthenticatedRequest by adding user property (or undefined)
-  (req as AuthenticatedRequest).user = validationResult.success
-    ? validationResult.user
-    : undefined;
+  if (!validationResult.success) {
+    sendAuthError(res, validationResult.error!);
+    return;
+  }
+
+  // Transform Request to AuthenticatedRequest by adding user property
+  (req as AuthenticatedRequest).user = validationResult.user;
   next();
 };
 

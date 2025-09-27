@@ -7,7 +7,7 @@ import {
   LoginResponse,
   RefreshResponse,
 } from "../types/auth.types";
-import { TokenPayload, JwtPayload } from "../types/jwt.types";
+import { TokenPayload, JwtPayload, TokenType } from "../types/jwt.types";
 import { UserServiceError } from "../types/error.types";
 import { JWTService } from "../utils/jwt";
 import { redisService } from "../utils/redis";
@@ -96,7 +96,11 @@ export class AuthService {
    */
   static async refreshToken(refreshToken: string): Promise<RefreshResponse> {
     try {
-      const payload = JWTService.verifyToken(refreshToken) as JwtPayload;
+      // Verify refresh token with type validation
+      const payload = JWTService.verifyToken(
+        refreshToken,
+        "refresh"
+      ) as JwtPayload;
       const { userId } = payload;
 
       await this.validateRefreshToken(userId, refreshToken);
@@ -238,14 +242,14 @@ export class AuthService {
     refresh_token: string;
     expires_in: number;
   }> {
-    const tokenPayload: TokenPayload = {
+    const baseTokenPayload = {
       userId: user.id,
       email: user.email,
       roles: user.roles,
     };
 
     const { accessToken, refreshToken } =
-      JWTService.generateTokenPair(tokenPayload);
+      JWTService.generateTokenPair(baseTokenPayload);
 
     // Store refresh token in Redis
     await redisService.storeRefreshToken(user.id, refreshToken);

@@ -104,5 +104,30 @@ describe("JWT Authentication Middleware", () => {
       expect(mockRes.status).not.toHaveBeenCalled();
       expect(mockRes.json).not.toHaveBeenCalled();
     });
+
+    it("should reject request with refresh token (wrong token type)", () => {
+      // Create a refresh token and try to use it with access middleware
+      const baseTokenPayload = {
+        userId: "test-user-123",
+        email: "test@example.com",
+        roles: ["user"],
+      };
+
+      const { refreshToken } = JWTService.generateTokenPair(baseTokenPayload);
+
+      mockReq.headers = {
+        authorization: `Bearer ${refreshToken}`,
+      };
+
+      jwtAuth(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: "Token type mismatch. Expected access token",
+        code: "INVALID_TOKEN_TYPE",
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
   });
 });

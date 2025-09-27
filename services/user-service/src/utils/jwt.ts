@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { config } from "../config/env";
-import { JwtPayload, TokenPayload } from "../types/jwt.types";
+import { JwtPayload, TokenPayload, TokenType } from "../types/jwt.types";
 
 /**
  * JWT service for handling token creation and verification
@@ -16,25 +16,37 @@ export class JWTService {
    * Verifies a JWT token and returns the decoded payload
    *
    * @param token - The JWT token to verify
+   * @param expectedType - Optional expected token type for validation
    * @returns The decoded JWT payload containing user information
    * @throws Error with "TOKEN_EXPIRED" message if the token has expired
    * @throws Error with "INVALID_TOKEN" message if the token is invalid
+   * @throws Error with "INVALID_TOKEN_TYPE" message if token type doesn't match expected
    * @example
    * ```typescript
    * try {
-   *   const payload = JWTService.verifyToken(token);
+   *   const payload = JWTService.verifyToken(token, 'access');
    *   console.log("User ID:", payload.userId);
    * } catch (error) {
    *   console.error("Token verification failed:", error.message);
    * }
    * ```
    */
-  static verifyToken(token: string): JwtPayload {
+  static verifyToken(token: string, expectedType?: TokenType): JwtPayload {
     try {
-      return jwt.verify(token, this.secret) as JwtPayload;
+      const payload = jwt.verify(token, this.secret) as JwtPayload;
+
+      // Validate token type if expectedType is provided
+      if (expectedType && payload.type !== expectedType) {
+        throw new Error("INVALID_TOKEN_TYPE");
+      }
+
+      return payload;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new Error("TOKEN_EXPIRED");
+      }
+      if (error instanceof Error && error.message === "INVALID_TOKEN_TYPE") {
+        throw error;
       }
       throw new Error("INVALID_TOKEN");
     }
@@ -57,19 +69,23 @@ export class JWTService {
    * console.log("Refresh Token:", tokens.refreshToken);
    * ```
    */
-  static generateTokenPair(payload: TokenPayload): {
+  static generateTokenPair(basePayload: Omit<TokenPayload, "type">): {
     accessToken: string;
     refreshToken: string;
   } {
     const now = Math.floor(Date.now() / 1000);
+
+    const accessPayload: TokenPayload = { ...basePayload, type: "access" };
+    const refreshPayload: TokenPayload = { ...basePayload, type: "refresh" };
+
     return {
       accessToken: this.createToken(
-        payload,
+        accessPayload,
         now,
         this.accessTokenExpirySeconds
       ),
       refreshToken: this.createToken(
-        payload,
+        refreshPayload,
         now + 1,
         this.refreshTokenExpirySeconds
       ), // Different timestamp for uniqueness
@@ -98,7 +114,11 @@ export class JWTService {
   /**
    * Generate expired token for testing
    */
-  static generateExpiredToken(payload: TokenPayload): string {
+  static generateExpiredToken(
+    basePayload: Omit<TokenPayload, "type">,
+    tokenType: TokenType = "access"
+  ): string {
+    const payload: TokenPayload = { ...basePayload, type: tokenType };
     return jwt.sign(
       { ...payload, iat: Math.floor(Date.now() / 1000) - 3600 }, // 1 hour ago
       this.secret,
