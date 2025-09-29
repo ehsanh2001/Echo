@@ -44,21 +44,35 @@ export class UserController {
 
   /**
    * POST /auth/refresh
+   * Requires jwtRefreshAuth middleware (refresh token in Authorization header)
    */
-  static async refresh(req: Request, res: Response): Promise<void> {
+  static async refresh(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
     try {
-      const { refresh_token } = req.body;
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: "Valid refresh token required",
+          code: "AUTH_REQUIRED",
+        });
+        return;
+      }
 
-      if (!refresh_token) {
+      // Extract refresh token from Authorization header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
         res.status(400).json({
           success: false,
-          message: "Refresh token is required",
+          message: "Refresh token is required in Authorization header",
           code: "MISSING_REFRESH_TOKEN",
         });
         return;
       }
 
-      const result = await AuthService.refreshToken(refresh_token);
+      const refreshToken = authHeader.substring(7); // Remove 'Bearer ' prefix
+      const result = await AuthService.refreshToken(refreshToken);
 
       res.json({
         success: true,
