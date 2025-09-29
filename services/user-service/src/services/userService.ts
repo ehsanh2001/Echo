@@ -92,7 +92,7 @@ export class UserService {
         email: data.email,
         passwordHash,
         username: data.username,
-        displayName: data.username, // Default display name to username
+        displayName: data.displayName || data.username, // Use provided displayName or default to username
         bio: data.bio || null,
         avatarUrl: null,
         lastSeen: null,
