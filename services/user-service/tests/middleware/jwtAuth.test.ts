@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { jwtAuth, AuthenticatedRequest } from "../../src/middleware/jwtAuth";
 import { JWTService } from "../../src/utils/jwt";
-
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterAll,
+  beforeAll,
+} from "@jest/globals";
 describe("JWT Authentication Middleware", () => {
   let mockReq: Partial<AuthenticatedRequest>;
   let mockRes: Partial<Response>;

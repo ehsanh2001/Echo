@@ -2,7 +2,7 @@ import { UserService } from "../../src/services/userService";
 import { UserServiceError } from "../../src/types/error.types";
 import { prisma } from "../../src/config/prisma";
 import bcrypt from "bcryptjs";
-
+import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 describe("UserService.registerUser", () => {
   beforeEach(async () => {
     // Clean up only reg test data - delete users with reg_ prefix

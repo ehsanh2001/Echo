@@ -3,8 +3,14 @@ import { AuthService } from "../../src/services/authService";
 import { UserServiceError } from "../../src/types/error.types";
 import { prisma } from "../../src/config/prisma";
 import { redisService } from "../../src/utils/redis";
-import bcrypt from "bcryptjs";
-
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterAll,
+  beforeAll,
+} from "@jest/globals";
 describe("AuthService.loginUser", () => {
   const testUser = {
     email: "login@example.com",

@@ -1,9 +1,15 @@
 import { UserService } from "../../src/services/userService";
 import { AuthService } from "../../src/services/authService";
-import { UserServiceError } from "../../src/types/error.types";
 import { prisma } from "../../src/config/prisma";
 import { redisService } from "../../src/utils/redis";
-
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterAll,
+  beforeAll,
+} from "@jest/globals";
 describe("AuthService.logoutUser", () => {
   const testUser = {
     email: "logout@example.com",
