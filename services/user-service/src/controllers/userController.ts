@@ -1,18 +1,21 @@
 import { Request, Response } from "express";
-import { UserService } from "../services/userService";
-import { AuthService } from "../services/authService";
+import { container } from "../container";
+import { IUserService } from "../interfaces/services/IUserService";
+import { IAuthService } from "../interfaces/services/IAuthService";
 import { RegisterRequest, LoginRequest } from "../types/auth.types";
 import { UserServiceError } from "../types/error.types";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
 
 export class UserController {
+  private static userService = container.resolve<IUserService>("IUserService");
+  private static authService = container.resolve<IAuthService>("IAuthService");
   /**
    * POST /auth/register
    */
   static async register(req: Request, res: Response): Promise<void> {
     try {
       const userData: RegisterRequest = req.body;
-      const result = await UserService.registerUser(userData);
+      const result = await this.userService.registerUser(userData);
 
       res.status(201).json({
         success: true,
@@ -30,7 +33,7 @@ export class UserController {
   static async login(req: Request, res: Response): Promise<void> {
     try {
       const loginData: LoginRequest = req.body;
-      const result = await AuthService.loginUser(loginData);
+      const result = await this.authService.loginUser(loginData);
 
       res.json({
         success: true,
@@ -72,7 +75,7 @@ export class UserController {
       }
 
       const refreshToken = authHeader.substring(7); // Remove 'Bearer ' prefix
-      const result = await AuthService.refreshToken(refreshToken);
+      const result = await this.authService.refreshToken(refreshToken);
 
       res.json({
         success: true,
@@ -100,7 +103,7 @@ export class UserController {
         return;
       }
 
-      await AuthService.logoutUser(req.user.userId);
+      await this.authService.logoutUser(req.user.userId);
 
       res.json({
         success: true,
