@@ -1,0 +1,414 @@
+import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
+import { container } from "../../src/container";
+import { IUserRepository } from "../../src/interfaces/repositories/IUserRepository";
+import { UserRepository } from "../../src/repositories/UserRepository";
+import { User, CreateUserData } from "../../src/types/user.types";
+import { prisma } from "../../src/config/prisma";
+
+describe("UserRepository", () => {
+  let userRepository: IUserRepository;
+
+  beforeEach(async () => {
+    // Clean up test data - delete users with repo_test_ prefix
+    await prisma.user.deleteMany({
+      where: {
+        username: { startsWith: "repo_test_" },
+      },
+    });
+
+    // Get repository instance from container
+    userRepository = container.resolve<IUserRepository>("IUserRepository");
+  });
+
+  afterAll(async () => {
+    // Final cleanup - delete all test users
+    await prisma.user.deleteMany({
+      where: {
+        username: { startsWith: "repo_test_" },
+      },
+    });
+  });
+
+  describe("create", () => {
+    it("should successfully create a new user", async () => {
+      // Arrange
+      const userData: CreateUserData = {
+        email: "repo_test_create@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_create_user",
+        displayName: "Test Create User",
+        bio: "Test user for create operation",
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      // Act
+      const createdUser = await userRepository.create(userData);
+
+      // Assert
+      expect(createdUser).toBeDefined();
+      expect(createdUser.id).toBeDefined();
+      expect(createdUser.email).toBe(userData.email);
+      expect(createdUser.username).toBe(userData.username);
+      expect(createdUser.displayName).toBe(userData.displayName);
+      expect(createdUser.bio).toBe(userData.bio);
+      expect(createdUser.passwordHash).toBe(userData.passwordHash);
+      expect(createdUser.roles).toEqual(userData.roles);
+      expect(createdUser.isActive).toBe(true);
+      expect(createdUser.createdAt).toBeDefined();
+      expect(createdUser.updatedAt).toBeDefined();
+      expect(createdUser.deletedAt).toBeNull();
+    });
+
+    it("should throw error when creating user with duplicate email", async () => {
+      // Arrange
+      const userData: CreateUserData = {
+        email: "repo_test_duplicate@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_duplicate_user1",
+        displayName: "Test User 1",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      // Create first user
+      await userRepository.create(userData);
+
+      // Try to create second user with same email but different username
+      const duplicateUserData: CreateUserData = {
+        ...userData,
+        username: "repo_test_duplicate_user2",
+      };
+
+      // Act & Assert
+      await expect(userRepository.create(duplicateUserData)).rejects.toThrow();
+    });
+
+    it("should throw error when creating user with duplicate username", async () => {
+      // Arrange
+      const userData: CreateUserData = {
+        email: "repo_test_unique1@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_duplicate_username",
+        displayName: "Test User 1",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      // Create first user
+      await userRepository.create(userData);
+
+      // Try to create second user with same username but different email
+      const duplicateUserData: CreateUserData = {
+        ...userData,
+        email: "repo_test_unique2@example.com",
+      };
+
+      // Act & Assert
+      await expect(userRepository.create(duplicateUserData)).rejects.toThrow();
+    });
+  });
+
+  describe("findByEmailOrUsername", () => {
+    let testUser: User;
+
+    beforeEach(async () => {
+      // Create a test user for find operations
+      const userData: CreateUserData = {
+        email: "repo_test_find@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_find_user",
+        displayName: "Test Find User",
+        bio: "Test user for find operations",
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+      testUser = await userRepository.create(userData);
+    });
+
+    it("should find user by email", async () => {
+      // Act
+      const foundUser = await userRepository.findByEmailOrUsername(
+        testUser.email,
+        "nonexistent_username"
+      );
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.email).toBe(testUser.email);
+      expect(foundUser!.username).toBe(testUser.username);
+    });
+
+    it("should find user by username", async () => {
+      // Act
+      const foundUser = await userRepository.findByEmailOrUsername(
+        "nonexistent@example.com",
+        testUser.username
+      );
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.email).toBe(testUser.email);
+      expect(foundUser!.username).toBe(testUser.username);
+    });
+
+    it("should return null when user not found", async () => {
+      // Act
+      const foundUser = await userRepository.findByEmailOrUsername(
+        "nonexistent@example.com",
+        "nonexistent_username"
+      );
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should not find deleted users", async () => {
+      // Arrange - mark user as deleted
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Act
+      const foundUser = await userRepository.findByEmailOrUsername(
+        testUser.email,
+        testUser.username
+      );
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+  });
+
+  describe("findActiveById", () => {
+    let activeUser: User;
+    let inactiveUser: User;
+    let deletedUser: User;
+
+    beforeEach(async () => {
+      // Create active user
+      const activeUserData: CreateUserData = {
+        email: "repo_test_active@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_active_user",
+        displayName: "Active User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+      activeUser = await userRepository.create(activeUserData);
+
+      // Create inactive user
+      const inactiveUserData: CreateUserData = {
+        email: "repo_test_inactive@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_inactive_user",
+        displayName: "Inactive User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: false, // Inactive
+      };
+      inactiveUser = await userRepository.create(inactiveUserData);
+
+      // Create deleted user
+      const deletedUserData: CreateUserData = {
+        email: "repo_test_deleted@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_deleted_user",
+        displayName: "Deleted User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: new Date(), // Deleted
+        roles: ["user"],
+        isActive: true,
+      };
+      deletedUser = await userRepository.create(deletedUserData);
+    });
+
+    it("should find active user by ID", async () => {
+      // Act
+      const foundUser = await userRepository.findActiveById(activeUser.id);
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(activeUser.id);
+      expect(foundUser!.isActive).toBe(true);
+      expect(foundUser!.deletedAt).toBeNull();
+    });
+
+    it("should not find inactive user", async () => {
+      // Act
+      const foundUser = await userRepository.findActiveById(inactiveUser.id);
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should not find deleted user", async () => {
+      // Act
+      const foundUser = await userRepository.findActiveById(deletedUser.id);
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should return null for non-existent user ID", async () => {
+      // Act
+      const foundUser = await userRepository.findActiveById("non-existent-id");
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+  });
+
+  describe("findById", () => {
+    let testUser: User;
+
+    beforeEach(async () => {
+      // Create a test user
+      const userData: CreateUserData = {
+        email: "repo_test_findbyid@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_findbyid_user",
+        displayName: "Test FindById User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+      testUser = await userRepository.create(userData);
+    });
+
+    it("should find user by ID regardless of active status", async () => {
+      // Act
+      const foundUser = await userRepository.findById(testUser.id);
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.email).toBe(testUser.email);
+      expect(foundUser!.username).toBe(testUser.username);
+    });
+
+    it("should find inactive user by ID", async () => {
+      // Arrange - make user inactive
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { isActive: false },
+      });
+
+      // Act
+      const foundUser = await userRepository.findById(testUser.id);
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.isActive).toBe(false);
+    });
+
+    it("should find deleted user by ID", async () => {
+      // Arrange - mark user as deleted
+      const deletedAt = new Date();
+      await prisma.user.update({
+        where: { id: testUser.id },
+        data: { deletedAt },
+      });
+
+      // Act
+      const foundUser = await userRepository.findById(testUser.id);
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.deletedAt).toEqual(deletedAt);
+    });
+
+    it("should return null for non-existent user ID", async () => {
+      // Act
+      const foundUser = await userRepository.findById("non-existent-id");
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+  });
+
+  describe("integration tests", () => {
+    it("should work with dependency injection container", async () => {
+      // Act
+      const repoFromContainer =
+        container.resolve<IUserRepository>("IUserRepository");
+
+      // Assert
+      expect(repoFromContainer).toBeInstanceOf(UserRepository);
+      expect(repoFromContainer).toBe(userRepository); // Should be singleton
+    });
+
+    it("should handle concurrent operations correctly", async () => {
+      // Arrange
+      const userData1: CreateUserData = {
+        email: "repo_test_concurrent1@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_concurrent_user1",
+        displayName: "Concurrent User 1",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const userData2: CreateUserData = {
+        email: "repo_test_concurrent2@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_concurrent_user2",
+        displayName: "Concurrent User 2",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      // Act - create users concurrently
+      const [user1, user2] = await Promise.all([
+        userRepository.create(userData1),
+        userRepository.create(userData2),
+      ]);
+
+      // Assert
+      expect(user1.id).toBeDefined();
+      expect(user2.id).toBeDefined();
+      expect(user1.id).not.toBe(user2.id);
+      expect(user1.email).toBe(userData1.email);
+      expect(user2.email).toBe(userData2.email);
+    });
+  });
+});
