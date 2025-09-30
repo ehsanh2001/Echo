@@ -126,4 +126,29 @@ export class UserRepository implements IUserRepository {
       );
     }
   }
+
+  /**
+   * Updates user's last seen timestamp
+   *
+   * Updates the lastSeen field for the specified user to current timestamp.
+   * Used to track user activity during login.
+   *
+   * @param userId - Unique user identifier
+   * @returns Promise that resolves when update is complete
+   */
+  async updateLastSeen(userId: string): Promise<void> {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastSeen: new Date() },
+      });
+    } catch (error) {
+      // Log the error but don't fail the login process if user doesn't exist
+      // This can happen during test cleanup or if user was deleted between validation and update
+      console.warn(
+        `Failed to update lastSeen for user ${userId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
 }

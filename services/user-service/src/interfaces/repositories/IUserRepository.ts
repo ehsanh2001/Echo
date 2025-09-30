@@ -49,4 +49,15 @@ export interface IUserRepository {
    * @returns Promise resolving to user if found, null otherwise
    */
   findById(userId: string): Promise<User | null>;
+
+  /**
+   * Updates user's last seen timestamp
+   *
+   * Updates the lastSeen field for the specified user to current timestamp.
+   * Used to track user activity during login.
+   *
+   * @param userId - Unique user identifier
+   * @returns Promise that resolves when update is complete
+   */
+  updateLastSeen(userId: string): Promise<void>;
 }
