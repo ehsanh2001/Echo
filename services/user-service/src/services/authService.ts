@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "../config/prisma";
+import { injectable, inject } from "tsyringe";
 import { config } from "../config/env";
 import { User, UserProfile } from "../types/user.types";
 import {
@@ -7,10 +7,12 @@ import {
   LoginResponse,
   RefreshResponse,
 } from "../types/auth.types";
-import { TokenPayload, JwtPayload, TokenType } from "../types/jwt.types";
+import { JwtPayload } from "../types/jwt.types";
 import { UserServiceError } from "../types/error.types";
 import { JWTService } from "../utils/jwt";
 import { redisService } from "../utils/redis";
+import { IAuthService } from "../interfaces/services/IAuthService";
+import { IUserRepository } from "../interfaces/repositories/IUserRepository";
 
 /**
  * Authentication service for user login, logout, and token management
@@ -23,9 +25,13 @@ import { redisService } from "../utils/redis";
  * - JWT-based access and refresh token management
  * - Redis-backed session storage with automatic expiry
  * - Secure logout with token invalidation
- *
+ * - Dependency injection for testability and modularity
  */
-export class AuthService {
+@injectable()
+export class AuthService implements IAuthService {
+  constructor(
+    @inject("IUserRepository") private userRepository: IUserRepository
+  ) {}
   /**
    * Authenticates a user and returns JWT tokens
    *
@@ -41,14 +47,14 @@ export class AuthService {
    *
    * @example
    * ```typescript
-   * const response = await AuthService.loginUser({
+   * const response = await authService.loginUser({
    *   identifier: 'john@example.com',
    *   password: 'securePassword123'
    * });
    * // Returns: { access_token, refresh_token, expires_in, user }
    * ```
    */
-  static async loginUser(data: LoginRequest): Promise<LoginResponse> {
+  async loginUser(data: LoginRequest): Promise<LoginResponse> {
     try {
       const user = await this.findAndValidateUser(data);
       await this.verifyPassword(data.password, user.passwordHash!);
@@ -90,11 +96,11 @@ export class AuthService {
    *
    * @example
    * ```typescript
-   * const newTokens = await AuthService.refreshToken('old.refresh.token');
+   * const newTokens = await authService.refreshToken('old.refresh.token');
    * // Returns: { access_token, refresh_token, expires_in }
    * ```
    */
-  static async refreshToken(refreshToken: string): Promise<RefreshResponse> {
+  async refreshToken(refreshToken: string): Promise<RefreshResponse> {
     try {
       // Verify refresh token with type validation
       const payload = JWTService.verifyToken(
@@ -137,11 +143,11 @@ export class AuthService {
    *
    * @example
    * ```typescript
-   * await AuthService.logoutUser('user123');
+   * await authService.logoutUser('user123');
    * console.log('User logged out successfully');
    * ```
    */
-  static async logoutUser(userId: string): Promise<void> {
+  async logoutUser(userId: string): Promise<void> {
     try {
       // Remove refresh token from Redis
       await redisService.removeRefreshToken(userId);
@@ -173,16 +179,13 @@ export class AuthService {
    * });
    * ```
    */
-  private static async findAndValidateUser(data: LoginRequest): Promise<User> {
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: data.identifier }, { username: data.identifier }],
-        deletedAt: null,
-        isActive: true,
-      },
-    });
+  private async findAndValidateUser(data: LoginRequest): Promise<User> {
+    const user = await this.userRepository.findByEmailOrUsername(
+      data.identifier,
+      data.identifier
+    );
 
-    if (!user || !user.passwordHash) {
+    if (!user || !user.passwordHash || !user.isActive || user.deletedAt) {
       throw new UserServiceError(
         "Invalid credentials",
         "INVALID_CREDENTIALS",
@@ -208,7 +211,7 @@ export class AuthService {
    * await this.verifyPassword('userPassword123', user.passwordHash);
    * ```
    */
-  private static async verifyPassword(
+  private async verifyPassword(
     password: string,
     passwordHash: string
   ): Promise<void> {
@@ -237,7 +240,7 @@ export class AuthService {
    * // Returns: { access_token, refresh_token, expires_in }
    * ```
    */
-  private static async generateAndStoreTokens(user: User): Promise<{
+  private async generateAndStoreTokens(user: User): Promise<{
     access_token: string;
     refresh_token: string;
     expires_in: number;
@@ -274,20 +277,8 @@ export class AuthService {
    * await this.updateLastSeen('user123');
    * ```
    */
-  private static async updateLastSeen(userId: string): Promise<void> {
-    try {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { lastSeen: new Date() },
-      });
-    } catch (error) {
-      // Log the error but don't fail the login process if user doesn't exist
-      // This can happen during test cleanup or if user was deleted between validation and update
-      console.warn(
-        `Failed to update lastSeen for user ${userId}:`,
-        error instanceof Error ? error.message : error
-      );
-    }
+  private async updateLastSeen(userId: string): Promise<void> {
+    await this.userRepository.updateLastSeen(userId);
   }
 
   /**
@@ -306,7 +297,7 @@ export class AuthService {
    * await this.validateRefreshToken('user123', 'refresh.token.here');
    * ```
    */
-  private static async validateRefreshToken(
+  private async validateRefreshToken(
     userId: string,
     refreshToken: string
   ): Promise<void> {
@@ -335,14 +326,8 @@ export class AuthService {
    * const user = await this.findActiveUser('user123');
    * ```
    */
-  private static async findActiveUser(userId: string): Promise<User> {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: userId,
-        deletedAt: null,
-        isActive: true,
-      },
-    });
+  private async findActiveUser(userId: string): Promise<User> {
+    const user = await this.userRepository.findActiveById(userId);
 
     if (!user) {
       throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
@@ -366,7 +351,7 @@ export class AuthService {
    * // Returns: { id, email, username, displayName, bio, avatarUrl, createdAt, lastSeen, roles }
    * ```
    */
-  private static formatUserProfile(user: User): UserProfile {
+  private formatUserProfile(user: User): UserProfile {
     return {
       id: user.id,
       email: user.email,
