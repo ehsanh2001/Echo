@@ -4,6 +4,8 @@ import { IUserRepository } from "./interfaces/repositories/IUserRepository";
 import { UserRepository } from "./repositories/UserRepository";
 import { IUserService } from "./interfaces/services/IUserService";
 import { UserService } from "./services/userService";
+import { IAuthService } from "./interfaces/services/IAuthService";
+import { AuthService } from "./services/authService";
 
 /**
  * Dependency Injection Container Configuration
@@ -17,5 +19,6 @@ container.registerSingleton<IUserRepository>("IUserRepository", UserRepository);
 
 // Register services
 container.registerSingleton<IUserService>("IUserService", UserService);
+container.registerSingleton<IAuthService>("IAuthService", AuthService);
 
 export { container };
