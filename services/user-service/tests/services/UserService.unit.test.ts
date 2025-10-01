@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { UserService } from "../../src/services/userService";
 import { IUserRepository } from "../../src/interfaces/repositories/IUserRepository";
 import { User } from "../../src/types/user.types";
-import { RegisterRequest } from "../../src/types/auth.types";
+import { RegisterRequest } from "../../src/types/user.types";
 import { UserServiceError } from "../../src/types/error.types";
 import bcrypt from "bcryptjs";
 

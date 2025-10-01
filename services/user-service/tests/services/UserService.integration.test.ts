@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { container } from "../../src/container";
 import { IUserService } from "../../src/interfaces/services/IUserService";
-import { RegisterRequest } from "../../src/types/auth.types";
+import { RegisterRequest } from "../../src/types/user.types";
 import { UserServiceError } from "../../src/types/error.types";
 import { prisma } from "../../src/config/prisma";
 

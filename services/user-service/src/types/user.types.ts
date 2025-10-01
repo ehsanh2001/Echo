@@ -71,3 +71,16 @@ export type UpdateUserData = Partial<Omit<User, "id" | "createdAt">>;
 export type UserSearchCriteria = Partial<
   Pick<User, "email" | "username" | "id">
 >;
+
+/**
+ * User registration request payload
+ *
+ * Contains all required and optional fields for creating a new user account.
+ */
+export type RegisterRequest = {
+  email: string;
+  password: string;
+  username: string;
+  displayName?: string;
+  bio?: string;
+};

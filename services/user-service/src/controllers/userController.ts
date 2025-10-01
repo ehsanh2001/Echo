@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { container } from "../container";
 import { IUserService } from "../interfaces/services/IUserService";
 import { IAuthService } from "../interfaces/services/IAuthService";
-import { RegisterRequest, LoginRequest } from "../types/auth.types";
+import { LoginRequest } from "../types/auth.types";
+import { RegisterRequest } from "../types/user.types";
 import { UserServiceError } from "../types/error.types";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
 

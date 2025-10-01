@@ -15,27 +15,25 @@ export type TokenType = "access" | "refresh";
  *
  * Contains user information embedded in JWT tokens for authentication
  * and authorization purposes.
- *
  */
-export interface TokenPayload {
+export type TokenPayload = {
   userId: string;
   email: string;
   roles: string[];
   type: TokenType;
-}
+};
 
 /**
  * Complete JWT payload including standard JWT fields
  *
  * Extends TokenPayload with standard JWT claims like issued at (iat)
  * and expiration time (exp) for token validation.
- *
  */
-export interface JwtPayload {
+export type JwtPayload = {
   userId: string;
   email: string;
   roles: string[];
   type: TokenType;
   iat: number;
   exp: number;
-}
+};

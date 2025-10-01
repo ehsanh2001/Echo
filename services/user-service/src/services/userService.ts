@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { IUserService } from "../interfaces/services/IUserService";
 import { IUserRepository } from "../interfaces/repositories/IUserRepository";
 import { User, UserProfile, CreateUserData } from "../types/user.types";
-import { RegisterRequest } from "../types/auth.types";
+import { RegisterRequest } from "../types/user.types";
 import { UserServiceError } from "../types/error.types";
 
 /**

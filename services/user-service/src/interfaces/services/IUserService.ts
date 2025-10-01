@@ -1,5 +1,5 @@
 import { UserProfile } from "../../types/user.types";
-import { RegisterRequest } from "../../types/auth.types";
+import { RegisterRequest } from "../../types/user.types";
 
 /**
  * User service interface for business logic operations
