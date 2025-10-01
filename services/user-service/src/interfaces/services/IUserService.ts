@@ -22,4 +22,17 @@ export interface IUserService {
    * @throws {UserServiceError} When database operation fails (REGISTRATION_FAILED)
    */
   registerUser(data: RegisterRequest): Promise<UserProfile>;
+
+  /**
+   * Retrieves a user's public profile
+   *
+   * Returns safe, public information about a user including roles.
+   * Excludes sensitive fields like password hash and internal status fields.
+   *
+   * @param userId - Unique user identifier
+   * @returns Promise resolving to user profile
+   * @throws {UserServiceError} When user not found (USER_NOT_FOUND)
+   * @throws {UserServiceError} When database operation fails (PROFILE_RETRIEVAL_FAILED)
+   */
+  getPublicProfile(userId: string): Promise<UserProfile>;
 }

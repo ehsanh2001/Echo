@@ -11,4 +11,7 @@ router.post("/auth/refresh", jwtRefreshAuth, UserController.refresh);
 // Type flow: Request → [jwtAuth] → AuthenticatedRequest → [UserController.logout]
 router.post("/auth/logout", jwtAuth, UserController.logout); // Protected with JWT auth
 
+// Public routes
+router.get("/:id", UserController.getPublicProfile); // Public profile lookup
+
 export default router;

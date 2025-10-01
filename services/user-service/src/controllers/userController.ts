@@ -116,6 +116,34 @@ export class UserController {
   }
 
   /**
+   * GET /users/:id
+   * Public profile lookup - no authentication required
+   */
+  static async getPublicProfile(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          message: "User ID is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const profile = await this.userService.getPublicProfile(id);
+
+      res.status(200).json({
+        success: true,
+        data: profile,
+      });
+    } catch (error) {
+      this.handleError(error, res, "Get public profile");
+    }
+  }
+
+  /**
    * Handles errors consistently across all endpoints
    *
    * @param error - The error that occurred

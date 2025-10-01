@@ -71,6 +71,38 @@ export class UserService implements IUserService {
     }
   }
 
+  /**
+   * Retrieves a user's public profile
+   *
+   * Returns safe, public information about a user including roles.
+   * Excludes sensitive fields like password hash and internal status fields.
+   *
+   * @param userId - Unique user identifier
+   * @returns Promise resolving to user profile
+   * @throws UserServiceError if user not found
+   */
+  async getPublicProfile(userId: string): Promise<UserProfile> {
+    try {
+      const user = await this.userRepository.findById(userId);
+
+      if (!user) {
+        throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
+      }
+
+      return this.formatUserProfile(user);
+    } catch (error) {
+      if (error instanceof UserServiceError) {
+        throw error;
+      }
+      console.error("Error getting public profile:", error);
+      throw new UserServiceError(
+        "Failed to retrieve user profile",
+        "PROFILE_RETRIEVAL_FAILED",
+        500
+      );
+    }
+  }
+
   // =============================================================================
   // Private Helper Methods
   // =============================================================================
