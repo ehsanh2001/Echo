@@ -330,4 +330,92 @@ describe("UserService (Unit Tests with Mocks)", () => {
       }
     });
   });
+
+  describe("getPublicProfile", () => {
+    const mockUser: User = {
+      id: "user-123",
+      email: "john@example.com",
+      passwordHash: "$2b$10$secrethash",
+      username: "johndoe",
+      displayName: "John Doe",
+      bio: "Software developer",
+      avatarUrl: "https://example.com/avatar.jpg",
+      lastSeen: new Date("2024-01-15T10:30:00.000Z"),
+      deletedAt: null,
+      roles: ["user", "developer"],
+      isActive: true,
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+    };
+
+    it("should return public profile for existing user", async () => {
+      mockUserRepository.findById.mockResolvedValue(mockUser as never);
+
+      const result = await userService.getPublicProfile("user-123");
+
+      expect(result).toEqual({
+        id: "user-123",
+        email: "john@example.com",
+        username: "johndoe",
+        displayName: "John Doe",
+        bio: "Software developer",
+        avatarUrl: "https://example.com/avatar.jpg",
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        lastSeen: new Date("2024-01-15T10:30:00.000Z"),
+        roles: ["user", "developer"],
+        // Note: passwordHash, isActive, deletedAt, updatedAt should NOT be present
+      });
+
+      expect(mockUserRepository.findById).toHaveBeenCalledWith("user-123");
+    });
+
+    it("should throw UserServiceError when user not found", async () => {
+      mockUserRepository.findById.mockResolvedValue(null as never);
+
+      try {
+        await userService.getPublicProfile("nonexistent");
+        fail("Should have thrown an error");
+      } catch (error) {
+        expect(error).toBeInstanceOf(UserServiceError);
+        expect((error as UserServiceError).message).toBe("User not found");
+        expect((error as UserServiceError).code).toBe("USER_NOT_FOUND");
+        expect((error as UserServiceError).statusCode).toBe(404);
+      }
+
+      expect(mockUserRepository.findById).toHaveBeenCalledWith("nonexistent");
+    });
+
+    it("should throw UserServiceError when repository throws error", async () => {
+      const dbError = new Error("Database connection failed");
+      mockUserRepository.findById.mockRejectedValue(dbError as never);
+
+      try {
+        await userService.getPublicProfile("user-123");
+        fail("Should have thrown an error");
+      } catch (error) {
+        expect(error).toBeInstanceOf(UserServiceError);
+        expect((error as UserServiceError).message).toBe(
+          "Failed to retrieve user profile"
+        );
+        expect((error as UserServiceError).code).toBe(
+          "PROFILE_RETRIEVAL_FAILED"
+        );
+        expect((error as UserServiceError).statusCode).toBe(500);
+      }
+
+      expect(mockUserRepository.findById).toHaveBeenCalledWith("user-123");
+    });
+
+    it("should exclude sensitive fields from response", async () => {
+      mockUserRepository.findById.mockResolvedValue(mockUser as never);
+
+      const result = await userService.getPublicProfile("user-123");
+
+      // Ensure sensitive fields are not included
+      expect(result).not.toHaveProperty("passwordHash");
+      expect(result).not.toHaveProperty("isActive");
+      expect(result).not.toHaveProperty("deletedAt");
+      expect(result).not.toHaveProperty("updatedAt");
+    });
+  });
 });

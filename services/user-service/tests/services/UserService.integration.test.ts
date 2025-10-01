@@ -211,6 +211,95 @@ describe("UserService (Integration Tests)", () => {
     });
   });
 
+  describe("getPublicProfile - Integration", () => {
+    let testUserId: string;
+
+    beforeEach(async () => {
+      // Create a test user for profile lookup
+      const registerData: RegisterRequest = {
+        email: "int_profile_test@example.com",
+        password: "password123",
+        username: "int_profile_user",
+        displayName: "Profile Test User",
+        bio: "Bio for profile testing",
+      };
+
+      const createdUser = await userService.registerUser(registerData);
+      testUserId = createdUser.id;
+    });
+
+    afterEach(async () => {
+      // Clean up test user
+      await prisma.user.deleteMany({
+        where: { email: "int_profile_test@example.com" },
+      });
+    });
+
+    it("should retrieve existing user profile from database", async () => {
+      // Act
+      const result = await userService.getPublicProfile(testUserId);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.id).toBe(testUserId);
+      expect(result.email).toBe("int_profile_test@example.com");
+      expect(result.username).toBe("int_profile_user");
+      expect(result.displayName).toBe("Profile Test User");
+      expect(result.bio).toBe("Bio for profile testing");
+      expect(result.roles).toEqual(["user"]);
+      expect(result.createdAt).toBeDefined();
+      expect(result.lastSeen).toBeNull(); // Initially null
+
+      // Ensure sensitive fields are excluded
+      expect(result).not.toHaveProperty("passwordHash");
+      expect(result).not.toHaveProperty("isActive");
+      expect(result).not.toHaveProperty("deletedAt");
+      expect(result).not.toHaveProperty("updatedAt");
+    });
+
+    it("should throw UserServiceError for non-existent user", async () => {
+      // Arrange
+      const nonExistentId = "00000000-0000-0000-0000-000000000000";
+
+      // Act & Assert
+      await expect(userService.getPublicProfile(nonExistentId)).rejects.toThrow(
+        UserServiceError
+      );
+      await expect(userService.getPublicProfile(nonExistentId)).rejects.toThrow(
+        "User not found"
+      );
+    });
+
+    it("should retrieve profile for user with updated lastSeen", async () => {
+      // Arrange - Update lastSeen directly in database
+      const lastSeenTime = new Date("2024-01-15T10:30:00.000Z");
+      await prisma.user.update({
+        where: { id: testUserId },
+        data: { lastSeen: lastSeenTime },
+      });
+
+      // Act
+      const result = await userService.getPublicProfile(testUserId);
+
+      // Assert
+      expect(result.lastSeen).toEqual(lastSeenTime);
+    });
+
+    it("should handle user with multiple roles", async () => {
+      // Arrange - Update user roles directly in database
+      await prisma.user.update({
+        where: { id: testUserId },
+        data: { roles: ["user", "moderator", "admin"] },
+      });
+
+      // Act
+      const result = await userService.getPublicProfile(testUserId);
+
+      // Assert
+      expect(result.roles).toEqual(["user", "moderator", "admin"]);
+    });
+  });
+
   describe("dependency injection integration", () => {
     it("should properly inject repository through container", async () => {
       // This test verifies the dependency injection is working correctly
