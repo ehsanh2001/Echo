@@ -30,6 +30,7 @@ describe("AuthService (Unit Tests with Mocks)", () => {
       findActiveById: jest.fn(),
       findById: jest.fn(),
       updateLastSeen: jest.fn(),
+      findByEmail: jest.fn(),
     };
 
     // Create service with mocked repository
