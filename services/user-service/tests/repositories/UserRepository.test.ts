@@ -411,4 +411,180 @@ describe("UserRepository", () => {
       expect(user2.email).toBe(userData2.email);
     });
   });
+
+  describe("findByEmail", () => {
+    let testUser: User;
+
+    beforeEach(async () => {
+      // Create a test user for findByEmail tests
+      const userData: CreateUserData = {
+        email: "repo_test_findemail@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_findemail_user",
+        displayName: "Test FindEmail User",
+        bio: "Test user for findByEmail operation",
+        avatarUrl: "https://example.com/avatar.jpg",
+        lastSeen: new Date("2024-01-10T10:00:00.000Z"),
+        deletedAt: null,
+        roles: ["user", "tester"],
+        isActive: true,
+      };
+
+      testUser = await userRepository.create(userData);
+    });
+
+    it("should find user by exact email match", async () => {
+      // Act
+      const foundUser = await userRepository.findByEmail(
+        "repo_test_findemail@example.com"
+      );
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(testUser.id);
+      expect(foundUser!.email).toBe("repo_test_findemail@example.com");
+      expect(foundUser!.username).toBe("repo_test_findemail_user");
+      expect(foundUser!.displayName).toBe("Test FindEmail User");
+      expect(foundUser!.bio).toBe("Test user for findByEmail operation");
+      expect(foundUser!.avatarUrl).toBe("https://example.com/avatar.jpg");
+      expect(foundUser!.roles).toEqual(["user", "tester"]);
+      expect(foundUser!.isActive).toBe(true);
+      expect(foundUser!.deletedAt).toBeNull();
+    });
+
+    it("should handle case-insensitive email search", async () => {
+      // Act - search with different case variations
+      const foundUser1 = await userRepository.findByEmail(
+        "REPO_TEST_FINDEMAIL@EXAMPLE.COM"
+      );
+      const foundUser2 = await userRepository.findByEmail(
+        "Repo_Test_FindEmail@Example.Com"
+      );
+      const foundUser3 = await userRepository.findByEmail(
+        "repo_test_findemail@EXAMPLE.com"
+      );
+
+      // Assert - all should find the same user
+      expect(foundUser1).toBeDefined();
+      expect(foundUser2).toBeDefined();
+      expect(foundUser3).toBeDefined();
+      expect(foundUser1!.id).toBe(testUser.id);
+      expect(foundUser2!.id).toBe(testUser.id);
+      expect(foundUser3!.id).toBe(testUser.id);
+    });
+
+    it("should return null for non-existent email", async () => {
+      // Act
+      const foundUser = await userRepository.findByEmail(
+        "nonexistent@example.com"
+      );
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should return null for invalid email format", async () => {
+      // Act
+      const foundUser1 = await userRepository.findByEmail("invalid-email");
+      const foundUser2 = await userRepository.findByEmail("@example.com");
+      const foundUser3 = await userRepository.findByEmail("test@");
+
+      // Assert
+      expect(foundUser1).toBeNull();
+      expect(foundUser2).toBeNull();
+      expect(foundUser3).toBeNull();
+    });
+
+    it("should return null for inactive users", async () => {
+      // Arrange - create inactive user
+      const inactiveUserData: CreateUserData = {
+        email: "repo_test_inactive@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_inactive_user",
+        displayName: "Inactive User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: false, // Inactive user
+      };
+
+      await userRepository.create(inactiveUserData);
+
+      // Act
+      const foundUser = await userRepository.findByEmail(
+        "repo_test_inactive@example.com"
+      );
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should return null for deleted users", async () => {
+      // Arrange - create deleted user
+      const deletedUserData: CreateUserData = {
+        email: "repo_test_deleted@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_deleted_user",
+        displayName: "Deleted User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: new Date(), // Deleted user
+        roles: ["user"],
+        isActive: true,
+      };
+
+      await userRepository.create(deletedUserData);
+
+      // Act
+      const foundUser = await userRepository.findByEmail(
+        "repo_test_deleted@example.com"
+      );
+
+      // Assert
+      expect(foundUser).toBeNull();
+    });
+
+    it("should handle empty email gracefully", async () => {
+      // Act
+      const foundUser1 = await userRepository.findByEmail("");
+      const foundUser2 = await userRepository.findByEmail(" ");
+
+      // Assert
+      expect(foundUser1).toBeNull();
+      expect(foundUser2).toBeNull();
+    });
+
+    it("should handle special characters in email", async () => {
+      // Arrange - create user with special characters in email
+      const specialEmailData: CreateUserData = {
+        email: "repo_test+special.email-123@example.co.uk",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_special_user",
+        displayName: "Special Email User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const specialUser = await userRepository.create(specialEmailData);
+
+      // Act
+      const foundUser = await userRepository.findByEmail(
+        "repo_test+special.email-123@example.co.uk"
+      );
+
+      // Assert
+      expect(foundUser).toBeDefined();
+      expect(foundUser!.id).toBe(specialUser.id);
+      expect(foundUser!.email).toBe(
+        "repo_test+special.email-123@example.co.uk"
+      );
+    });
+  });
 });

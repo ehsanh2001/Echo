@@ -24,6 +24,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
       findActiveById: jest.fn(),
       findById: jest.fn(),
       updateLastSeen: jest.fn(),
+      findByEmail: jest.fn(),
     };
 
     // Create service with mocked repository
@@ -416,6 +417,109 @@ describe("UserService (Unit Tests with Mocks)", () => {
       expect(result).not.toHaveProperty("isActive");
       expect(result).not.toHaveProperty("deletedAt");
       expect(result).not.toHaveProperty("updatedAt");
+    });
+  });
+
+  describe("getPublicProfileByEmail - Service Layer Tests", () => {
+    const mockUser: User = {
+      id: "user-456",
+      email: "jane@example.com",
+      passwordHash: "$2b$10$secrethash",
+      username: "janedoe",
+      displayName: "Jane Doe",
+      bio: "Product Manager",
+      avatarUrl: "https://example.com/jane-avatar.jpg",
+      lastSeen: new Date("2024-01-20T14:30:00.000Z"),
+      deletedAt: null,
+      roles: ["user", "admin"],
+      isActive: true,
+      createdAt: new Date("2024-01-05T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-05T00:00:00.000Z"),
+    };
+
+    it("should validate email format and call repository with lowercase email", async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(mockUser as never);
+
+      const result = await userService.getPublicProfileByEmail(
+        "JANE@EXAMPLE.COM"
+      );
+
+      // Should normalize email to lowercase before calling repository
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(
+        "jane@example.com"
+      );
+      expect(result).toBeDefined();
+    });
+
+    it("should throw UserServiceError for invalid email format", async () => {
+      await expect(
+        userService.getPublicProfileByEmail("invalid-email")
+      ).rejects.toThrow(
+        expect.objectContaining({
+          message: "Invalid email format",
+          code: "INVALID_EMAIL",
+          statusCode: 400,
+        })
+      );
+
+      // Should not call repository for invalid email
+      expect(mockUserRepository.findByEmail).not.toHaveBeenCalled();
+    });
+
+    it("should throw UserServiceError when repository returns null", async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null as never);
+
+      await expect(
+        userService.getPublicProfileByEmail("notfound@example.com")
+      ).rejects.toThrow(
+        expect.objectContaining({
+          message: "User not found",
+          code: "USER_NOT_FOUND",
+          statusCode: 404,
+        })
+      );
+    });
+
+    it("should properly format user profile response", async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(mockUser as never);
+
+      const result = await userService.getPublicProfileByEmail(
+        "jane@example.com"
+      );
+
+      // Verify proper formatting (excludes sensitive fields)
+      expect(result).toEqual({
+        id: "user-456",
+        email: "jane@example.com",
+        username: "janedoe",
+        displayName: "Jane Doe",
+        bio: "Product Manager",
+        avatarUrl: "https://example.com/jane-avatar.jpg",
+        createdAt: new Date("2024-01-05T00:00:00.000Z"),
+        lastSeen: new Date("2024-01-20T14:30:00.000Z"),
+        roles: ["user", "admin"],
+      });
+
+      // Ensure sensitive fields are not included
+      expect(result).not.toHaveProperty("passwordHash");
+      expect(result).not.toHaveProperty("isActive");
+      expect(result).not.toHaveProperty("deletedAt");
+      expect(result).not.toHaveProperty("updatedAt");
+    });
+
+    it("should handle repository errors with proper error transformation", async () => {
+      const dbError = new Error("Database connection failed");
+      mockUserRepository.findByEmail.mockRejectedValue(dbError as never);
+
+      await expect(
+        userService.getPublicProfileByEmail("jane@example.com")
+      ).rejects.toThrow(
+        expect.objectContaining({
+          message: "Failed to retrieve user profile",
+          code: "PROFILE_RETRIEVAL_FAILED",
+          statusCode: 500,
+        })
+      );
     });
   });
 });
