@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  member
+  guest
+}
+
+enum ChannelRole { 
+  owner
+  admin
+  member
+  viewer
+}
+
+enum ChannelType {
+  public
+  private
+  direct
+  group_dm
+}
+
+enum InviteType {
+  workspace
+  channel
+}
+
+enum OutboxStatus {
+  pending
+  published
+  failed
+}
+
+model Workspace {
+  id        String    @id @default(uuid())  @db.Uuid
+  name      String
+  displayName String?   @unique @map("display_name")
+  description String?
+  ownerId   String    @db.Uuid @map("owner_id")
+  isArchived Boolean  @default(false) @map("is_archived")
+  maxMembers    Int?      @map("max_members")        // Workspace size limits
+  isPublic      Boolean   @default(false) @map("is_public") // Public workspace discovery
+  vanityUrl     String?   @unique @map("vanity_url") // Custom workspace URLs
+  settings  Json      @default("{}") 
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  members   WorkspaceMember[]
+  channels  Channel[]
+  invites   Invite[]
+  auditLogs AuditLog[]
+  outbox    OutboxEvent[]
+
+  @@map("workspaces")
+  @@index([isPublic, isArchived]) // For public workspace discovery
+}
+
+model WorkspaceMember {
+  id           String   @id @default(uuid()) @db.Uuid
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId  String    @db.Uuid @map("workspace_id")
+  userId       String    @db.Uuid @map("user_id")
+  role         WorkspaceRole @default(member)
+  invitedBy     String?   @db.Uuid @map("invited_by") // Who invited this user
+  joinedAt     DateTime  @default(now()) @map("joined_at")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  leftAt        DateTime? @map("left_at")    // Track when user left
+  isActive     Boolean   @default(true) @map("is_active")
+  preferences  Json      @default("{}") 
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+
+  @@map("workspace_members")
+}
+
+model Channel {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId String    @db.Uuid @map("workspace_id")
+  name        String
+  displayName String?  @map("display_name")
+  description String?
+  type        ChannelType @default(public)
+  createdBy   String?     @db.Uuid @map("created_by") //User who created the channel
+  memberCount   Int       @default(0) @map("member_count") // Denormalized for performance
+  lastActivity  DateTime? @map("last_activity")
+  isArchived  Boolean     @default(false) @map("is_archived")
+  isReadOnly  Boolean     @default(false) @map("is_read_only")
+  settings    Json        @default("{}")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  members      ChannelMember[]
+  invites      Invite[]
+  auditLogs    AuditLog[]
+  outbox       OutboxEvent[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([workspaceId, type])
+
+  @@map("channels")
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  channelId String    @db.Uuid @map("channel_id")
+  userId    String    @db.Uuid @map("user_id")
+  joinedBy  String?   @db.Uuid @map("joined_by")
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  role      ChannelRole @default(member)
+  isMuted   Boolean   @default(false) @map("is_muted")
+  isActive  Boolean   @default(true) @map("is_active")
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+  @@index([userId])
+
+  @@map("channel_members")
+}
+
+model Invite {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId String?   @db.Uuid @map("workspace_id")
+  channel     Channel?   @relation(fields: [channelId], references: [id])
+  channelId   String?   @db.Uuid @map("channel_id")
+  inviterId   String?   @db.Uuid @map("inviter_id")
+  email       String?   
+  inviteToken String    @unique @map("invite_token")
+  type        InviteType @default(workspace)
+  expiresAt   DateTime? @map("expires_at")
+  acceptedBy  String?   @db.Uuid @map("accepted_by")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  metadata    Json      @default("{}")
+
+  @@index([workspaceId])
+  @@index([email])
+
+  @@map("invites")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId String?   @db.Uuid @map("workspace_id")
+  channel     Channel?   @relation(fields: [channelId], references: [id])
+  channelId   String?   @db.Uuid @map("channel_id")
+  actorUserId String?   @db.Uuid @map("actor_user_id")
+  action      String
+  target      Json?
+  metadata    Json      @default("{}")
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([channelId, createdAt])
+
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId  String?   @db.Uuid @map("workspace_id")
+  channel      Channel?   @relation(fields: [channelId], references: [id])
+  channelId    String?   @db.Uuid @map("channel_id")
+  aggregateType String @map("aggregate_type")
+  aggregateId   String?   @db.Uuid @map("aggregate_id")
+  eventType     String @map("event_type")
+  payload       Json
+  producedAt    DateTime @default(now()) @map("produced_at")
+  publishedAt   DateTime? @map("published_at")
+  publishAttempts Int     @default(0) @map("publish_attempts")
+  status        OutboxStatus @default(pending)
+
+  @@index([status, producedAt])
+  @@index([aggregateType, aggregateId])
+  @@index([workspaceId])
+  @@index([channelId])
+
+  @@map("outbox_events")
+}
