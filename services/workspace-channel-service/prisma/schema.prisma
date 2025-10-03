@@ -41,7 +41,7 @@ enum OutboxStatus {
 
 model Workspace {
   id        String    @id @default(uuid())  @db.Uuid
-  name      String
+  name      String    @unique
   displayName String?   @unique @map("display_name")
   description String?
   ownerId   String    @db.Uuid @map("owner_id")
@@ -194,3 +194,4 @@ model OutboxEvent {
 
   @@map("outbox_events")
 }
+
