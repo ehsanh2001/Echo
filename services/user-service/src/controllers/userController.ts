@@ -144,6 +144,38 @@ export class UserController {
   }
 
   /**
+   * GET /users/searchbyemail/:email
+   * Public profile lookup by email - no authentication required
+   * Used for user discovery and invitation flows
+   */
+  static async getPublicProfileByEmail(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { email } = req.params;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: "Email is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const profile = await this.userService.getPublicProfileByEmail(email);
+
+      res.status(200).json({
+        success: true,
+        data: profile,
+      });
+    } catch (error) {
+      this.handleError(error, res, "Get public profile by email");
+    }
+  }
+
+  /**
    * Handles errors consistently across all endpoints
    *
    * @param error - The error that occurred

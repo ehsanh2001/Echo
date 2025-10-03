@@ -60,4 +60,15 @@ export interface IUserRepository {
    * @returns Promise that resolves when update is complete
    */
   updateLastSeen(userId: string): Promise<void>;
+
+  /**
+   * Finds a user by email address
+   *
+   * Searches for active, non-deleted users by email address.
+   * Used for user discovery and invitation flows.
+   *
+   * @param email - User's email address
+   * @returns Promise resolving to user if found, null otherwise
+   */
+  findByEmail(email: string): Promise<User | null>;
 }

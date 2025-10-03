@@ -35,4 +35,18 @@ export interface IUserService {
    * @throws {UserServiceError} When database operation fails (PROFILE_RETRIEVAL_FAILED)
    */
   getPublicProfile(userId: string): Promise<UserProfile>;
+
+  /**
+   * Retrieves a user's public profile by email address
+   *
+   * Used for user discovery and invitation flows in other microservices.
+   * Returns safe, public information about an active user including roles.
+   *
+   * @param email - User's email address
+   * @returns Promise resolving to user profile
+   * @throws {UserServiceError} When email format is invalid (INVALID_EMAIL)
+   * @throws {UserServiceError} When user not found (USER_NOT_FOUND)
+   * @throws {UserServiceError} When database operation fails (PROFILE_RETRIEVAL_FAILED)
+   */
+  getPublicProfileByEmail(email: string): Promise<UserProfile>;
 }

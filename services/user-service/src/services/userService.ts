@@ -103,6 +103,47 @@ export class UserService implements IUserService {
     }
   }
 
+  /**
+   * Retrieves a user's public profile by email address
+   *
+   * Used for user discovery and invitation flows in other microservices.
+   * Returns safe, public information about an active user including roles.
+   *
+   * @param email - User's email address
+   * @returns Promise resolving to user profile
+   * @throws UserServiceError if email format is invalid or user not found
+   */
+  async getPublicProfileByEmail(email: string): Promise<UserProfile> {
+    try {
+      // Basic email validation
+      if (!email || !this.isValidEmail(email)) {
+        throw new UserServiceError(
+          "Invalid email format",
+          "INVALID_EMAIL",
+          400
+        );
+      }
+
+      const user = await this.userRepository.findByEmail(email.toLowerCase());
+
+      if (!user) {
+        throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
+      }
+
+      return this.formatUserProfile(user);
+    } catch (error) {
+      if (error instanceof UserServiceError) {
+        throw error;
+      }
+      console.error("Error getting public profile by email:", error);
+      throw new UserServiceError(
+        "Failed to retrieve user profile",
+        "PROFILE_RETRIEVAL_FAILED",
+        500
+      );
+    }
+  }
+
   // =============================================================================
   // Private Helper Methods
   // =============================================================================
@@ -189,5 +230,16 @@ export class UserService implements IUserService {
         500
       );
     }
+  }
+
+  /**
+   * Validates email format using regex
+   *
+   * @param email - Email address to validate
+   * @returns True if email format is valid
+   */
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   }
 }

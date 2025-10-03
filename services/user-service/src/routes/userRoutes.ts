@@ -13,5 +13,6 @@ router.post("/auth/logout", jwtAuth, UserController.logout); // Protected with J
 
 // Public routes
 router.get("/:id", UserController.getPublicProfile); // Public profile lookup
+router.get("/searchbyemail/:email", UserController.getPublicProfileByEmail); // Search by email for invitations
 
 export default router;

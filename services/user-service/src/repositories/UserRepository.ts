@@ -151,4 +151,35 @@ export class UserRepository implements IUserRepository {
       );
     }
   }
+
+  /**
+   * Finds a user by email address
+   *
+   * Searches for active, non-deleted users by email address.
+   * Used for user discovery and invitation flows.
+   *
+   * @param email - User's email address
+   * @returns Promise resolving to user if found, null otherwise
+   */
+  async findByEmail(email: string): Promise<User | null> {
+    try {
+      return await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: email,
+            mode: "insensitive",
+          },
+          deletedAt: null, // Only non-deleted users
+          isActive: true, // Only active users for public search
+        },
+      });
+    } catch (error) {
+      console.error("Error finding user by email:", error);
+      throw new Error(
+        `Failed to find user by email: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
 }
