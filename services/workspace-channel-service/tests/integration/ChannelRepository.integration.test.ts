@@ -1,0 +1,391 @@
+import "reflect-metadata";
+import { PrismaClient } from "@prisma/client";
+import { IChannelRepository } from "../../src/interfaces/repositories/IChannelRepository";
+import {
+  CreateChannelData,
+  CreateChannelMemberData,
+  CreateWorkspaceData,
+} from "../../src/types";
+import { WorkspaceChannelServiceError } from "../../src/utils/errors";
+import { container } from "../../src/container"; // Auto-configured container
+import { randomUUID } from "crypto";
+import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
+
+// Type assertion to avoid Prisma client typing issues during development
+const prismaClientWithModels = (client: PrismaClient) => client as any;
+
+// Test-specific prefix to avoid interference with other concurrent tests
+const TEST_PREFIX = "channel-repo-test-";
+
+// Helper function to create a test workspace with prefixed name
+const createTestWorkspace = async (
+  db: any,
+  label: string,
+  overrides: Partial<CreateWorkspaceData> = {}
+) => {
+  const testId = randomUUID();
+  const workspaceData: CreateWorkspaceData = {
+    name: overrides.name ?? `${TEST_PREFIX}${label}-${testId}`,
+    displayName: overrides.displayName ?? `${label} ${testId}`,
+    ownerId: overrides.ownerId ?? randomUUID(),
+    settings: overrides.settings ?? {},
+  };
+
+  if (overrides.description !== undefined) {
+    workspaceData.description = overrides.description;
+  }
+
+  return await db.workspace.create({
+    data: workspaceData,
+  });
+};
+
+// Helper function to create a test channel with prefixed name
+const createTestChannel = async (
+  channelRepo: IChannelRepository,
+  workspaceId: string,
+  label: string,
+  overrides: Partial<CreateChannelData> = {}
+) => {
+  const testId = randomUUID();
+  const channelData: CreateChannelData = {
+    workspaceId,
+    name: overrides.name ?? `${TEST_PREFIX}${label}-${testId}`,
+    type: overrides.type ?? "public",
+    createdBy: overrides.createdBy ?? randomUUID(),
+    memberCount: overrides.memberCount ?? 0,
+    settings: overrides.settings ?? {},
+    ...(overrides.displayName !== undefined && {
+      displayName: overrides.displayName,
+    }),
+    ...(overrides.description !== undefined && {
+      description: overrides.description,
+    }),
+  };
+
+  return await channelRepo.create(channelData);
+};
+
+describe("ChannelRepository Integration Tests", () => {
+  let prisma: PrismaClient;
+  let channelRepository: IChannelRepository;
+
+  beforeAll(async () => {
+    // Use container to resolve both PrismaClient and ChannelRepository with automatic DI
+    prisma = container.resolve(PrismaClient);
+    channelRepository =
+      container.resolve<IChannelRepository>("IChannelRepository");
+  });
+
+  afterEach(async () => {
+    // Clean up test data after each test to ensure clean state for next test
+    const db = prismaClientWithModels(prisma);
+
+    await db.channelMember.deleteMany({
+      where: {
+        channel: {
+          workspace: {
+            name: {
+              startsWith: TEST_PREFIX,
+            },
+          },
+        },
+      },
+    });
+
+    await db.channel.deleteMany({
+      where: {
+        workspace: {
+          name: {
+            startsWith: TEST_PREFIX,
+          },
+        },
+      },
+    });
+
+    await db.workspaceMember.deleteMany({
+      where: {
+        workspace: {
+          name: {
+            startsWith: TEST_PREFIX,
+          },
+        },
+      },
+    });
+
+    await db.workspace.deleteMany({
+      where: {
+        name: {
+          startsWith: TEST_PREFIX,
+        },
+      },
+    });
+  });
+
+  describe("core functionality", () => {
+    it("should create a channel successfully with valid data", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "channel-test");
+
+      const result = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "general",
+        {
+          displayName: "General Channel",
+          description: "A test channel for integration testing",
+          settings: { notifications: true },
+        }
+      );
+
+      expect(result).toMatchObject({
+        displayName: "General Channel",
+        description: "A test channel for integration testing",
+        type: "public",
+        workspaceId: testWorkspace.id,
+        memberCount: 0,
+        settings: { notifications: true },
+      });
+      expect(result.id).toBeDefined();
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
+    });
+
+    it("should create channel with minimal data", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "minimal-test");
+
+      const result = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "random",
+        {
+          type: "private",
+        }
+      );
+
+      expect(result).toMatchObject({
+        displayName: null,
+        description: null,
+        type: "private",
+        workspaceId: testWorkspace.id,
+        memberCount: 0,
+        settings: {},
+      });
+      expect(result.isArchived).toBe(false);
+      expect(result.isReadOnly).toBe(false);
+    });
+
+    it("should add channel member successfully", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "member-test");
+
+      const testChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "test-channel"
+      );
+
+      const memberData: CreateChannelMemberData = {
+        channelId: testChannel.id,
+        userId: randomUUID(),
+        role: "member",
+        joinedBy: randomUUID(),
+      };
+
+      const result = await channelRepository.addMember(memberData);
+
+      expect(result).toMatchObject({
+        channelId: memberData.channelId,
+        userId: memberData.userId,
+        role: memberData.role,
+        joinedBy: memberData.joinedBy,
+      });
+      expect(result.id).toBeDefined();
+      expect(result.joinedAt).toBeDefined();
+      expect(result.isMuted).toBe(false);
+      expect(result.isActive).toBe(true);
+
+      const updatedChannel = await db.channel.findUnique({
+        where: { id: testChannel.id },
+      });
+
+      expect(updatedChannel?.memberCount).toBe(1);
+    });
+
+    it("should add channel member with minimal data", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "minimal-member");
+
+      const testChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "minimal-channel",
+        {
+          type: "private",
+        }
+      );
+
+      const minimalMemberData: CreateChannelMemberData = {
+        channelId: testChannel.id,
+        userId: randomUUID(),
+        role: "viewer",
+      };
+
+      const result = await channelRepository.addMember(minimalMemberData);
+
+      expect(result).toMatchObject({
+        channelId: minimalMemberData.channelId,
+        userId: minimalMemberData.userId,
+        role: minimalMemberData.role,
+        joinedBy: null,
+      });
+
+      const updatedChannel = await db.channel.findUnique({
+        where: { id: testChannel.id },
+      });
+
+      expect(updatedChannel?.memberCount).toBe(1);
+    });
+  });
+
+  describe("constraint validation", () => {
+    it("should throw conflict error for duplicate channel name in same workspace", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "duplicate-test");
+      const channelName = `${TEST_PREFIX}duplicate-channel`;
+
+      const firstChannelData: CreateChannelData = {
+        workspaceId: testWorkspace.id,
+        name: channelName,
+        displayName: "First Channel",
+        type: "public",
+        createdBy: randomUUID(),
+        memberCount: 0,
+        settings: {},
+      };
+
+      // Create first channel
+      const created = await channelRepository.create(firstChannelData);
+
+      // Try to create channel with same name in same workspace
+      const duplicateData: CreateChannelData = {
+        workspaceId: testWorkspace.id,
+        name: channelName, // Same name in same workspace - should cause conflict
+        displayName: "Second Channel",
+        type: "private",
+        createdBy: randomUUID(),
+        memberCount: 0,
+        settings: {},
+      };
+
+      await expect(channelRepository.create(duplicateData)).rejects.toThrow(
+        WorkspaceChannelServiceError
+      );
+
+      await expect(channelRepository.create(duplicateData)).rejects.toThrow(
+        `Channel name '${channelName}' already exists in this workspace`
+      );
+    });
+
+    it("should allow same channel name in different workspaces", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace1 = await createTestWorkspace(db, "workspace1");
+      const testWorkspace2 = await createTestWorkspace(db, "workspace2");
+      const channelName = `${TEST_PREFIX}same-name-channel`;
+
+      const channelData1: CreateChannelData = {
+        workspaceId: testWorkspace1.id,
+        name: channelName,
+        type: "public",
+        createdBy: randomUUID(),
+        memberCount: 0,
+        settings: {},
+      };
+
+      const channelData2: CreateChannelData = {
+        workspaceId: testWorkspace2.id,
+        name: channelName, // Same name but different workspace - should be allowed
+        type: "private",
+        createdBy: randomUUID(),
+        memberCount: 0,
+        settings: {},
+      };
+
+      // Should create both channels successfully
+      const result1 = await channelRepository.create(channelData1);
+      const result2 = await channelRepository.create(channelData2);
+
+      expect(result1.name).toBe(channelName);
+      expect(result2.name).toBe(channelName);
+      expect(result1.workspaceId).toBe(testWorkspace1.id);
+      expect(result2.workspaceId).toBe(testWorkspace2.id);
+      expect(result1.id).not.toBe(result2.id);
+    });
+
+    it("should throw conflict error for duplicate channel membership", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "member-duplicate");
+
+      const testChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "duplicate-member-channel"
+      );
+
+      const userId = randomUUID();
+      const memberData: CreateChannelMemberData = {
+        channelId: testChannel.id,
+        userId: userId,
+        role: "member",
+        joinedBy: randomUUID(),
+      };
+
+      // Add member first time
+      const firstMember = await channelRepository.addMember(memberData);
+
+      // Try to add same user again
+      await expect(channelRepository.addMember(memberData)).rejects.toThrow(
+        WorkspaceChannelServiceError
+      );
+
+      await expect(channelRepository.addMember(memberData)).rejects.toThrow(
+        "User is already a member of this channel"
+      );
+
+      const channelAfterAttempts = await db.channel.findUnique({
+        where: { id: testChannel.id },
+      });
+
+      expect(channelAfterAttempts?.memberCount).toBe(1);
+    });
+
+    it("should handle foreign key constraint for non-existent channel", async () => {
+      const invalidMemberData: CreateChannelMemberData = {
+        channelId: randomUUID(), // Non-existent channel ID
+        userId: randomUUID(),
+        role: "member",
+        joinedBy: randomUUID(),
+      };
+
+      await expect(
+        channelRepository.addMember(invalidMemberData)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+    });
+
+    it("should handle foreign key constraint for non-existent workspace", async () => {
+      const invalidChannelData: CreateChannelData = {
+        workspaceId: randomUUID(), // Non-existent workspace ID
+        name: `${TEST_PREFIX}invalid-workspace-channel`,
+        type: "public",
+        createdBy: randomUUID(),
+        memberCount: 0,
+        settings: {},
+      };
+
+      await expect(
+        channelRepository.create(invalidChannelData)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+    });
+  });
+});
