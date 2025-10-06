@@ -9,6 +9,7 @@ import {
 import { WorkspaceChannelServiceError } from "../../src/utils/errors";
 import { container } from "../../src/container"; // Auto-configured container
 import { randomUUID } from "crypto";
+import { it, describe, expect, beforeAll, afterEach } from "@jest/globals";
 
 // Type assertion to avoid Prisma client typing issues during development
 const prismaClientWithModels = (client: PrismaClient) => client as any;
@@ -83,7 +84,10 @@ describe("WorkspaceRepository Integration Tests", () => {
         settings: { theme: "dark", notifications: true },
       };
 
-      const result = await workspaceRepository.create(validWorkspaceData);
+      const result = await workspaceRepository.create(
+        validWorkspaceData,
+        validWorkspaceData.ownerId
+      );
 
       expect(result).toMatchObject({
         name: validWorkspaceData.name,
@@ -105,7 +109,10 @@ describe("WorkspaceRepository Integration Tests", () => {
         ownerId: randomUUID(),
       };
 
-      const result = await workspaceRepository.create(minimalData);
+      const result = await workspaceRepository.create(
+        minimalData,
+        minimalData.ownerId
+      );
 
       expect(result).toMatchObject({
         name: minimalData.name,
@@ -124,7 +131,10 @@ describe("WorkspaceRepository Integration Tests", () => {
         ownerId: randomUUID(),
       };
 
-      const createdWorkspace = await workspaceRepository.create(workspaceData);
+      const createdWorkspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
       const foundWorkspace = await workspaceRepository.findByName(
         workspaceData.name
       );
@@ -149,7 +159,10 @@ describe("WorkspaceRepository Integration Tests", () => {
         displayName: `Member Test ${testId}`,
         ownerId: randomUUID(),
       };
-      const testWorkspace = await workspaceRepository.create(workspaceData);
+      const testWorkspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
 
       const memberData: CreateWorkspaceMemberData = {
         workspaceId: testWorkspace.id,
@@ -183,7 +196,10 @@ describe("WorkspaceRepository Integration Tests", () => {
       };
 
       // Create first workspace
-      const created = await workspaceRepository.create(firstWorkspace);
+      const created = await workspaceRepository.create(
+        firstWorkspace,
+        firstWorkspace.ownerId
+      );
 
       // Try to create workspace with same name
       const duplicateData: CreateWorkspaceData = {
@@ -191,13 +207,13 @@ describe("WorkspaceRepository Integration Tests", () => {
         displayName: `Different Display Name ${testId}`,
         ownerId: randomUUID(),
       };
-      await expect(workspaceRepository.create(duplicateData)).rejects.toThrow(
-        WorkspaceChannelServiceError
-      );
+      await expect(
+        workspaceRepository.create(duplicateData, duplicateData.ownerId)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
 
-      await expect(workspaceRepository.create(duplicateData)).rejects.toThrow(
-        `Workspace name '${baseName}' is already taken`
-      );
+      await expect(
+        workspaceRepository.create(duplicateData, duplicateData.ownerId)
+      ).rejects.toThrow(`Workspace name '${baseName}' is already taken`);
     });
 
     it("should throw conflict error for duplicate display name", async () => {
@@ -211,7 +227,10 @@ describe("WorkspaceRepository Integration Tests", () => {
       };
 
       // Create first workspace
-      const created = await workspaceRepository.create(firstWorkspace);
+      const created = await workspaceRepository.create(
+        firstWorkspace,
+        firstWorkspace.ownerId
+      );
 
       // Try to create workspace with same display name
       const duplicateData: CreateWorkspaceData = {
@@ -220,11 +239,13 @@ describe("WorkspaceRepository Integration Tests", () => {
         ownerId: randomUUID(),
       };
 
-      await expect(workspaceRepository.create(duplicateData)).rejects.toThrow(
-        WorkspaceChannelServiceError
-      );
+      await expect(
+        workspaceRepository.create(duplicateData, duplicateData.ownerId)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
 
-      await expect(workspaceRepository.create(duplicateData)).rejects.toThrow(
+      await expect(
+        workspaceRepository.create(duplicateData, duplicateData.ownerId)
+      ).rejects.toThrow(
         `Workspace display name '${baseDisplayName}' is already taken`
       );
     });
@@ -237,7 +258,10 @@ describe("WorkspaceRepository Integration Tests", () => {
         displayName: `Member Duplicate Test ${testId}`,
         ownerId: randomUUID(),
       };
-      const testWorkspace = await workspaceRepository.create(workspaceData);
+      const testWorkspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
 
       const userId = randomUUID();
       const memberData: CreateWorkspaceMemberData = {

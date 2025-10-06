@@ -1,6 +1,7 @@
 import { injectable, inject } from "tsyringe";
 import { PrismaClient, Workspace, WorkspaceMember } from "@prisma/client";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
+import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { CreateWorkspaceData, CreateWorkspaceMemberData } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 
@@ -10,43 +11,121 @@ import { WorkspaceChannelServiceError } from "../utils/errors";
  */
 @injectable()
 export class WorkspaceRepository implements IWorkspaceRepository {
-  constructor(@inject(PrismaClient) private prisma: PrismaClient) {}
+  constructor(
+    @inject(PrismaClient) private prisma: PrismaClient,
+    @inject("IChannelRepository") private channelRepository: IChannelRepository
+  ) {}
 
-  async create(data: CreateWorkspaceData): Promise<Workspace> {
+  /**
+   * Handles Prisma errors and converts them to WorkspaceChannelServiceError
+   * for workspace-related operations.
+   */
+  private handleWorkspaceError(
+    error: any,
+    workspaceData?: CreateWorkspaceData
+  ): never {
+    console.error("Error in workspace operation:", error);
+
+    // Handle unique constraint violations
+    if (error.code === "P2002") {
+      const target = error.meta?.target;
+      if (target?.includes("name") && workspaceData) {
+        throw WorkspaceChannelServiceError.conflict(
+          `Workspace name '${workspaceData.name}' is already taken`,
+          { field: "name", value: workspaceData.name }
+        );
+      }
+      if (target?.includes("display_name") && workspaceData) {
+        throw WorkspaceChannelServiceError.conflict(
+          `Workspace display name '${workspaceData.displayName}' is already taken`,
+          { field: "displayName", value: workspaceData.displayName }
+        );
+      }
+    }
+
+    throw WorkspaceChannelServiceError.database(
+      `Failed workspace operation: ${error.message}`,
+      { originalError: error.code }
+    );
+  }
+
+  /**
+   * Handles Prisma errors for workspace member operations
+   */
+  private handleMemberError(
+    error: any,
+    data?: CreateWorkspaceMemberData
+  ): never {
+    console.error("Error in workspace member operation:", error);
+
+    // Handle unique constraint violations
+    if (error.code === "P2002") {
+      throw WorkspaceChannelServiceError.conflict(
+        "User is already a member of this workspace",
+        data
+          ? { workspaceId: data.workspaceId, userId: data.userId }
+          : undefined
+      );
+    }
+
+    throw WorkspaceChannelServiceError.database(
+      `Failed to add workspace member: ${error.message}`,
+      { originalError: error.code }
+    );
+  }
+
+  async create(data: CreateWorkspaceData, ownerId: string): Promise<Workspace> {
     try {
-      return await this.prisma.workspace.create({
-        data: {
-          name: data.name,
-          displayName: data.displayName,
-          description: data.description || null,
-          ownerId: data.ownerId,
-          settings: data.settings || {},
-        },
+      // Use Prisma's interactive transaction for atomic operations
+      // All operations succeed together or all are rolled back
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Create workspace
+        const workspace = await tx.workspace.create({
+          data: {
+            name: data.name,
+            displayName: data.displayName,
+            description: data.description || null,
+            ownerId: ownerId,
+            settings: data.settings || {},
+          },
+        });
+
+        // 2. Add creator as workspace owner
+        await tx.workspaceMember.create({
+          data: {
+            workspaceId: workspace.id,
+            userId: ownerId,
+            role: "owner",
+          },
+        });
+
+        // 3. Create default "general" channel with creator as owner
+        // Use createInTransaction to share the same transaction context
+        // If this fails, the entire workspace creation will be rolled back.
+        await this.channelRepository.createInTransaction(
+          tx,
+          {
+            workspaceId: workspace.id,
+            name: "general",
+            displayName: "General",
+            description: "This is the default channel for general discussions",
+            type: "public",
+            createdBy: ownerId,
+            memberCount: 0, // Will be set to 1 by ChannelRepository.create()
+            settings: {},
+          },
+          ownerId
+        );
+
+        console.log(`✅ Workspace created with defaults: ${workspace.name}`);
+        return workspace;
       });
     } catch (error: any) {
-      console.error("Error creating workspace:", error);
-
-      // Handle unique constraint violations
-      if (error.code === "P2002") {
-        const target = error.meta?.target;
-        if (target?.includes("name")) {
-          throw WorkspaceChannelServiceError.conflict(
-            `Workspace name '${data.name}' is already taken`,
-            { field: "name", value: data.name }
-          );
-        }
-        if (target?.includes("display_name")) {
-          throw WorkspaceChannelServiceError.conflict(
-            `Workspace display name '${data.displayName}' is already taken`,
-            { field: "displayName", value: data.displayName }
-          );
-        }
-      }
-
-      throw WorkspaceChannelServiceError.database(
-        `Failed to create workspace: ${error.message}`,
-        { originalError: error.code }
+      console.error(
+        "Error creating workspace (transaction rolled back):",
+        error
       );
+      this.handleWorkspaceError(error, data);
     }
   }
 
@@ -61,20 +140,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error adding workspace member:", error);
-
-      // Handle unique constraint violations
-      if (error.code === "P2002") {
-        throw WorkspaceChannelServiceError.conflict(
-          "User is already a member of this workspace",
-          { workspaceId: data.workspaceId, userId: data.userId }
-        );
-      }
-
-      throw WorkspaceChannelServiceError.database(
-        `Failed to add workspace member: ${error.message}`,
-        { originalError: error.code }
-      );
+      this.handleMemberError(error, data);
     }
   }
 
