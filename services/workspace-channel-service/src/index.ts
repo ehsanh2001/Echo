@@ -5,6 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
+import "./container"; // Auto-configure dependency injection
 
 const prisma = new PrismaClient();
 const app = express();
@@ -24,6 +25,12 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Import routes after dependencies are configured
+import workspaceRoutes from "./routes/workspaceRoutes";
+
+// API routes
+app.use("/api/workspaces", workspaceRoutes);
 
 // Health check endpoint
 app.get("/health", async (req, res) => {
