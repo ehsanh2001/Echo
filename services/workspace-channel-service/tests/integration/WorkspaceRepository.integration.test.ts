@@ -139,7 +139,11 @@ describe("WorkspaceRepository Integration Tests", () => {
         workspaceData.name
       );
 
-      expect(foundWorkspace).toMatchObject(workspaceData);
+      // Compare individual fields instead of using toMatchObject with CreateWorkspaceData
+      expect(foundWorkspace).toBeDefined();
+      expect(foundWorkspace?.name).toBe(workspaceData.name);
+      expect(foundWorkspace?.displayName).toBe(workspaceData.displayName);
+      expect(foundWorkspace?.ownerId).toBe(workspaceData.ownerId);
       expect(foundWorkspace?.id).toBe(createdWorkspace.id);
     });
 

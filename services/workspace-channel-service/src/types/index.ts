@@ -19,18 +19,18 @@ export interface CreateWorkspaceRequest {
   description?: string;
 }
 
-// Workspace response
+// Workspace response (matches Prisma Workspace model)
 export interface WorkspaceResponse {
   id: string;
   name: string;
-  displayName: string;
-  description?: string;
+  displayName: string | null; // Optional in Prisma schema
+  description: string | null; // Optional in Prisma schema
   ownerId: string;
   isArchived: boolean;
-  maxMembers?: number;
+  maxMembers: number | null; // Optional in Prisma schema
   isPublic: boolean;
-  vanityUrl?: string;
-  settings: Record<string, any>;
+  vanityUrl: string | null; // Optional in Prisma schema
+  settings: any; // Json type in Prisma (use any or JsonValue for compatibility)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,39 +63,41 @@ export interface ValidationError {
   value?: any;
 }
 
-// Create workspace data for repository
+// Create workspace data for repository (matches Prisma Workspace fields)
+// Optional fields use ? and default to null when passed to Prisma
 export interface CreateWorkspaceData {
   name: string;
-  displayName: string;
-  description?: string;
+  displayName?: string | null;
+  description?: string | null;
   ownerId: string;
-  settings?: Record<string, any>;
+  settings?: any; // Json type in Prisma, defaults to {}
 }
 
-// Create channel data for repository
+// Create channel data for repository (matches Prisma Channel fields)
+// Optional fields use ? and default to null when passed to Prisma
 export interface CreateChannelData {
   workspaceId: string;
   name: string;
-  displayName?: string;
-  description?: string;
+  displayName?: string | null;
+  description?: string | null;
   type: "public" | "private" | "direct" | "group_dm";
-  createdBy: string;
+  createdBy?: string | null;
   memberCount: number;
-  settings?: Record<string, any>;
+  settings?: any; // Json type in Prisma, defaults to {}
 }
 
-// Create workspace member data
+// Create workspace member data (matches Prisma WorkspaceMember fields)
 export interface CreateWorkspaceMemberData {
   workspaceId: string;
   userId: string;
   role: "owner" | "admin" | "member" | "guest";
-  invitedBy?: string;
+  invitedBy?: string | null;
 }
 
-// Create channel member data
+// Create channel member data (matches Prisma ChannelMember fields)
 export interface CreateChannelMemberData {
   channelId: string;
   userId: string;
   role: "owner" | "admin" | "member" | "viewer";
-  joinedBy?: string;
+  joinedBy?: string | null;
 }

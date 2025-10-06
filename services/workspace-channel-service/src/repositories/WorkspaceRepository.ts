@@ -83,10 +83,10 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         const workspace = await tx.workspace.create({
           data: {
             name: data.name,
-            displayName: data.displayName,
-            description: data.description || null,
+            displayName: data.displayName ?? null,
+            description: data.description ?? null,
             ownerId: ownerId,
-            settings: data.settings || {},
+            settings: data.settings ?? {},
           },
         });
 

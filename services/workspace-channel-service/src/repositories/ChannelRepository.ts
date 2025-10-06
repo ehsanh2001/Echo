@@ -83,13 +83,13 @@ export class ChannelRepository implements IChannelRepository {
     const channel = await tx.channel.create({
       data: {
         name: data.name,
-        displayName: data.displayName || null,
-        description: data.description || null,
+        displayName: data.displayName ?? null,
+        description: data.description ?? null,
         type: data.type,
         workspaceId: data.workspaceId,
-        createdBy: creatorId,
-        settings: data.settings || {},
-        memberCount: 1, // Start with 1 for the creator
+        createdBy: data.createdBy ?? null,
+        settings: data.settings ?? {},
+        memberCount: 1,
       },
     });
 
