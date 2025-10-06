@@ -48,11 +48,12 @@ const createTestChannel = async (
   overrides: Partial<CreateChannelData> = {}
 ) => {
   const testId = randomUUID();
+  const creatorId = overrides.createdBy ?? randomUUID();
   const channelData: CreateChannelData = {
     workspaceId,
     name: overrides.name ?? `${TEST_PREFIX}${label}-${testId}`,
     type: overrides.type ?? "public",
-    createdBy: overrides.createdBy ?? randomUUID(),
+    createdBy: creatorId,
     memberCount: overrides.memberCount ?? 0,
     settings: overrides.settings ?? {},
     ...(overrides.displayName !== undefined && {
@@ -63,7 +64,7 @@ const createTestChannel = async (
     }),
   };
 
-  return await channelRepo.create(channelData);
+  return await channelRepo.create(channelData, creatorId);
 };
 
 describe("ChannelRepository Integration Tests", () => {
@@ -143,7 +144,7 @@ describe("ChannelRepository Integration Tests", () => {
         description: "A test channel for integration testing",
         type: "public",
         workspaceId: testWorkspace.id,
-        memberCount: 0,
+        memberCount: 1,
         settings: { notifications: true },
       });
       expect(result.id).toBeDefined();
@@ -169,7 +170,7 @@ describe("ChannelRepository Integration Tests", () => {
         description: null,
         type: "private",
         workspaceId: testWorkspace.id,
-        memberCount: 0,
+        memberCount: 1,
         settings: {},
       });
       expect(result.isArchived).toBe(false);
@@ -210,7 +211,7 @@ describe("ChannelRepository Integration Tests", () => {
         where: { id: testChannel.id },
       });
 
-      expect(updatedChannel?.memberCount).toBe(1);
+      expect(updatedChannel?.memberCount).toBe(2);
     });
 
     it("should add channel member with minimal data", async () => {
@@ -245,7 +246,7 @@ describe("ChannelRepository Integration Tests", () => {
         where: { id: testChannel.id },
       });
 
-      expect(updatedChannel?.memberCount).toBe(1);
+      expect(updatedChannel?.memberCount).toBe(2);
     });
   });
 
@@ -255,35 +256,42 @@ describe("ChannelRepository Integration Tests", () => {
       const testWorkspace = await createTestWorkspace(db, "duplicate-test");
       const channelName = `${TEST_PREFIX}duplicate-channel`;
 
+      const creatorId1 = randomUUID();
       const firstChannelData: CreateChannelData = {
         workspaceId: testWorkspace.id,
         name: channelName,
         displayName: "First Channel",
         type: "public",
-        createdBy: randomUUID(),
-        memberCount: 0,
+        createdBy: creatorId1,
+        memberCount: 1,
         settings: {},
       };
 
       // Create first channel
-      const created = await channelRepository.create(firstChannelData);
+      const created = await channelRepository.create(
+        firstChannelData,
+        creatorId1
+      );
 
       // Try to create channel with same name in same workspace
+      const creatorId2 = randomUUID();
       const duplicateData: CreateChannelData = {
         workspaceId: testWorkspace.id,
         name: channelName, // Same name in same workspace - should cause conflict
         displayName: "Second Channel",
         type: "private",
-        createdBy: randomUUID(),
-        memberCount: 0,
+        createdBy: creatorId2,
+        memberCount: 1,
         settings: {},
       };
 
-      await expect(channelRepository.create(duplicateData)).rejects.toThrow(
-        WorkspaceChannelServiceError
-      );
+      await expect(
+        channelRepository.create(duplicateData, creatorId2)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
 
-      await expect(channelRepository.create(duplicateData)).rejects.toThrow(
+      await expect(
+        channelRepository.create(duplicateData, creatorId2)
+      ).rejects.toThrow(
         `Channel name '${channelName}' already exists in this workspace`
       );
     });
@@ -294,27 +302,29 @@ describe("ChannelRepository Integration Tests", () => {
       const testWorkspace2 = await createTestWorkspace(db, "workspace2");
       const channelName = `${TEST_PREFIX}same-name-channel`;
 
+      const creatorId1 = randomUUID();
       const channelData1: CreateChannelData = {
         workspaceId: testWorkspace1.id,
         name: channelName,
         type: "public",
-        createdBy: randomUUID(),
-        memberCount: 0,
+        createdBy: creatorId1,
+        memberCount: 1,
         settings: {},
       };
 
+      const creatorId2 = randomUUID();
       const channelData2: CreateChannelData = {
         workspaceId: testWorkspace2.id,
         name: channelName, // Same name but different workspace - should be allowed
         type: "private",
-        createdBy: randomUUID(),
-        memberCount: 0,
+        createdBy: creatorId2,
+        memberCount: 1,
         settings: {},
       };
 
       // Should create both channels successfully
-      const result1 = await channelRepository.create(channelData1);
-      const result2 = await channelRepository.create(channelData2);
+      const result1 = await channelRepository.create(channelData1, creatorId1);
+      const result2 = await channelRepository.create(channelData2, creatorId2);
 
       expect(result1.name).toBe(channelName);
       expect(result2.name).toBe(channelName);
@@ -357,7 +367,7 @@ describe("ChannelRepository Integration Tests", () => {
         where: { id: testChannel.id },
       });
 
-      expect(channelAfterAttempts?.memberCount).toBe(1);
+      expect(channelAfterAttempts?.memberCount).toBe(2);
     });
 
     it("should handle foreign key constraint for non-existent channel", async () => {
@@ -374,17 +384,18 @@ describe("ChannelRepository Integration Tests", () => {
     });
 
     it("should handle foreign key constraint for non-existent workspace", async () => {
+      const creatorId = randomUUID();
       const invalidChannelData: CreateChannelData = {
         workspaceId: randomUUID(), // Non-existent workspace ID
         name: `${TEST_PREFIX}invalid-workspace-channel`,
         type: "public",
-        createdBy: randomUUID(),
-        memberCount: 0,
+        createdBy: creatorId,
+        memberCount: 1,
         settings: {},
       };
 
       await expect(
-        channelRepository.create(invalidChannelData)
+        channelRepository.create(invalidChannelData, creatorId)
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
   });
