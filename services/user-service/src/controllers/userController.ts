@@ -13,10 +13,10 @@ export class UserController {
   /**
    * POST /auth/register
    */
-  static async register(req: Request, res: Response): Promise<void> {
+  static register = async (req: Request, res: Response): Promise<void> => {
     try {
       const userData: RegisterRequest = req.body;
-      const result = await this.userService.registerUser(userData);
+      const result = await UserController.userService.registerUser(userData);
 
       res.status(201).json({
         success: true,
@@ -24,17 +24,17 @@ export class UserController {
         data: result,
       });
     } catch (error) {
-      this.handleError(error, res, "Registration");
+      UserController.handleError(error, res, "Registration");
     }
-  }
+  };
 
   /**
    * POST /auth/login
    */
-  static async login(req: Request, res: Response): Promise<void> {
+  static login = async (req: Request, res: Response): Promise<void> => {
     try {
       const loginData: LoginRequest = req.body;
-      const result = await this.authService.loginUser(loginData);
+      const result = await UserController.authService.loginUser(loginData);
 
       res.json({
         success: true,
@@ -42,18 +42,18 @@ export class UserController {
         data: result,
       });
     } catch (error) {
-      this.handleError(error, res, "Login");
+      UserController.handleError(error, res, "Login");
     }
-  }
+  };
 
   /**
    * POST /auth/refresh
    * Requires jwtRefreshAuth middleware (refresh token in Authorization header)
    */
-  static async refresh(
+  static refresh = async (
     req: AuthenticatedRequest,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       if (!req.user) {
         res.status(401).json({
@@ -76,7 +76,9 @@ export class UserController {
       }
 
       const refreshToken = authHeader.substring(7); // Remove 'Bearer ' prefix
-      const result = await this.authService.refreshToken(refreshToken);
+      const result = await UserController.authService.refreshToken(
+        refreshToken
+      );
 
       res.json({
         success: true,
@@ -84,15 +86,18 @@ export class UserController {
         data: result,
       });
     } catch (error) {
-      this.handleError(error, res, "Token refresh");
+      UserController.handleError(error, res, "Token refresh");
     }
-  }
+  };
 
   /**
    * POST /auth/logout
    * Requires JWT authentication middleware
    */
-  static async logout(req: AuthenticatedRequest, res: Response): Promise<void> {
+  static logout = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       // Get userId from JWT middleware (req.user is set by jwtAuth middleware)
       if (!req.user) {
@@ -104,22 +109,25 @@ export class UserController {
         return;
       }
 
-      await this.authService.logoutUser(req.user.userId);
+      await UserController.authService.logoutUser(req.user.userId);
 
       res.json({
         success: true,
         message: "Logout successful",
       });
     } catch (error) {
-      this.handleError(error, res, "Logout");
+      UserController.handleError(error, res, "Logout");
     }
-  }
+  };
 
   /**
    * GET /users/:id
    * Public profile lookup - no authentication required
    */
-  static async getPublicProfile(req: Request, res: Response): Promise<void> {
+  static getPublicProfile = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
@@ -132,26 +140,26 @@ export class UserController {
         return;
       }
 
-      const profile = await this.userService.getPublicProfile(id);
+      const profile = await UserController.userService.getPublicProfile(id);
 
       res.status(200).json({
         success: true,
         data: profile,
       });
     } catch (error) {
-      this.handleError(error, res, "Get public profile");
+      UserController.handleError(error, res, "Get public profile");
     }
-  }
+  };
 
   /**
    * GET /users/searchbyemail/:email
    * Public profile lookup by email - no authentication required
    * Used for user discovery and invitation flows
    */
-  static async getPublicProfileByEmail(
+  static getPublicProfileByEmail = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const { email } = req.params;
 
@@ -164,16 +172,18 @@ export class UserController {
         return;
       }
 
-      const profile = await this.userService.getPublicProfileByEmail(email);
+      const profile = await UserController.userService.getPublicProfileByEmail(
+        email
+      );
 
       res.status(200).json({
         success: true,
         data: profile,
       });
     } catch (error) {
-      this.handleError(error, res, "Get public profile by email");
+      UserController.handleError(error, res, "Get public profile by email");
     }
-  }
+  };
 
   /**
    * Handles errors consistently across all endpoints
