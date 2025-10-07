@@ -140,6 +140,7 @@ model Invite {
   email       String?   
   inviteToken String    @unique @map("invite_token")
   type        InviteType @default(workspace)
+  role        WorkspaceRole @default(member)  // NEW: Intended role for invitee
   expiresAt   DateTime? @map("expires_at")
   acceptedBy  String?   @db.Uuid @map("accepted_by")
   acceptedAt  DateTime? @map("accepted_at")
@@ -148,6 +149,8 @@ model Invite {
 
   @@index([workspaceId])
   @@index([email])
+  @@index([inviteToken])
+  @@index([workspaceId, email])  // NEW: For checking duplicate invites
 
   @@map("invites")
 }
@@ -185,6 +188,7 @@ model OutboxEvent {
   producedAt    DateTime @default(now()) @map("produced_at")
   publishedAt   DateTime? @map("published_at")
   publishAttempts Int     @default(0) @map("publish_attempts")
+  failedAttempts Int     @default(0) @map("failed_attempts")  // NEW: Track failed publishing attempts
   status        OutboxStatus @default(pending)
 
   @@index([status, producedAt])
