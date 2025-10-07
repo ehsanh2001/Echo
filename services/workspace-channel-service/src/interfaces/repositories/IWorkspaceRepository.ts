@@ -39,4 +39,32 @@ export interface IWorkspaceRepository {
    * @returns {Promise<Workspace | null>} The workspace if found, null otherwise
    */
   findByName(name: string): Promise<Workspace | null>;
+
+  /**
+   * Finds a workspace by its ID.
+   *
+   * @param id - The workspace ID to search for
+   * @returns {Promise<Workspace | null>} The workspace if found, null otherwise
+   */
+  findById(id: string): Promise<Workspace | null>;
+
+  /**
+   * Gets a user's membership in a workspace.
+   *
+   * @param userId - The user ID
+   * @param workspaceId - The workspace ID
+   * @returns {Promise<WorkspaceMember | null>} The membership if found, null otherwise
+   */
+  getMembership(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceMember | null>;
+
+  /**
+   * Counts the number of active members in a workspace.
+   *
+   * @param workspaceId - The workspace ID
+   * @returns {Promise<number>} The count of active members
+   */
+  countActiveMembers(workspaceId: string): Promise<number>;
 }

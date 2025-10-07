@@ -48,6 +48,8 @@ describe("WorkspaceService (Unit Tests)", () => {
       findByName: jest.fn(),
       findById: jest.fn(),
       addMember: jest.fn(),
+      getMembership: jest.fn(),
+      countActiveMembers: jest.fn(),
     } as any;
 
     mockChannelRepository = {
@@ -640,6 +642,275 @@ describe("WorkspaceService (Unit Tests)", () => {
       await expect(
         workspaceService.createWorkspace("user-123", request)
       ).rejects.toBe(originalError); // Same error instance
+    });
+  });
+
+  describe("getWorkspaceDetails", () => {
+    const mockWorkspaceWithSettings = {
+      ...mockWorkspace,
+      settings: { theme: "dark", notifications: true },
+    };
+
+    const mockMembership = {
+      id: "membership-123",
+      workspaceId: "workspace-123",
+      userId: "user-123",
+      role: "member" as const,
+      invitedBy: "owner-user-id",
+      joinedAt: new Date("2023-01-01T00:00:00.000Z"),
+      lastSeenAt: new Date("2023-01-02T00:00:00.000Z"),
+      leftAt: null,
+      isActive: true,
+      preferences: {},
+    };
+
+    it("should return workspace details with user role and member count for active member", async () => {
+      // Arrange
+      mockWorkspaceRepository.findById.mockResolvedValue(
+        mockWorkspaceWithSettings
+      );
+      mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(5);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(mockWorkspaceRepository.findById).toHaveBeenCalledWith(
+        "workspace-123"
+      );
+      expect(mockWorkspaceRepository.getMembership).toHaveBeenCalledWith(
+        "user-123",
+        "workspace-123"
+      );
+      expect(mockWorkspaceRepository.countActiveMembers).toHaveBeenCalledWith(
+        "workspace-123"
+      );
+      expect(result).toEqual({
+        id: mockWorkspaceWithSettings.id,
+        name: mockWorkspaceWithSettings.name,
+        displayName: mockWorkspaceWithSettings.displayName,
+        description: mockWorkspaceWithSettings.description,
+        ownerId: mockWorkspaceWithSettings.ownerId,
+        isArchived: mockWorkspaceWithSettings.isArchived,
+        maxMembers: mockWorkspaceWithSettings.maxMembers,
+        isPublic: mockWorkspaceWithSettings.isPublic,
+        vanityUrl: mockWorkspaceWithSettings.vanityUrl,
+        settings: mockWorkspaceWithSettings.settings,
+        createdAt: mockWorkspaceWithSettings.createdAt,
+        updatedAt: mockWorkspaceWithSettings.updatedAt,
+        userRole: "member",
+        memberCount: 5,
+      });
+    });
+
+    it("should return workspace details for owner with correct role", async () => {
+      // Arrange
+      const ownerMembership = {
+        ...mockMembership,
+        role: "owner" as const,
+      };
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(ownerMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(10);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(result.userRole).toBe("owner");
+      expect(result.memberCount).toBe(10);
+    });
+
+    it("should throw 404 error when workspace does not exist", async () => {
+      // Arrange
+      mockWorkspaceRepository.findById.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        workspaceService.getWorkspaceDetails(
+          "user-123",
+          "nonexistent-workspace"
+        )
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.getWorkspaceDetails(
+          "user-123",
+          "nonexistent-workspace"
+        )
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: expect.stringContaining("Workspace"),
+      });
+
+      // Verify it didn't try to check membership or count members
+      expect(mockWorkspaceRepository.getMembership).not.toHaveBeenCalled();
+      expect(mockWorkspaceRepository.countActiveMembers).not.toHaveBeenCalled();
+    });
+
+    it("should throw 403 error when user is not a member of the workspace", async () => {
+      // Arrange
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(null); // Not a member
+
+      // Act & Assert
+      await expect(
+        workspaceService.getWorkspaceDetails("non-member-user", "workspace-123")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.getWorkspaceDetails("non-member-user", "workspace-123")
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        message: "You are not a member of this workspace",
+      });
+
+      // Verify it didn't try to count members
+      expect(mockWorkspaceRepository.countActiveMembers).not.toHaveBeenCalled();
+    });
+
+    it("should throw 403 error when user membership is inactive", async () => {
+      // Arrange
+      const inactiveMembership = {
+        ...mockMembership,
+        isActive: false,
+      };
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(
+        inactiveMembership
+      );
+
+      // Act & Assert
+      await expect(
+        workspaceService.getWorkspaceDetails("user-123", "workspace-123")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.getWorkspaceDetails("user-123", "workspace-123")
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        message: "Your membership in this workspace is inactive",
+      });
+
+      // Verify it didn't try to count members
+      expect(mockWorkspaceRepository.countActiveMembers).not.toHaveBeenCalled();
+    });
+
+    it("should include settings in the response", async () => {
+      // Arrange
+      const customSettings = {
+        allowGuestInvites: false,
+        messageRetentionDays: 90,
+        theme: "light",
+      };
+      const workspaceWithCustomSettings = {
+        ...mockWorkspace,
+        settings: customSettings,
+      };
+      mockWorkspaceRepository.findById.mockResolvedValue(
+        workspaceWithCustomSettings
+      );
+      mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(8);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(result.settings).toEqual(customSettings);
+    });
+
+    it("should handle workspace with zero member count (edge case)", async () => {
+      // Arrange - This shouldn't happen in reality but testing edge case
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(0);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(result.memberCount).toBe(0);
+    });
+
+    it("should handle archived workspace (still accessible to members)", async () => {
+      // Arrange
+      const archivedWorkspace = {
+        ...mockWorkspace,
+        isArchived: true,
+      };
+      mockWorkspaceRepository.findById.mockResolvedValue(archivedWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(2);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(result.isArchived).toBe(true);
+      expect(result.userRole).toBe("member");
+      expect(result.memberCount).toBe(2);
+    });
+
+    it("should call repository methods in correct order", async () => {
+      // Arrange
+      const callOrder: string[] = [];
+      mockWorkspaceRepository.findById.mockImplementation(async () => {
+        callOrder.push("findById");
+        return mockWorkspace;
+      });
+      mockWorkspaceRepository.getMembership.mockImplementation(async () => {
+        callOrder.push("getMembership");
+        return mockMembership;
+      });
+      mockWorkspaceRepository.countActiveMembers.mockImplementation(
+        async () => {
+          callOrder.push("countActiveMembers");
+          return 5;
+        }
+      );
+
+      // Act
+      await workspaceService.getWorkspaceDetails("user-123", "workspace-123");
+
+      // Assert - Verify operations happen in the correct sequence
+      expect(callOrder).toEqual([
+        "findById",
+        "getMembership",
+        "countActiveMembers",
+      ]);
+    });
+
+    it("should handle workspace with large member count", async () => {
+      // Arrange
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
+      mockWorkspaceRepository.countActiveMembers.mockResolvedValue(10000);
+
+      // Act
+      const result = await workspaceService.getWorkspaceDetails(
+        "user-123",
+        "workspace-123"
+      );
+
+      // Assert
+      expect(result.memberCount).toBe(10000);
     });
   });
 });

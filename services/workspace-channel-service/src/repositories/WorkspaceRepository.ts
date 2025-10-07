@@ -156,4 +156,63 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       );
     }
   }
+
+  /**
+   * Finds a workspace by its ID
+   */
+  async findById(id: string): Promise<Workspace | null> {
+    try {
+      return await this.prisma.workspace.findUnique({
+        where: { id },
+      });
+    } catch (error: any) {
+      console.error("Error finding workspace by ID:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find workspace: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Gets a user's membership in a workspace
+   */
+  async getMembership(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceMember | null> {
+    try {
+      return await this.prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("Error finding workspace membership:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find membership: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Counts the number of active members in a workspace
+   */
+  async countActiveMembers(workspaceId: string): Promise<number> {
+    try {
+      return await this.prisma.workspaceMember.count({
+        where: {
+          workspaceId,
+          isActive: true,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error counting workspace members:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to count members: ${error.message}`
+      );
+    }
+  }
 }

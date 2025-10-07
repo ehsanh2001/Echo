@@ -1,4 +1,8 @@
-import { CreateWorkspaceRequest, WorkspaceResponse } from "../../types";
+import {
+  CreateWorkspaceRequest,
+  WorkspaceResponse,
+  WorkspaceDetailsResponse,
+} from "../../types";
 
 /**
  * Interface for workspace service operations
@@ -22,4 +26,15 @@ export interface IWorkspaceService {
    * Check if workspace name is available
    */
   isNameAvailable(name: string): Promise<boolean>;
+
+  /**
+   * Get workspace details for a member
+   * - Validates user is an active member
+   * - Returns workspace details with user's role
+   * - Includes member count
+   */
+  getWorkspaceDetails(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceDetailsResponse>;
 }

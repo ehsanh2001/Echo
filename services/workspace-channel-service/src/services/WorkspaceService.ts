@@ -7,6 +7,7 @@ import { UserServiceClient } from "./userServiceClient";
 import {
   CreateWorkspaceRequest,
   WorkspaceResponse,
+  WorkspaceDetailsResponse,
   CreateWorkspaceData,
 } from "../types";
 import {
@@ -255,6 +256,64 @@ export class WorkspaceService implements IWorkspaceService {
       settings: workspace.settings,
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
+    };
+  }
+
+  /**
+   * Get workspace details for a member
+   *
+   * User Story: View Workspace Info (1.4)
+   * - Validates workspace exists
+   * - Validates user is an active member
+   * - Returns workspace details with user's role and member count
+   *
+   * @param userId - The ID of the user requesting workspace details
+   * @param workspaceId - The ID of the workspace to retrieve
+   * @throws {WorkspaceChannelServiceError} 404 if workspace not found, 403 if not a member or inactive
+   * @returns {Promise<WorkspaceDetailsResponse>} Workspace details with user's role and member count
+   */
+  async getWorkspaceDetails(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceDetailsResponse> {
+    // 1. Find workspace
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+
+    if (!workspace) {
+      throw WorkspaceChannelServiceError.notFound("Workspace", workspaceId);
+    }
+
+    // 2. Check user membership
+    const membership = await this.workspaceRepository.getMembership(
+      userId,
+      workspaceId
+    );
+
+    if (!membership) {
+      throw WorkspaceChannelServiceError.forbidden(
+        "You are not a member of this workspace"
+      );
+    }
+
+    // 3. Verify membership is active
+    if (!membership.isActive) {
+      throw WorkspaceChannelServiceError.forbidden(
+        "Your membership in this workspace is inactive"
+      );
+    }
+
+    // 4. Count active members
+    const memberCount = await this.workspaceRepository.countActiveMembers(
+      workspaceId
+    );
+
+    // 5. Build response with user's role
+    const baseResponse = this.mapWorkspaceToResponse(workspace);
+
+    return {
+      ...baseResponse,
+      userRole: membership.role,
+      memberCount,
     };
   }
 }

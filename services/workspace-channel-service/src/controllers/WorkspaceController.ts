@@ -78,6 +78,46 @@ export class WorkspaceController {
   }
 
   /**
+   * Get workspace details
+   * GET /api/workspaces/:workspaceId
+   *
+   * User Story: View Workspace Info (1.4)
+   * Protected endpoint - requires JWT authentication
+   * Returns workspace details with user's role and member count
+   */
+  async getWorkspaceDetails(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+
+      if (!workspaceId || typeof workspaceId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Workspace ID is required"
+        );
+      }
+
+      console.log(
+        `📋 Get workspace details request from user: ${req.user.userId} for workspace: ${workspaceId}`
+      );
+
+      const workspaceDetails = await this.workspaceService.getWorkspaceDetails(
+        req.user.userId,
+        workspaceId
+      );
+
+      res.status(200).json({
+        success: true,
+        data: workspaceDetails,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("getWorkspaceDetails", error, res);
+    }
+  }
+
+  /**
    * Validates and extracts create workspace request body
    *
    * Controller-level validation focuses on:

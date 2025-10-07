@@ -50,4 +50,37 @@ workspaceRoutes.get("/check-name/:name", jwtAuth, async (req, res) => {
   await workspaceController.checkNameAvailability(req, res);
 });
 
+/**
+ * Get workspace details
+ * GET /api/workspaces/:workspaceId
+ *
+ * Returns workspace details with user's role and member count
+ * Protected - requires JWT authentication
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "id": "uuid",
+ *     "name": "my-workspace",
+ *     "displayName": "My Workspace",
+ *     "description": "Description...",
+ *     "ownerId": "uuid",
+ *     "isArchived": false,
+ *     "isPublic": false,
+ *     "maxMembers": null,
+ *     "vanityUrl": null,
+ *     "settings": {},
+ *     "createdAt": "2025-10-03T...",
+ *     "updatedAt": "2025-10-03T...",
+ *     "userRole": "owner",
+ *     "memberCount": 5
+ *   },
+ *   "timestamp": "2025-10-03T..."
+ * }
+ */
+workspaceRoutes.get("/:workspaceId", jwtAuth, async (req, res) => {
+  await workspaceController.getWorkspaceDetails(req as any, res);
+});
+
 export default workspaceRoutes;

@@ -35,6 +35,12 @@ export interface WorkspaceResponse {
   updatedAt: Date;
 }
 
+// Workspace details response (extends WorkspaceResponse with user's membership info)
+export interface WorkspaceDetailsResponse extends WorkspaceResponse {
+  userRole: "owner" | "admin" | "member" | "guest"; // User's role in this workspace
+  memberCount: number; // Total number of active members
+}
+
 // User info from user-service (matches UserProfile from user-service)
 export interface UserInfo {
   id: string;

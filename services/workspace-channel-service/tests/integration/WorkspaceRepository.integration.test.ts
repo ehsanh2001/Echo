@@ -301,4 +301,410 @@ describe("WorkspaceRepository Integration Tests", () => {
       );
     });
   });
+
+  describe("findById", () => {
+    it("should find workspace by ID when it exists", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}findbyid-test-${testId}`,
+        displayName: `Find By ID Test ${testId}`,
+        description: "Test workspace for findById",
+        ownerId: randomUUID(),
+        settings: { theme: "light" },
+      };
+
+      const createdWorkspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      const foundWorkspace = await workspaceRepository.findById(
+        createdWorkspace.id
+      );
+
+      expect(foundWorkspace).toBeDefined();
+      expect(foundWorkspace?.id).toBe(createdWorkspace.id);
+      expect(foundWorkspace?.name).toBe(workspaceData.name);
+      expect(foundWorkspace?.displayName).toBe(workspaceData.displayName);
+      expect(foundWorkspace?.description).toBe(workspaceData.description);
+      expect(foundWorkspace?.ownerId).toBe(workspaceData.ownerId);
+      expect(foundWorkspace?.settings).toEqual(workspaceData.settings);
+    });
+
+    it("should return null when workspace does not exist", async () => {
+      const nonExistentId = randomUUID();
+      const result = await workspaceRepository.findById(nonExistentId);
+
+      expect(result).toBeNull();
+    });
+
+    it("should find archived workspace", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}archived-test-${testId}`,
+        displayName: `Archived Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Manually archive the workspace
+      const db = prismaClientWithModels(prisma);
+      await db.workspace.update({
+        where: { id: workspace.id },
+        data: { isArchived: true },
+      });
+
+      const foundWorkspace = await workspaceRepository.findById(workspace.id);
+
+      expect(foundWorkspace).toBeDefined();
+      expect(foundWorkspace?.isArchived).toBe(true);
+    });
+  });
+
+  describe("getMembership", () => {
+    it("should get membership when user is a member", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}membership-test-${testId}`,
+        displayName: `Membership Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Owner should have a membership (created automatically)
+      const membership = await workspaceRepository.getMembership(
+        workspaceData.ownerId,
+        workspace.id
+      );
+
+      expect(membership).toBeDefined();
+      expect(membership?.userId).toBe(workspaceData.ownerId);
+      expect(membership?.workspaceId).toBe(workspace.id);
+      expect(membership?.role).toBe("owner");
+      expect(membership?.isActive).toBe(true);
+    });
+
+    it("should return null when user is not a member", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}non-member-test-${testId}`,
+        displayName: `Non Member Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      const nonMemberId = randomUUID();
+      const membership = await workspaceRepository.getMembership(
+        nonMemberId,
+        workspace.id
+      );
+
+      expect(membership).toBeNull();
+    });
+
+    it("should return null for non-existent workspace", async () => {
+      const userId = randomUUID();
+      const nonExistentWorkspaceId = randomUUID();
+
+      const membership = await workspaceRepository.getMembership(
+        userId,
+        nonExistentWorkspaceId
+      );
+
+      expect(membership).toBeNull();
+    });
+
+    it("should get membership with different roles", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}roles-test-${testId}`,
+        displayName: `Roles Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Add members with different roles
+      const adminUserId = randomUUID();
+      const memberUserId = randomUUID();
+      const guestUserId = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: adminUserId,
+        role: "admin",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: memberUserId,
+        role: "member",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: guestUserId,
+        role: "guest",
+      });
+
+      // Verify all roles
+      const ownerMembership = await workspaceRepository.getMembership(
+        workspaceData.ownerId,
+        workspace.id
+      );
+      expect(ownerMembership?.role).toBe("owner");
+
+      const adminMembership = await workspaceRepository.getMembership(
+        adminUserId,
+        workspace.id
+      );
+      expect(adminMembership?.role).toBe("admin");
+
+      const memberMembership = await workspaceRepository.getMembership(
+        memberUserId,
+        workspace.id
+      );
+      expect(memberMembership?.role).toBe("member");
+
+      const guestMembership = await workspaceRepository.getMembership(
+        guestUserId,
+        workspace.id
+      );
+      expect(guestMembership?.role).toBe("guest");
+    });
+
+    it("should get inactive membership", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}inactive-test-${testId}`,
+        displayName: `Inactive Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      const userId = randomUUID();
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: userId,
+        role: "member",
+      });
+
+      // Deactivate the membership
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: {
+          workspaceId_userId: {
+            workspaceId: workspace.id,
+            userId: userId,
+          },
+        },
+        data: { isActive: false },
+      });
+
+      const membership = await workspaceRepository.getMembership(
+        userId,
+        workspace.id
+      );
+
+      expect(membership).toBeDefined();
+      expect(membership?.isActive).toBe(false);
+    });
+  });
+
+  describe("countActiveMembers", () => {
+    it("should count only active members", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}count-active-${testId}`,
+        displayName: `Count Active Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Add 3 active members
+      const user1 = randomUUID();
+      const user2 = randomUUID();
+      const user3 = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: user1,
+        role: "member",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: user2,
+        role: "member",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: user3,
+        role: "admin",
+      });
+
+      // Count should be 4 (owner + 3 members)
+      const count = await workspaceRepository.countActiveMembers(workspace.id);
+      expect(count).toBe(4);
+    });
+
+    it("should not count inactive members", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}count-inactive-${testId}`,
+        displayName: `Count Inactive Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Add 2 members
+      const user1 = randomUUID();
+      const user2 = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: user1,
+        role: "member",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: user2,
+        role: "member",
+      });
+
+      // Deactivate one member
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: {
+          workspaceId_userId: {
+            workspaceId: workspace.id,
+            userId: user1,
+          },
+        },
+        data: { isActive: false },
+      });
+
+      // Count should be 2 (owner + 1 active member)
+      const count = await workspaceRepository.countActiveMembers(workspace.id);
+      expect(count).toBe(2);
+    });
+
+    it("should return 0 for non-existent workspace", async () => {
+      const nonExistentId = randomUUID();
+      const count = await workspaceRepository.countActiveMembers(nonExistentId);
+      expect(count).toBe(0);
+    });
+
+    it("should count only owner when no other members", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}count-owner-only-${testId}`,
+        displayName: `Count Owner Only Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      const count = await workspaceRepository.countActiveMembers(workspace.id);
+      expect(count).toBe(1); // Only the owner
+    });
+
+    it("should handle workspace with all inactive members", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}count-all-inactive-${testId}`,
+        displayName: `Count All Inactive Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Deactivate the owner membership
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: {
+          workspaceId_userId: {
+            workspaceId: workspace.id,
+            userId: workspaceData.ownerId,
+          },
+        },
+        data: { isActive: false },
+      });
+
+      const count = await workspaceRepository.countActiveMembers(workspace.id);
+      expect(count).toBe(0);
+    });
+
+    it("should count members correctly with mixed roles", async () => {
+      const testId = randomUUID();
+      const workspaceData: CreateWorkspaceData = {
+        name: `${TEST_PREFIX}count-mixed-roles-${testId}`,
+        displayName: `Count Mixed Roles Test ${testId}`,
+        ownerId: randomUUID(),
+      };
+
+      const workspace = await workspaceRepository.create(
+        workspaceData,
+        workspaceData.ownerId
+      );
+
+      // Add members with different roles
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: randomUUID(),
+        role: "admin",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: randomUUID(),
+        role: "member",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: randomUUID(),
+        role: "guest",
+      });
+
+      // All roles should be counted
+      const count = await workspaceRepository.countActiveMembers(workspace.id);
+      expect(count).toBe(4); // owner + admin + member + guest
+    });
+  });
 });
