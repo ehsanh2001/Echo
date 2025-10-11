@@ -187,8 +187,7 @@ model OutboxEvent {
   payload       Json
   producedAt    DateTime @default(now()) @map("produced_at")
   publishedAt   DateTime? @map("published_at")
-  publishAttempts Int     @default(0) @map("publish_attempts")
-  failedAttempts Int     @default(0) @map("failed_attempts")  // NEW: Track failed publishing attempts
+  failedAttempts Int     @default(0) @map("failed_attempts")  // Track failed publishing attempts for retry logic
   status        OutboxStatus @default(pending)
 
   @@index([status, producedAt])
