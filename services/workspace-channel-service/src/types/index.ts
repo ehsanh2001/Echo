@@ -107,3 +107,76 @@ export interface CreateChannelMemberData {
   role: "owner" | "admin" | "member" | "viewer";
   joinedBy?: string | null;
 }
+
+// ===== INVITE TYPES =====
+
+// Create workspace invite request
+export interface CreateWorkspaceInviteRequest {
+  email: string;
+  role?: "owner" | "admin" | "member" | "guest"; // Optional, defaults to 'member'
+  expiresInDays?: number; // Optional, defaults to 7
+  customMessage?: string; // Optional personal message from inviter
+}
+
+// Create workspace invite data for repository (matches Prisma Invite fields)
+export interface CreateWorkspaceInviteData {
+  workspaceId: string;
+  inviterId: string;
+  email: string;
+  inviteToken: string;
+  type: "workspace";
+  role: "owner" | "admin" | "member" | "guest";
+  expiresAt?: Date | null;
+  metadata?: any; // Json type in Prisma, defaults to {}
+}
+
+// Workspace invite response
+export interface WorkspaceInviteResponse {
+  inviteId: string;
+  email: string;
+  workspaceId: string;
+  inviteUrl: string;
+  role: "owner" | "admin" | "member" | "guest";
+  invitedBy: string;
+  createdAt: Date;
+  expiresAt: Date | null;
+}
+
+// ===== OUTBOX EVENT TYPES =====
+
+// Create workspace outbox event data for repository (matches Prisma OutboxEvent fields)
+export interface CreateOutboxEventData {
+  workspaceId: string;
+  aggregateType: "workspace";
+  aggregateId: string;
+  eventType: string;
+  payload: any; // Json type in Prisma
+}
+
+// Workspace invite created event payload
+export interface WorkspaceInviteCreatedEventPayload {
+  eventId: string;
+  eventType: "workspace.invite.created";
+  aggregateType: "workspace";
+  aggregateId: string; // workspace ID
+  timestamp: string; // ISO 8601
+  version: string; // "1.0"
+  data: {
+    inviteId: string;
+    workspaceId: string;
+    workspaceName: string;
+    workspaceDisplayName: string | null;
+    email: string;
+    role: "owner" | "admin" | "member" | "guest";
+    inviterUserId: string;
+    inviteToken: string;
+    inviteUrl: string;
+    expiresAt: string | null; // ISO 8601
+    customMessage?: string;
+  };
+  metadata: {
+    source: "workspace-channel-service";
+    correlationId?: string;
+    causationId?: string;
+  };
+}

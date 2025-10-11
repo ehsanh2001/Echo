@@ -97,6 +97,26 @@ export const config = {
     userServiceUrl: getOptionalEnv("USER_SERVICE_URL", "http://localhost:8001"),
   },
 
+  // Frontend Configuration
+  frontend: {
+    baseUrl: getRequiredEnv("FRONTEND_BASE_URL"),
+  },
+
+  // Invite Configuration & Business Rules
+  invites: {
+    // Configurable via environment (with sensible defaults)
+    defaultExpirationDays: parseInt(
+      getOptionalEnv("INVITE_DEFAULT_EXPIRATION_DAYS", "7")
+    ),
+
+    // Business rules (constants - rarely change)
+    maxExpirationDays: 30,
+    minExpirationDays: 1,
+    defaultRole: "member" as const,
+    maxCustomMessageLength: 500,
+    tokenLength: 64,
+  },
+
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(getOptionalEnv("RATE_LIMIT_WINDOW", "900000")), // 15 minutes
@@ -146,6 +166,13 @@ export function validateConfig() {
     new URL(config.service.userServiceUrl);
   } catch {
     errors.push("USER_SERVICE_URL must be a valid URL");
+  }
+
+  // Frontend URL validation
+  try {
+    new URL(config.frontend.baseUrl);
+  } catch {
+    errors.push("FRONTEND_BASE_URL must be a valid URL");
   }
 
   // Throw error if any validation failed
