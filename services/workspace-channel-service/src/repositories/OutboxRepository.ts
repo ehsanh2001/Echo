@@ -22,16 +22,28 @@ export class OutboxRepository implements IOutboxRepository {
    */
   async create(data: CreateOutboxEventData): Promise<OutboxEvent> {
     try {
+      // Build the data object conditionally to satisfy exactOptionalPropertyTypes
+      const createData: any = {
+        aggregateType: data.aggregateType,
+        aggregateId: data.aggregateId,
+        eventType: data.eventType,
+        payload: data.payload,
+        status: OutboxStatus.pending,
+        failedAttempts: 0,
+      };
+
+      // Only add workspaceId if it's defined
+      if (data.workspaceId !== undefined) {
+        createData.workspaceId = data.workspaceId;
+      }
+
+      // Only add channelId if it's defined
+      if (data.channelId !== undefined) {
+        createData.channelId = data.channelId;
+      }
+
       return await this.prisma.outboxEvent.create({
-        data: {
-          workspaceId: data.workspaceId,
-          aggregateType: data.aggregateType,
-          aggregateId: data.aggregateId,
-          eventType: data.eventType,
-          payload: data.payload,
-          status: OutboxStatus.pending,
-          failedAttempts: 0,
-        },
+        data: createData,
       });
     } catch (error: any) {
       this.handleOutboxError(error, data);

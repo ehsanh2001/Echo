@@ -144,39 +144,129 @@ export interface WorkspaceInviteResponse {
 
 // ===== OUTBOX EVENT TYPES =====
 
-// Create workspace outbox event data for repository (matches Prisma OutboxEvent fields)
+// Generic outbox event data for repository (matches Prisma OutboxEvent fields)
+// This is the low-level structure that goes into the database
 export interface CreateOutboxEventData {
-  workspaceId: string;
-  aggregateType: "workspace";
-  aggregateId: string;
-  eventType: string;
-  payload: any; // Json type in Prisma
+  workspaceId?: string | null; // Optional: for workspace-level events
+  channelId?: string | null; // Optional: for channel-level events
+  aggregateType: string; // "workspace" | "channel" | "user" | "message" etc.
+  aggregateId: string | null; // ID of the aggregate root
+  eventType: string; // Specific event type like "workspace.invite.created"
+  payload: any; // Json type in Prisma - the full event payload
 }
 
-// Workspace invite created event payload
-export interface WorkspaceInviteCreatedEventPayload {
+// ===== EVENT PAYLOAD BASE STRUCTURE =====
+
+// Base structure for all event payloads
+export interface BaseEventPayload<TEventType extends string, TData> {
   eventId: string;
-  eventType: "workspace.invite.created";
-  aggregateType: "workspace";
-  aggregateId: string; // workspace ID
+  eventType: TEventType;
+  aggregateType: string;
+  aggregateId: string;
   timestamp: string; // ISO 8601
   version: string; // "1.0"
-  data: {
-    inviteId: string;
-    workspaceId: string;
-    workspaceName: string;
-    workspaceDisplayName: string | null;
-    email: string;
-    role: "owner" | "admin" | "member" | "guest";
-    inviterUserId: string;
-    inviteToken: string;
-    inviteUrl: string;
-    expiresAt: string | null; // ISO 8601
-    customMessage?: string;
-  };
+  data: TData;
   metadata: {
     source: "workspace-channel-service";
     correlationId?: string;
     causationId?: string;
   };
 }
+
+// ===== WORKSPACE INVITE EVENTS =====
+
+// Input data for creating a workspace invite event
+export interface CreateInviteEventData {
+  inviteId: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceDisplayName: string | null;
+  email: string;
+  role: "owner" | "admin" | "member" | "guest";
+  inviterUserId: string;
+  inviteToken: string;
+  inviteUrl: string;
+  expiresAt: string | null;
+  customMessage?: string;
+}
+
+// Workspace invite event data (used inside payload)
+export interface WorkspaceInviteEventData {
+  inviteId: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceDisplayName: string | null;
+  email: string;
+  role: "owner" | "admin" | "member" | "guest";
+  inviterUserId: string;
+  inviteToken: string;
+  inviteUrl: string;
+  expiresAt: string | null; // ISO 8601
+  customMessage?: string;
+}
+
+// Workspace invite created event payload (complete structure)
+export interface WorkspaceInviteCreatedEventPayload
+  extends BaseEventPayload<
+    "workspace.invite.created",
+    WorkspaceInviteEventData
+  > {
+  aggregateType: "workspace";
+}
+
+// ===== CHANNEL EVENTS (Examples for future) =====
+
+// Channel created event data
+export interface ChannelCreatedEventData {
+  channelId: string;
+  workspaceId: string;
+  channelName: string;
+  channelDisplayName: string | null;
+  channelType: "public" | "private" | "direct" | "group_dm";
+  createdBy: string;
+  memberCount: number;
+}
+
+// Channel created event payload
+export interface ChannelCreatedEventPayload
+  extends BaseEventPayload<"channel.created", ChannelCreatedEventData> {
+  aggregateType: "channel";
+}
+
+// Channel member added event data
+export interface ChannelMemberAddedEventData {
+  channelId: string;
+  workspaceId: string;
+  channelName: string;
+  userId: string;
+  role: "owner" | "admin" | "member" | "viewer";
+  addedBy: string;
+}
+
+// Channel member added event payload
+export interface ChannelMemberAddedEventPayload
+  extends BaseEventPayload<
+    "channel.member.added",
+    ChannelMemberAddedEventData
+  > {
+  aggregateType: "channel";
+}
+
+// ===== UNION TYPES FOR TYPE SAFETY =====
+
+// All event types in this service
+export type ServiceEventType =
+  | "workspace.invite.created"
+  | "channel.created"
+  | "channel.member.added";
+// Add more as needed
+
+// All aggregate types in this service
+export type AggregateType = "workspace" | "channel" | "user" | "message";
+
+// Union of all event payloads for type safety
+export type EventPayload =
+  | WorkspaceInviteCreatedEventPayload
+  | ChannelCreatedEventPayload
+  | ChannelMemberAddedEventPayload;
+// Add more as needed
