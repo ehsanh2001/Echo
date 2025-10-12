@@ -41,8 +41,9 @@ export interface IInviteRepository {
 
   /**
    * Delete expired invites (cleanup operation)
+   * Only deletes invites that are expired and not accepted
    * @param olderThan - Delete invites expired before this date
    * @returns Promise resolving to number of deleted invites
    */
-  deleteExpired(olderThan: Date): Promise<number>;
+  deleteUnacceptedExpired(olderThan: Date): Promise<number>;
 }
