@@ -1,5 +1,11 @@
-import { OutboxEvent } from "@prisma/client";
+import { OutboxEvent, PrismaClient } from "@prisma/client";
 import { CreateOutboxEventData } from "../../types";
+
+// Type for Prisma transaction context
+export type PrismaTransaction = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 /**
  * Repository interface for outbox event operations
@@ -13,43 +19,44 @@ export interface IOutboxRepository {
   create(data: CreateOutboxEventData): Promise<OutboxEvent>;
 
   /**
-   * Find pending outbox events for processing
+   * Find and lock pending outbox events for processing (multi-instance safe)
+   * Acquires locks within the provided transaction to prevent concurrent processing by multiple instances
+   * @param tx - Prisma transaction context
    * @param limit - Maximum number of events to return
-   * @returns Promise resolving to array of pending events
+   * @returns Promise resolving to array of locked pending events
    */
-  findPending(limit?: number): Promise<OutboxEvent[]>;
+  findPending(tx: PrismaTransaction, limit?: number): Promise<OutboxEvent[]>;
 
   /**
-   * Find failed outbox events for retry
+   * Find and lock failed outbox events for retry (multi-instance safe)
+   * Acquires locks within the provided transaction to prevent concurrent retry attempts by multiple instances
+   * @param tx - Prisma transaction context
    * @param maxAttempts - Maximum failed attempts to consider for retry
    * @param limit - Maximum number of events to return
-   * @returns Promise resolving to array of failed events eligible for retry
+   * @returns Promise resolving to array of locked failed events eligible for retry
    */
   findFailedForRetry(
+    tx: PrismaTransaction,
     maxAttempts?: number,
     limit?: number
   ): Promise<OutboxEvent[]>;
 
   /**
-   * Mark an outbox event as published
+   * Mark an outbox event as published within a transaction
+   * @param tx - Prisma transaction context
    * @param id - The outbox event ID
    * @returns Promise resolving when event is marked as published
    */
-  markPublished(id: string): Promise<void>;
+  markPublished(tx: PrismaTransaction, id: string): Promise<void>;
 
   /**
-   * Mark an outbox event as failed
+   * Mark an outbox event as failed and increment the failed attempts counter within a transaction
+   * This combines both status update and attempt counting for atomicity and efficiency
+   * @param tx - Prisma transaction context
    * @param id - The outbox event ID
-   * @returns Promise resolving when event is marked as failed
+   * @returns Promise resolving when event is marked as failed and attempts incremented
    */
-  markFailed(id: string): Promise<void>;
-
-  /**
-   * Increment failed attempts counter for an outbox event
-   * @param id - The outbox event ID
-   * @returns Promise resolving when failed attempts is incremented
-   */
-  incrementFailedAttempts(id: string): Promise<void>;
+  markFailed(tx: PrismaTransaction, id: string): Promise<void>;
 
   /**
    * Delete old published events (cleanup operation)

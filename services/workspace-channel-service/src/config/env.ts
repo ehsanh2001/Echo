@@ -117,6 +117,22 @@ export const config = {
     tokenLength: 64,
   },
 
+  // Outbox Configuration
+  outbox: {
+    // Configurable via environment (with sensible defaults)
+    maxBatchSize: parseInt(getOptionalEnv("OUTBOX_MAX_BATCH_SIZE", "50")),
+    maxRetryAttempts: parseInt(
+      getOptionalEnv("OUTBOX_MAX_RETRY_ATTEMPTS", "3")
+    ),
+    retryDelayMs: parseInt(getOptionalEnv("OUTBOX_RETRY_DELAY_MS", "5000")), // 5 seconds
+    cleanupIntervalMs: parseInt(
+      getOptionalEnv("OUTBOX_CLEANUP_INTERVAL_MS", "3600000")
+    ), // 1 hour
+    cleanupRetentionDays: parseInt(
+      getOptionalEnv("OUTBOX_CLEANUP_RETENTION_DAYS", "7")
+    ), // Keep published events for 7 days
+  },
+
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(getOptionalEnv("RATE_LIMIT_WINDOW", "900000")), // 15 minutes

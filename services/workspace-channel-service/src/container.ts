@@ -6,12 +6,14 @@ import { PrismaClient } from "@prisma/client";
 import { IWorkspaceRepository } from "./interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "./interfaces/repositories/IChannelRepository";
 import { IInviteRepository } from "./interfaces/repositories/IInviteRepository";
+import { IOutboxRepository } from "./interfaces/repositories/IOutboxRepository";
 import { IWorkspaceService } from "./interfaces/services/IWorkspaceService";
 
 // Import implementations
 import { WorkspaceRepository } from "./repositories/WorkspaceRepository";
 import { ChannelRepository } from "./repositories/ChannelRepository";
 import { InviteRepository } from "./repositories/InviteRepository";
+import { OutboxRepository } from "./repositories/OutboxRepository";
 import { WorkspaceService } from "./services/WorkspaceService";
 import { UserServiceClient } from "./services/userServiceClient";
 
@@ -37,6 +39,10 @@ container.registerSingleton<IChannelRepository>(
 container.registerSingleton<IInviteRepository>(
   "IInviteRepository",
   InviteRepository
+);
+container.registerSingleton<IOutboxRepository>(
+  "IOutboxRepository",
+  OutboxRepository
 );
 
 // Register services
