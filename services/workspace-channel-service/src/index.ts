@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
 import "./container"; // Auto-configure dependency injection
+import { container } from "./container";
+import { IOutboxPublisher } from "./interfaces/workers/IOutboxPublisher";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -97,6 +99,12 @@ async function startServer() {
     await prisma.$connect();
     console.log("✅ Database connection successful");
 
+    // Start Outbox Publisher Worker
+    const outboxPublisher =
+      container.resolve<IOutboxPublisher>("IOutboxPublisher");
+    await outboxPublisher.start();
+    console.log("✅ Outbox Publisher Worker started");
+
     // Start the server
     const server = app.listen(config.port, () => {
       console.log(`🌐 Server running on port ${config.port}`);
@@ -111,6 +119,10 @@ async function startServer() {
         console.log("🔌 HTTP server closed");
 
         try {
+          // Stop Outbox Publisher Worker
+          await outboxPublisher.stop();
+          console.log("🛑 Outbox Publisher Worker stopped");
+
           await prisma.$disconnect();
           console.log("💾 Database connection closed");
           console.log("👋 Graceful shutdown complete");

@@ -59,9 +59,9 @@ export class OutboxService implements IOutboxService {
     // Prepare the outbox event data
     const eventData: CreateOutboxEventData = {
       workspaceId,
-      aggregateType: "workspace",
+      aggregateType: payload.aggregateType,
       aggregateId: workspaceId,
-      eventType: "workspace.invite.created",
+      eventType: payload.eventType,
       payload: payload, // Store the complete event payload
     };
 

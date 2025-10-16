@@ -11,6 +11,7 @@ import { IWorkspaceService } from "./interfaces/services/IWorkspaceService";
 import { IInviteService } from "./interfaces/services/IInviteService";
 import { IOutboxService } from "./interfaces/services/IOutboxService";
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
+import { IOutboxPublisher } from "./interfaces/workers/IOutboxPublisher";
 
 // Import implementations
 import { WorkspaceRepository } from "./repositories/WorkspaceRepository";
@@ -21,6 +22,7 @@ import { WorkspaceService } from "./services/WorkspaceService";
 import { InviteService } from "./services/InviteService";
 import { OutboxService } from "./services/OutboxService";
 import { RabbitMQService } from "./services/RabbitMQService";
+import { OutboxPublisher } from "./workers/OutboxPublisher";
 import { UserServiceClient } from "./services/userServiceClient";
 
 /**
@@ -65,6 +67,12 @@ container.registerSingleton<IOutboxService>("IOutboxService", OutboxService);
 container.registerSingleton<IRabbitMQService>(
   "IRabbitMQService",
   RabbitMQService
+);
+
+// Register workers
+container.registerSingleton<IOutboxPublisher>(
+  "IOutboxPublisher",
+  OutboxPublisher
 );
 
 console.log("✅ Dependency injection container configured");
