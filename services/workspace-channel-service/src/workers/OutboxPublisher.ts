@@ -1,4 +1,4 @@
-import { injectable } from "tsyringe";
+import { injectable, inject } from "tsyringe";
 import { PrismaClient, OutboxEvent } from "@prisma/client";
 import { IOutboxPublisher } from "../interfaces/workers/IOutboxPublisher";
 import {
@@ -34,7 +34,9 @@ export class OutboxPublisher implements IOutboxPublisher {
   private shutdownRequested = false;
 
   constructor(
+    @inject("IOutboxRepository")
     private readonly outboxRepository: IOutboxRepository,
+    @inject("IRabbitMQService")
     private readonly rabbitMQService: IRabbitMQService,
     private readonly prisma: PrismaClient
   ) {}
