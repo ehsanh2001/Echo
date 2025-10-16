@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { WorkspaceRole } from "@prisma/client";
 
 /**
  * Load environment variables from multiple sources
@@ -112,7 +113,7 @@ export const config = {
     // Business rules (constants - rarely change)
     maxExpirationDays: 30,
     minExpirationDays: 1,
-    defaultRole: "member" as const,
+    defaultRole: WorkspaceRole.member,
     maxCustomMessageLength: 500,
     tokenLength: 64,
   },

@@ -8,6 +8,7 @@ import { IChannelRepository } from "./interfaces/repositories/IChannelRepository
 import { IInviteRepository } from "./interfaces/repositories/IInviteRepository";
 import { IOutboxRepository } from "./interfaces/repositories/IOutboxRepository";
 import { IWorkspaceService } from "./interfaces/services/IWorkspaceService";
+import { IInviteService } from "./interfaces/services/IInviteService";
 import { IOutboxService } from "./interfaces/services/IOutboxService";
 
 // Import implementations
@@ -16,6 +17,7 @@ import { ChannelRepository } from "./repositories/ChannelRepository";
 import { InviteRepository } from "./repositories/InviteRepository";
 import { OutboxRepository } from "./repositories/OutboxRepository";
 import { WorkspaceService } from "./services/WorkspaceService";
+import { InviteService } from "./services/InviteService";
 import { OutboxService } from "./services/OutboxService";
 import { UserServiceClient } from "./services/userServiceClient";
 
@@ -56,6 +58,7 @@ container.registerSingleton<IWorkspaceService>(
   "IWorkspaceService",
   WorkspaceService
 );
+container.registerSingleton<IInviteService>("IInviteService", InviteService);
 container.registerSingleton<IOutboxService>("IOutboxService", OutboxService);
 
 console.log("✅ Dependency injection container configured");

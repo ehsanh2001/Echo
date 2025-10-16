@@ -2,6 +2,24 @@
  * Common types and interfaces for workspace-channel-service
  */
 
+// Re-export Prisma enums for convenience
+export {
+  WorkspaceRole,
+  ChannelRole,
+  ChannelType,
+  InviteType,
+} from "@prisma/client";
+
+// Import for local use in type definitions
+import type {
+  WorkspaceRole,
+  ChannelRole,
+  ChannelType,
+  InviteType,
+} from "@prisma/client";
+
+// ===== JWT & AUTH TYPES =====
+
 // JWT Token payload structure (must match user-service)
 export interface JwtPayload {
   userId: string;
@@ -37,7 +55,7 @@ export interface WorkspaceResponse {
 
 // Workspace details response (extends WorkspaceResponse with user's membership info)
 export interface WorkspaceDetailsResponse extends WorkspaceResponse {
-  userRole: "owner" | "admin" | "member" | "guest"; // User's role in this workspace
+  userRole: WorkspaceRole; // User's role in this workspace
   memberCount: number; // Total number of active members
 }
 
@@ -86,7 +104,7 @@ export interface CreateChannelData {
   name: string;
   displayName?: string | null;
   description?: string | null;
-  type: "public" | "private" | "direct" | "group_dm";
+  type: ChannelType;
   createdBy?: string | null;
   memberCount: number;
   settings?: any; // Json type in Prisma, defaults to {}
@@ -96,7 +114,7 @@ export interface CreateChannelData {
 export interface CreateWorkspaceMemberData {
   workspaceId: string;
   userId: string;
-  role: "owner" | "admin" | "member" | "guest";
+  role: WorkspaceRole;
   invitedBy?: string | null;
 }
 
@@ -104,7 +122,7 @@ export interface CreateWorkspaceMemberData {
 export interface CreateChannelMemberData {
   channelId: string;
   userId: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: ChannelRole;
   joinedBy?: string | null;
 }
 
@@ -113,7 +131,7 @@ export interface CreateChannelMemberData {
 // Create workspace invite request
 export interface CreateWorkspaceInviteRequest {
   email: string;
-  role?: "owner" | "admin" | "member" | "guest"; // Optional, defaults to 'member'
+  role?: WorkspaceRole; // Optional, defaults to 'member'
   expiresInDays?: number; // Optional, defaults to 7
   customMessage?: string; // Optional personal message from inviter
 }
@@ -124,8 +142,8 @@ export interface CreateWorkspaceInviteData {
   inviterId: string;
   email: string;
   inviteToken: string;
-  type: "workspace";
-  role: "owner" | "admin" | "member" | "guest";
+  type: InviteType;
+  role: WorkspaceRole;
   expiresAt?: Date | null;
   metadata?: any; // Json type in Prisma, defaults to {}
 }
@@ -136,7 +154,7 @@ export interface WorkspaceInviteResponse {
   email: string;
   workspaceId: string;
   inviteUrl: string;
-  role: "owner" | "admin" | "member" | "guest";
+  role: WorkspaceRole;
   invitedBy: string;
   createdAt: Date;
   expiresAt: Date | null;
@@ -182,7 +200,7 @@ export interface CreateInviteEventData {
   workspaceName: string;
   workspaceDisplayName: string | null;
   email: string;
-  role: "owner" | "admin" | "member" | "guest";
+  role: WorkspaceRole;
   inviterUserId: string;
   inviteToken: string;
   inviteUrl: string;
@@ -197,7 +215,7 @@ export interface WorkspaceInviteEventData {
   workspaceName: string;
   workspaceDisplayName: string | null;
   email: string;
-  role: "owner" | "admin" | "member" | "guest";
+  role: WorkspaceRole;
   inviterUserId: string;
   inviteToken: string;
   inviteUrl: string;
@@ -222,7 +240,7 @@ export interface ChannelCreatedEventData {
   workspaceId: string;
   channelName: string;
   channelDisplayName: string | null;
-  channelType: "public" | "private" | "direct" | "group_dm";
+  channelType: ChannelType;
   createdBy: string;
   memberCount: number;
 }
@@ -239,7 +257,7 @@ export interface ChannelMemberAddedEventData {
   workspaceId: string;
   channelName: string;
   userId: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: ChannelRole;
   addedBy: string;
 }
 
