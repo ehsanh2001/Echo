@@ -17,10 +17,15 @@ export interface IChannelRepository {
    *
    * @param data - The channel data to create
    * @param creatorId - The ID of the user creating the channel (will be added as owner)
+   * @param transaction - Optional Prisma transaction context for external transaction management
    * @throws {WorkspaceChannelServiceError} If any operation fails (transaction rolled back)
    * @returns {Promise<Channel>} The created channel
    */
-  create(data: CreateChannelData, creatorId: string): Promise<Channel>;
+  create(
+    data: CreateChannelData,
+    creatorId: string,
+    transaction?: any
+  ): Promise<Channel>;
 
   /**
    * Creates a channel within an existing transaction context.
@@ -40,15 +45,6 @@ export interface IChannelRepository {
     data: CreateChannelData,
     creatorId: string
   ): Promise<Channel>;
-
-  /**
-   * Adds a member to an existing channel (increments memberCount).
-   *
-   * @param data - The channel member data
-   * @throws {WorkspaceChannelServiceError} If member already exists or channel not found
-   * @returns {Promise<ChannelMember>} The created membership
-   */
-  addMember(data: CreateChannelMemberData): Promise<ChannelMember>;
 
   /**
    * Finds all public, non-archived channels in a workspace.
@@ -81,4 +77,32 @@ export interface IChannelRepository {
     role: string,
     transaction?: any
   ): Promise<ChannelMember>;
+
+  /**
+   * Adds multiple members to a channel in a single transaction.
+   * Used for direct/group_dm channel creation where multiple users are added at once.
+   *
+   * @param channelId - The channel ID
+   * @param members - Array of members to add with their roles
+   * @param transaction - Optional Prisma transaction context
+   * @returns {Promise<ChannelMember[]>} Array of created memberships
+   */
+  addMembers(
+    channelId: string,
+    members: Array<{ userId: string; role: string; joinedBy: string | null }>,
+    transaction?: any
+  ): Promise<ChannelMember[]>;
+
+  /**
+   * Finds a channel by name within a workspace.
+   * Used to check for duplicate channel names.
+   *
+   * @param workspaceId - The workspace ID
+   * @param name - The channel name to search for
+   * @returns {Promise<Channel | null>} The channel if found, null otherwise
+   */
+  findByNameInWorkspace(
+    workspaceId: string,
+    name: string
+  ): Promise<Channel | null>;
 }

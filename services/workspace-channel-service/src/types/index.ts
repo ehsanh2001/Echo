@@ -160,6 +160,37 @@ export interface WorkspaceInviteResponse {
   expiresAt: Date | null;
 }
 
+// ===== CHANNEL TYPES =====
+
+// Create channel request (from API layer)
+export interface CreateChannelRequest {
+  name?: string; // Required for public/private/group_dm, auto-generated for direct
+  displayName?: string; // Optional
+  description?: string; // Optional
+  type: ChannelType; // Required: public, private, direct, group_dm
+  participants?: string[]; // Required for 'direct' (exactly 1 other user), optional for others
+}
+
+// Create channel response (to API layer)
+export interface CreateChannelResponse {
+  id: string;
+  workspaceId: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  type: ChannelType;
+  createdBy: string;
+  memberCount: number;
+  isArchived: boolean;
+  isReadOnly: boolean;
+  createdAt: string;
+  updatedAt: string;
+  members: Array<{
+    userId: string;
+    role: ChannelRole;
+  }>;
+}
+
 // ===== OUTBOX EVENT TYPES =====
 
 // Generic outbox event data for repository (matches Prisma OutboxEvent fields)

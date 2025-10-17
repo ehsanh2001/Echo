@@ -1,9 +1,16 @@
 import { Request, Response } from "express";
 import { container } from "tsyringe";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
+import { IInviteService } from "../interfaces/services/IInviteService";
+import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
-import { CreateWorkspaceRequest, AcceptInviteRequest } from "../types";
+import {
+  CreateWorkspaceRequest,
+  AcceptInviteRequest,
+  CreateWorkspaceInviteRequest,
+} from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
+import { WorkspaceRole } from "@prisma/client";
 import { config } from "../config/env";
 
 /**
@@ -12,11 +19,17 @@ import { config } from "../config/env";
  */
 export class WorkspaceController {
   private readonly workspaceService: IWorkspaceService;
+  private readonly inviteService: IInviteService;
+  private readonly workspaceRepository: IWorkspaceRepository;
 
   constructor() {
     // Resolve dependencies from container
     this.workspaceService =
       container.resolve<IWorkspaceService>("IWorkspaceService");
+    this.inviteService = container.resolve<IInviteService>("IInviteService");
+    this.workspaceRepository = container.resolve<IWorkspaceRepository>(
+      "IWorkspaceRepository"
+    );
   }
 
   /**
@@ -153,6 +166,87 @@ export class WorkspaceController {
       });
     } catch (error) {
       this.handleControllerError("acceptInvite", error, res);
+    }
+  }
+
+  /**
+   * Create a workspace invite
+   * POST /api/ws-ch/workspaces/:workspaceId/invites
+   *
+   * Authorization: Only workspace owners and admins can create invites
+   * Protected endpoint - requires JWT authentication
+   */
+  async createWorkspaceInvite(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      // 1. Extract authenticated user from JWT
+      const userId = req.user.userId;
+
+      // 2. Extract workspaceId from route params
+      const { workspaceId } = req.params;
+
+      if (!workspaceId) {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Workspace ID is required"
+        );
+      }
+
+      // 3. Extract and validate request body
+      const inviteData = req.body as CreateWorkspaceInviteRequest;
+
+      // Basic request validation
+      if (!inviteData.email) {
+        throw WorkspaceChannelServiceError.validation("Email is required", {
+          field: "email",
+          message: "Email is required",
+          value: inviteData.email,
+        });
+      }
+
+      console.log(
+        `📬 Create workspace invite request from user: ${userId} for workspace: ${workspaceId}`
+      );
+
+      // 4. Authorization: Check if user is owner or admin of the workspace
+      const membership = await this.workspaceRepository.getMembership(
+        workspaceId,
+        userId
+      );
+
+      if (!membership) {
+        throw WorkspaceChannelServiceError.forbidden(
+          "You are not a member of this workspace"
+        );
+      }
+
+      // Check if user has owner or admin role
+      if (
+        membership.role !== WorkspaceRole.owner &&
+        membership.role !== WorkspaceRole.admin
+      ) {
+        throw WorkspaceChannelServiceError.forbidden(
+          "Only workspace owners and admins can create invites"
+        );
+      }
+
+      // 5. Delegate to service layer
+      const invite = await this.inviteService.createWorkspaceInvite(
+        workspaceId,
+        userId,
+        inviteData
+      );
+
+      // 6. Send success response
+      res.status(201).json({
+        success: true,
+        data: invite,
+        message: "Workspace invite created successfully",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("createWorkspaceInvite", error, res);
     }
   }
 

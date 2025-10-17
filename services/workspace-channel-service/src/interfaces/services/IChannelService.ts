@@ -1,9 +1,28 @@
 import { ChannelMember } from "@prisma/client";
+import {
+  CreateChannelRequest,
+  CreateChannelResponse,
+  ChannelRole,
+} from "../../types";
 
 /**
  * Interface for channel service operations
  */
 export interface IChannelService {
+  /**
+   * Creates a new channel in a workspace
+   * @param workspaceId - ID of the workspace
+   * @param userId - ID of the user creating the channel
+   * @param request - Channel creation request data
+   * @returns Created channel with members
+   * @throws WorkspaceChannelServiceError if validation fails or user lacks permission
+   */
+  createChannel(
+    workspaceId: string,
+    userId: string,
+    request: CreateChannelRequest
+  ): Promise<CreateChannelResponse>;
+
   /**
    * Add a member to a channel or reactivate inactive membership
    * @param channelId - The channel ID
@@ -17,7 +36,7 @@ export interface IChannelService {
     channelId: string,
     userId: string,
     joinedBy: string,
-    role?: string,
+    role?: ChannelRole,
     transaction?: any
   ): Promise<ChannelMember>;
 }
