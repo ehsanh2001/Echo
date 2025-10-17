@@ -104,7 +104,9 @@ describe("ChannelService - Unit Tests", () => {
             type: ChannelType.group_dm,
             participants: ["user-456"],
           })
-        ).rejects.toThrow("Group DM channels must have at least 2 other participants");
+        ).rejects.toThrow(
+          "Group DM channels must have at least 2 other participants"
+        );
       });
     });
 
@@ -149,7 +151,9 @@ describe("ChannelService - Unit Tests", () => {
             type: ChannelType.public,
             name: "test-channel",
           })
-        ).rejects.toThrow("Only workspace owners and admins can create public channels");
+        ).rejects.toThrow(
+          "Only workspace owners and admins can create public channels"
+        );
       });
 
       it("should reject member trying to create private channel", async () => {
@@ -165,7 +169,9 @@ describe("ChannelService - Unit Tests", () => {
             type: ChannelType.private,
             name: "test-channel",
           })
-        ).rejects.toThrow("Only workspace owners and admins can create private channels");
+        ).rejects.toThrow(
+          "Only workspace owners and admins can create private channels"
+        );
       });
 
       it("should allow admin to create public channel", async () => {
@@ -176,7 +182,7 @@ describe("ChannelService - Unit Tests", () => {
           isActive: true,
         } as any);
         mockChannelRepository.findByNameInWorkspace.mockResolvedValue(null);
-        
+
         const mockChannel = {
           id: "channel-123",
           name: "test-channel",
@@ -192,13 +198,13 @@ describe("ChannelService - Unit Tests", () => {
         };
 
         mockChannelRepository.create.mockResolvedValue(mockChannel as any);
-        
+
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {
           const mockTx = {
             channelMember: {
-              findMany: jest.fn().mockResolvedValue([
-                { userId, role: ChannelRole.owner },
-              ]),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ userId, role: ChannelRole.owner }]),
             },
           };
           return callback(mockTx);
@@ -220,7 +226,7 @@ describe("ChannelService - Unit Tests", () => {
           role: WorkspaceRole.member,
           isActive: true,
         } as any);
-        
+
         const mockChannel = {
           id: "channel-123",
           name: "dm-user-123-user-456",
@@ -236,13 +242,13 @@ describe("ChannelService - Unit Tests", () => {
         };
 
         mockChannelRepository.create.mockResolvedValue(mockChannel as any);
-        
+
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {
           const mockTx = {
             channelMember: {
-              findMany: jest.fn().mockResolvedValue([
-                { userId, role: ChannelRole.owner },
-              ]),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ userId, role: ChannelRole.owner }]),
             },
           };
           return callback(mockTx);
@@ -284,7 +290,7 @@ describe("ChannelService - Unit Tests", () => {
 
       it("should allow creation if name is unique", async () => {
         mockChannelRepository.findByNameInWorkspace.mockResolvedValue(null);
-        
+
         const mockChannel = {
           id: "channel-123",
           name: "test-channel",
@@ -300,13 +306,13 @@ describe("ChannelService - Unit Tests", () => {
         };
 
         mockChannelRepository.create.mockResolvedValue(mockChannel as any);
-        
+
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {
           const mockTx = {
             channelMember: {
-              findMany: jest.fn().mockResolvedValue([
-                { userId, role: ChannelRole.owner },
-              ]),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ userId, role: ChannelRole.owner }]),
             },
           };
           return callback(mockTx);
@@ -353,13 +359,13 @@ describe("ChannelService - Unit Tests", () => {
         };
 
         mockChannelRepository.create.mockResolvedValue(mockChannel as any);
-        
+
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {
           const mockTx = {
             channelMember: {
-              findMany: jest.fn().mockResolvedValue([
-                { userId, role: ChannelRole.owner },
-              ]),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ userId, role: ChannelRole.owner }]),
             },
           };
           return callback(mockTx);
