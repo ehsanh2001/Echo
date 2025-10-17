@@ -51,6 +51,30 @@ workspaceRoutes.get("/check-name/:name", jwtAuth, async (req, res) => {
 });
 
 /**
+ * Accept workspace invite
+ * POST /api/workspaces/invites/accept
+ *
+ * Body:
+ * {
+ *   "token": "uuid-token-string"
+ * }
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspace": { workspace details },
+ *     "channels": [ { channel details } ]
+ *   },
+ *   "message": "Workspace invite accepted successfully",
+ *   "timestamp": "2025-10-03T..."
+ * }
+ */
+workspaceRoutes.post("/invites/accept", jwtAuth, async (req, res) => {
+  await workspaceController.acceptInvite(req as any, res);
+});
+
+/**
  * Get workspace details
  * GET /api/workspaces/:workspaceId
  *

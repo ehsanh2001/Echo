@@ -9,6 +9,7 @@ import { IInviteRepository } from "./interfaces/repositories/IInviteRepository";
 import { IOutboxRepository } from "./interfaces/repositories/IOutboxRepository";
 import { IWorkspaceService } from "./interfaces/services/IWorkspaceService";
 import { IInviteService } from "./interfaces/services/IInviteService";
+import { IChannelService } from "./interfaces/services/IChannelService";
 import { IOutboxService } from "./interfaces/services/IOutboxService";
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { IOutboxPublisher } from "./interfaces/workers/IOutboxPublisher";
@@ -20,6 +21,7 @@ import { InviteRepository } from "./repositories/InviteRepository";
 import { OutboxRepository } from "./repositories/OutboxRepository";
 import { WorkspaceService } from "./services/WorkspaceService";
 import { InviteService } from "./services/InviteService";
+import { ChannelService } from "./services/ChannelService";
 import { OutboxService } from "./services/OutboxService";
 import { RabbitMQService } from "./services/RabbitMQService";
 import { OutboxPublisher } from "./workers/OutboxPublisher";
@@ -63,6 +65,7 @@ container.registerSingleton<IWorkspaceService>(
   WorkspaceService
 );
 container.registerSingleton<IInviteService>("IInviteService", InviteService);
+container.registerSingleton<IChannelService>("IChannelService", ChannelService);
 container.registerSingleton<IOutboxService>("IOutboxService", OutboxService);
 container.registerSingleton<IRabbitMQService>(
   "IRabbitMQService",

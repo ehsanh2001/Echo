@@ -2,6 +2,7 @@ import {
   CreateWorkspaceRequest,
   WorkspaceResponse,
   WorkspaceDetailsResponse,
+  AcceptInviteResponse,
 } from "../../types";
 
 /**
@@ -37,4 +38,16 @@ export interface IWorkspaceService {
     userId: string,
     workspaceId: string
   ): Promise<WorkspaceDetailsResponse>;
+
+  /**
+   * Accept a workspace invite
+   * - Validates invite token
+   * - Checks invite is not expired
+   * - Checks workspace is not archived
+   * - Adds user to workspace
+   * - Adds user to all public channels
+   * - Marks invite as accepted
+   * All operations are atomic (in a transaction)
+   */
+  acceptInvite(token: string, userId: string): Promise<AcceptInviteResponse>;
 }
