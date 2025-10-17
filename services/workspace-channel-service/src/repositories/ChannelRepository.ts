@@ -106,46 +106,23 @@ export class ChannelRepository implements IChannelRepository {
     return channel;
   }
 
-  async create(data: CreateChannelData, creatorId: string): Promise<Channel> {
+  async create(
+    data: CreateChannelData,
+    creatorId: string,
+    transaction?: any
+  ): Promise<Channel> {
     try {
+      // If transaction provided, use it; otherwise create a new transaction
+      if (transaction) {
+        return await this.createInTransaction(transaction, data, creatorId);
+      }
+
       // Use transaction to create channel and add creator as member atomically
-      // Reuses createInTransaction logic
       return await this.prisma.$transaction(async (tx) => {
         return await this.createInTransaction(tx, data, creatorId);
       });
     } catch (error: any) {
       this.handleChannelError(error, data);
-    }
-  }
-
-  async addMember(data: CreateChannelMemberData): Promise<ChannelMember> {
-    try {
-      // Use transaction to ensure both member creation and count increment happen atomically
-      return await this.prisma.$transaction(async (tx) => {
-        // Create the channel member
-        const channelMember = await tx.channelMember.create({
-          data: {
-            channelId: data.channelId,
-            userId: data.userId,
-            role: data.role,
-            joinedBy: data.joinedBy || null,
-          },
-        });
-
-        // Increment the member count
-        await tx.channel.update({
-          where: { id: data.channelId },
-          data: {
-            memberCount: {
-              increment: 1,
-            },
-          },
-        });
-
-        return channelMember;
-      });
-    } catch (error: any) {
-      this.handleChannelMemberError(error, data);
     }
   }
 
@@ -179,7 +156,7 @@ export class ChannelRepository implements IChannelRepository {
 
   /**
    * Adds a member to a channel or reactivates an inactive membership.
-   * Supports transaction context for atomic operations.
+   * All operations are atomic - wrapped in a transaction.
    */
   async addOrReactivateMember(
     channelId: string,
@@ -189,55 +166,65 @@ export class ChannelRepository implements IChannelRepository {
     transaction?: any
   ): Promise<ChannelMember> {
     try {
-      const prismaClient = transaction || this.prisma;
+      const executeInTransaction = async (tx: any) => {
+        // Convert empty string to null for joinedBy
+        const normalizedJoinedBy = joinedBy?.trim() || null;
 
-      // Check if membership exists to determine if we need to increment count
-      const existingMembership = await prismaClient.channelMember.findUnique({
-        where: {
-          channelId_userId: {
-            channelId,
-            userId,
-          },
-        },
-      });
-
-      const isActive = existingMembership?.isActive ?? false;
-
-      // Upsert the membership
-      const member = await prismaClient.channelMember.upsert({
-        where: {
-          channelId_userId: {
-            channelId,
-            userId,
-          },
-        },
-        create: {
-          channelId,
-          userId,
-          role: role as any,
-          joinedBy,
-          isActive: true,
-        },
-        update: {
-          isActive: true,
-          role: role as any,
-          joinedBy,
-        },
-      });
-
-      // Increment member count only if creating new or reactivating inactive
-      if (!isActive) {
-        await prismaClient.channel.update({
-          where: { id: channelId },
-          data: {
-            memberCount: {
-              increment: 1,
+        // Check if membership exists to determine if we need to increment count
+        const existingMembership = await tx.channelMember.findUnique({
+          where: {
+            channelId_userId: {
+              channelId,
+              userId,
             },
           },
         });
+
+        const isActive = existingMembership?.isActive ?? false;
+
+        // Upsert the membership
+        const member = await tx.channelMember.upsert({
+          where: {
+            channelId_userId: {
+              channelId,
+              userId,
+            },
+          },
+          create: {
+            channelId,
+            userId,
+            role: role as any,
+            joinedBy: normalizedJoinedBy,
+            isActive: true,
+          },
+          update: {
+            isActive: true,
+            role: role as any,
+            joinedBy: normalizedJoinedBy,
+          },
+        });
+
+        // Increment member count only if creating new or reactivating inactive
+        if (!isActive) {
+          await tx.channel.update({
+            where: { id: channelId },
+            data: {
+              memberCount: {
+                increment: 1,
+              },
+            },
+          });
+        }
+
+        return member;
+      };
+
+      // If transaction provided, execute directly in it; otherwise create new transaction
+      if (transaction) {
+        return await executeInTransaction(transaction);
       }
 
-      return member;
+      return await this.prisma.$transaction(executeInTransaction);
     } catch (error: any) {
       console.error("Error adding/reactivating channel member:", error);
       this.handleChannelMemberError(error, {
@@ -246,6 +233,73 @@ export class ChannelRepository implements IChannelRepository {
         role: role as any,
         joinedBy,
       });
+    }
+  }
+
+  /**
+   * Adds multiple members to a channel in a single transaction.
+   * Uses addOrReactivateMember for each member to handle reactivation.
+   * Used for direct/group_dm channel creation.
+   */
+  async addMembers(
+    channelId: string,
+    members: Array<{ userId: string; role: string; joinedBy: string | null }>,
+    transaction?: any
+  ): Promise<ChannelMember[]> {
+    try {
+      // If transaction provided, execute directly in it; otherwise create new transaction
+      const executeInTransaction = async (tx: any) => {
+        // Add all channel members using addOrReactivateMember
+        const createdMembers: ChannelMember[] = [];
+
+        for (const member of members) {
+          const channelMember = await this.addOrReactivateMember(
+            channelId,
+            member.userId,
+            member.joinedBy ?? member.userId,
+            member.role,
+            tx
+          );
+          createdMembers.push(channelMember);
+        }
+
+        return createdMembers;
+      };
+
+      if (transaction) {
+        return await executeInTransaction(transaction);
+      }
+
+      return await this.prisma.$transaction(executeInTransaction);
+    } catch (error: any) {
+      console.error("Error adding multiple channel members:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to add multiple channel members: ${error.message}`,
+        { originalError: error.code }
+      );
+    }
+  }
+
+  /**
+   * Finds a channel by name within a workspace.
+   * Used to check for duplicate channel names.
+   */
+  async findByNameInWorkspace(
+    workspaceId: string,
+    name: string
+  ): Promise<Channel | null> {
+    try {
+      return await this.prisma.channel.findFirst({
+        where: {
+          workspaceId,
+          name,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error finding channel by name:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find channel by name: ${error.message}`
+      );
     }
   }
 }

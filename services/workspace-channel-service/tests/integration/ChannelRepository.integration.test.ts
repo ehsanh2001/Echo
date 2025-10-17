@@ -204,7 +204,12 @@ describe("ChannelRepository Integration Tests", () => {
         joinedBy: randomUUID(),
       };
 
-      const result = await channelRepository.addMember(memberData);
+      const result = await channelRepository.addOrReactivateMember(
+        memberData.channelId,
+        memberData.userId,
+        memberData.joinedBy!,
+        memberData.role
+      );
 
       expect(result).toMatchObject({
         channelId: memberData.channelId,
@@ -243,7 +248,12 @@ describe("ChannelRepository Integration Tests", () => {
         role: "viewer",
       };
 
-      const result = await channelRepository.addMember(minimalMemberData);
+      const result = await channelRepository.addOrReactivateMember(
+        minimalMemberData.channelId,
+        minimalMemberData.userId,
+        "", // No joinedBy for minimal data
+        minimalMemberData.role
+      );
 
       expect(result).toMatchObject({
         channelId: minimalMemberData.channelId,
@@ -343,7 +353,7 @@ describe("ChannelRepository Integration Tests", () => {
       expect(result1.id).not.toBe(result2.id);
     });
 
-    it("should throw conflict error for duplicate channel membership", async () => {
+    it("should reactivate inactive member when adding duplicate membership", async () => {
       const db = prismaClientWithModels(prisma);
       const testWorkspace = await createTestWorkspace(db, "member-duplicate");
 
@@ -354,42 +364,60 @@ describe("ChannelRepository Integration Tests", () => {
       );
 
       const userId = randomUUID();
-      const memberData: CreateChannelMemberData = {
-        channelId: testChannel.id,
-        userId: userId,
-        role: "member",
-        joinedBy: randomUUID(),
-      };
+      const joinedBy = randomUUID();
 
       // Add member first time
-      const firstMember = await channelRepository.addMember(memberData);
+      const firstMember = await channelRepository.addOrReactivateMember(
+        testChannel.id,
+        userId,
+        joinedBy,
+        "member"
+      );
+      expect(firstMember.isActive).toBe(true);
 
-      // Try to add same user again
-      await expect(channelRepository.addMember(memberData)).rejects.toThrow(
-        WorkspaceChannelServiceError
+      // Deactivate the member manually
+      await db.channelMember.update({
+        where: { id: firstMember.id },
+        data: { isActive: false },
+      });
+
+      // Update channel count manually
+      await db.channel.update({
+        where: { id: testChannel.id },
+        data: { memberCount: { decrement: 1 } },
+      });
+
+      // Try to add same user again - should reactivate
+      const secondMember = await channelRepository.addOrReactivateMember(
+        testChannel.id,
+        userId,
+        joinedBy,
+        "member"
       );
 
-      await expect(channelRepository.addMember(memberData)).rejects.toThrow(
-        "User is already a member of this channel"
-      );
+      expect(secondMember.isActive).toBe(true);
+      expect(secondMember.id).toBe(firstMember.id); // Same record
 
-      const channelAfterAttempts = await db.channel.findUnique({
+      const channelAfterReactivation = await db.channel.findUnique({
         where: { id: testChannel.id },
       });
 
-      expect(channelAfterAttempts?.memberCount).toBe(2);
+      // Member count should be back to 2 (creator + reactivated member)
+      expect(channelAfterReactivation?.memberCount).toBe(2);
     });
 
     it("should handle foreign key constraint for non-existent channel", async () => {
-      const invalidMemberData: CreateChannelMemberData = {
-        channelId: randomUUID(), // Non-existent channel ID
-        userId: randomUUID(),
-        role: "member",
-        joinedBy: randomUUID(),
-      };
+      const invalidChannelId = randomUUID(); // Non-existent channel ID
+      const userId = randomUUID();
+      const joinedBy = randomUUID();
 
       await expect(
-        channelRepository.addMember(invalidMemberData)
+        channelRepository.addOrReactivateMember(
+          invalidChannelId,
+          userId,
+          joinedBy,
+          "member"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
