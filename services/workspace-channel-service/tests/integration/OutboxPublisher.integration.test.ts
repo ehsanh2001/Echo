@@ -157,10 +157,59 @@ describe("OutboxPublisher Integration Tests", () => {
     prisma = container.resolve<PrismaClient>(PrismaClient); // Use same instance from container
 
     // Clear database tables (in correct order due to foreign keys)
-    await prisma.outboxEvent.deleteMany();
-    await prisma.channelMember.deleteMany();
-    await prisma.channel.deleteMany();
-    await prisma.workspace.deleteMany();
+    // Only delete data created by this test suite (using TEST_PREFIX)
+    await prisma.outboxEvent.deleteMany({
+      where: {
+        aggregateId: {
+          in: await prisma.workspace
+            .findMany({
+              where: { name: { startsWith: TEST_PREFIX } },
+              select: { id: true },
+            })
+            .then((ws) => ws.map((w) => w.id)),
+        },
+      },
+    });
+
+    await prisma.invite.deleteMany({
+      where: {
+        workspace: {
+          name: { startsWith: TEST_PREFIX },
+        },
+      },
+    });
+
+    await prisma.channelMember.deleteMany({
+      where: {
+        channel: {
+          workspace: {
+            name: { startsWith: TEST_PREFIX },
+          },
+        },
+      },
+    });
+
+    await prisma.channel.deleteMany({
+      where: {
+        workspace: {
+          name: { startsWith: TEST_PREFIX },
+        },
+      },
+    });
+
+    await prisma.workspaceMember.deleteMany({
+      where: {
+        workspace: {
+          name: { startsWith: TEST_PREFIX },
+        },
+      },
+    });
+
+    await prisma.workspace.deleteMany({
+      where: {
+        name: { startsWith: TEST_PREFIX },
+      },
+    });
 
     // Purge test queue to remove any old messages
     try {
@@ -204,6 +253,11 @@ describe("OutboxPublisher Integration Tests", () => {
 
       // Delete workspaces
       if (createdWorkspaceIds.length > 0) {
+        // Delete invites first
+        await prisma.invite.deleteMany({
+          where: { workspaceId: { in: createdWorkspaceIds } },
+        });
+
         // Delete channel members first
         await prisma.channelMember.deleteMany({
           where: { channel: { workspaceId: { in: createdWorkspaceIds } } },

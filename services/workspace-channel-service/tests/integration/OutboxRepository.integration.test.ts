@@ -47,6 +47,13 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
 
       // Delete workspaces and their related data in proper order
       if (createdWorkspaceIds.length > 0) {
+        // Delete invites first (references both workspace and channel)
+        await prisma.invite.deleteMany({
+          where: {
+            workspaceId: { in: createdWorkspaceIds },
+          },
+        });
+
         // Delete channel members first
         await prisma.channelMember.deleteMany({
           where: {

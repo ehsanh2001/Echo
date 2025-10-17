@@ -358,7 +358,7 @@ describe("OutboxService", () => {
       // Simulate multiple instances creating events concurrently
       mockRepository.create.mockImplementation(async (data) => ({
         id: randomUUID(),
-        workspaceId: data.workspaceId,
+        workspaceId: data.workspaceId || null,
         channelId: null,
         aggregateType: data.aggregateType,
         aggregateId: data.aggregateId,

@@ -51,6 +51,8 @@ describe("InviteService", () => {
       findAllPending: jest.fn(),
       invalidateInvite: jest.fn(),
       deleteUnacceptedExpired: jest.fn(),
+      findByToken: jest.fn(),
+      markAsAccepted: jest.fn(),
     };
 
     mockWorkspaceRepository = {
@@ -60,6 +62,7 @@ describe("InviteService", () => {
       addMember: jest.fn(),
       getMembership: jest.fn(),
       countActiveMembers: jest.fn(),
+      addOrReactivateMember: jest.fn(),
     };
 
     mockOutboxService = {
