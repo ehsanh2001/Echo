@@ -288,3 +288,31 @@ export type EventPayload =
   | ChannelCreatedEventPayload
   | ChannelMemberAddedEventPayload;
 // Add more as needed
+
+// ===== INVITE ACCEPTANCE TYPES =====
+
+// Accept invite request
+export interface AcceptInviteRequest {
+  token: string;
+}
+
+// Channel info in accept invite response
+export interface AcceptInviteChannelInfo {
+  id: string;
+  name: string;
+  displayName: string | null;
+}
+
+// Workspace info in accept invite response
+export interface AcceptInviteWorkspaceInfo {
+  id: string;
+  name: string;
+  displayName: string | null;
+}
+
+// Accept invite response
+export interface AcceptInviteResponse {
+  message: string;
+  workspace: AcceptInviteWorkspaceInfo;
+  channels: AcceptInviteChannelInfo[];
+}

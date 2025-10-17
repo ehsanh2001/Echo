@@ -46,4 +46,26 @@ export interface IInviteRepository {
    * @returns Promise resolving to number of deleted invites
    */
   deleteUnacceptedExpired(olderThan: Date): Promise<number>;
+
+  /**
+   * Find an invite by its token
+   * @param token - The invite token
+   * @returns Promise resolving to the invite or null if not found
+   */
+  findByToken(token: string): Promise<Invite | null>;
+
+  /**
+   * Mark an invite as accepted
+   * @param inviteId - The invite ID
+   * @param acceptedBy - User ID who accepted the invite
+   * @param acceptedAt - Timestamp of acceptance
+   * @param transaction - Optional Prisma transaction context
+   * @returns Promise resolving to the updated invite
+   */
+  markAsAccepted(
+    inviteId: string,
+    acceptedBy: string,
+    acceptedAt: Date,
+    transaction?: any
+  ): Promise<Invite>;
 }

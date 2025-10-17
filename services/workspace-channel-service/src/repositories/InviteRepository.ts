@@ -142,6 +142,51 @@ export class InviteRepository implements IInviteRepository {
   }
 
   /**
+   * Find an invite by its token
+   * @param token - The invite token
+   * @returns Promise resolving to the invite or null if not found
+   */
+  async findByToken(token: string): Promise<Invite | null> {
+    try {
+      return await this.prisma.invite.findUnique({
+        where: { inviteToken: token },
+      });
+    } catch (error: any) {
+      console.error("Error finding invite by token:", error);
+      this.handleInviteError(error);
+    }
+  }
+
+  /**
+   * Mark an invite as accepted
+   * @param inviteId - The invite ID
+   * @param acceptedBy - User ID who accepted the invite
+   * @param acceptedAt - Timestamp of acceptance
+   * @param transaction - Optional Prisma transaction context
+   * @returns Promise resolving to the updated invite
+   */
+  async markAsAccepted(
+    inviteId: string,
+    acceptedBy: string,
+    acceptedAt: Date,
+    transaction?: any
+  ): Promise<Invite> {
+    try {
+      const prismaClient = transaction || this.prisma;
+
+      return await prismaClient.invite.update({
+        where: { id: inviteId },
+        data: {
+          acceptedBy,
+          acceptedAt,
+        },
+      });
+    } catch (error: any) {
+      this.handleInviteError(error, undefined, inviteId);
+    }
+  }
+
+  /**
    * Handle invite-specific errors and convert them to appropriate service errors
    * @param error - The Prisma error
    * @param inviteData - The invite data that caused the error (for context)

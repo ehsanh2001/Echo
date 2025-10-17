@@ -148,4 +148,104 @@ export class ChannelRepository implements IChannelRepository {
       this.handleChannelMemberError(error, data);
     }
   }
+
+  /**
+   * Finds all public, non-archived channels in a workspace
+   */
+  async findPublicChannelsByWorkspace(
+    workspaceId: string,
+    transaction?: any
+  ): Promise<Channel[]> {
+    try {
+      const prismaClient = transaction || this.prisma;
+
+      return await prismaClient.channel.findMany({
+        where: {
+          workspaceId,
+          type: "public",
+          isArchived: false,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+    } catch (error: any) {
+      console.error("Error finding public channels:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find public channels: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Adds a member to a channel or reactivates an inactive membership.
+   * Supports transaction context for atomic operations.
+   */
+  async addOrReactivateMember(
+    channelId: string,
+    userId: string,
+    joinedBy: string,
+    role: string = "member",
+    transaction?: any
+  ): Promise<ChannelMember> {
+    try {
+      const prismaClient = transaction || this.prisma;
+
+      // Check if membership exists to determine if we need to increment count
+      const existingMembership = await prismaClient.channelMember.findUnique({
+        where: {
+          channelId_userId: {
+            channelId,
+            userId,
+          },
+        },
+      });
+
+      const isActive = existingMembership?.isActive ?? false;
+
+      // Upsert the membership
+      const member = await prismaClient.channelMember.upsert({
+        where: {
+          channelId_userId: {
+            channelId,
+            userId,
+          },
+        },
+        create: {
+          channelId,
+          userId,
+          role: role as any,
+          joinedBy,
+          isActive: true,
+        },
+        update: {
+          isActive: true,
+          role: role as any,
+          joinedBy,
+        },
+      });
+
+      // Increment member count only if creating new or reactivating inactive
+      if (!isActive) {
+        await prismaClient.channel.update({
+          where: { id: channelId },
+          data: {
+            memberCount: {
+              increment: 1,
+            },
+          },
+        });
+      }
+
+      return member;
+    } catch (error: any) {
+      console.error("Error adding/reactivating channel member:", error);
+      this.handleChannelMemberError(error, {
+        channelId,
+        userId,
+        role: role as any,
+        joinedBy,
+      });
+    }
+  }
 }
