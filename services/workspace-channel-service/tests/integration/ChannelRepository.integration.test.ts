@@ -585,10 +585,7 @@ describe("ChannelRepository Integration Tests", () => {
 
     it("should support create with external transaction", async () => {
       const db = prismaClientWithModels(prisma);
-      const testWorkspace = await createTestWorkspace(
-        db,
-        "create-transaction"
-      );
+      const testWorkspace = await createTestWorkspace(db, "create-transaction");
       const creatorId = randomUUID();
 
       let channelId: string | undefined;
@@ -651,9 +648,7 @@ describe("ChannelRepository Integration Tests", () => {
 
       try {
         await prisma.$transaction(async (tx) => {
-          const members = [
-            { userId, role: "member", joinedBy: randomUUID() },
-          ];
+          const members = [{ userId, role: "member", joinedBy: randomUUID() }];
 
           await channelRepository.addMembers(channel.id, members, tx);
 
