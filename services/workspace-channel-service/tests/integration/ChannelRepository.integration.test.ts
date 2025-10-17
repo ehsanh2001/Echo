@@ -437,4 +437,250 @@ describe("ChannelRepository Integration Tests", () => {
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
   });
+
+  describe("new repository methods", () => {
+    it("should find channel by name in workspace", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "findbyname-test");
+
+      // Create a channel
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "test-channel"
+      );
+
+      // Find the channel by name
+      const foundChannel = await channelRepository.findByNameInWorkspace(
+        testWorkspace.id,
+        channel.name
+      );
+
+      expect(foundChannel).toBeDefined();
+      expect(foundChannel?.id).toBe(channel.id);
+      expect(foundChannel?.name).toBe(channel.name);
+      expect(foundChannel?.workspaceId).toBe(testWorkspace.id);
+    });
+
+    it("should return null when channel name not found in workspace", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(
+        db,
+        "findbyname-notfound"
+      );
+
+      const foundChannel = await channelRepository.findByNameInWorkspace(
+        testWorkspace.id,
+        "non-existent-channel"
+      );
+
+      expect(foundChannel).toBeNull();
+    });
+
+    it("should not find channel from different workspace", async () => {
+      const db = prismaClientWithModels(prisma);
+      const workspace1 = await createTestWorkspace(db, "findbyname-ws1");
+      const workspace2 = await createTestWorkspace(db, "findbyname-ws2");
+
+      // Create channel in workspace1
+      const channel = await createTestChannel(
+        channelRepository,
+        workspace1.id,
+        "shared-name"
+      );
+
+      // Try to find it in workspace2
+      const foundChannel = await channelRepository.findByNameInWorkspace(
+        workspace2.id,
+        channel.name
+      );
+
+      expect(foundChannel).toBeNull();
+    });
+
+    it("should add multiple members to channel atomically", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "addmembers-test");
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "multi-member-channel"
+      );
+
+      const user1Id = randomUUID();
+      const user2Id = randomUUID();
+      const user3Id = randomUUID();
+      const addedById = randomUUID();
+
+      const members = [
+        { userId: user1Id, role: "member", joinedBy: addedById },
+        { userId: user2Id, role: "member", joinedBy: addedById },
+        { userId: user3Id, role: "admin", joinedBy: addedById },
+      ];
+
+      const result = await channelRepository.addMembers(
+        channel.id,
+        members,
+        undefined
+      );
+
+      // Verify all members were added
+      expect(result).toHaveLength(3);
+      expect(result.length).toBeGreaterThanOrEqual(3);
+      expect(result[0]!.userId).toBe(user1Id);
+      expect(result[0]!.role).toBe("member");
+      expect(result[1]!.userId).toBe(user2Id);
+      expect(result[2]!.userId).toBe(user3Id);
+      expect(result[2]!.role).toBe("admin");
+
+      // Verify member count was incremented
+      const updatedChannel = await db.channel.findUnique({
+        where: { id: channel.id },
+      });
+      expect(updatedChannel.memberCount).toBe(channel.memberCount + 3);
+    });
+
+    it("should handle addMembers with transaction", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(
+        db,
+        "addmembers-transaction"
+      );
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "transaction-channel"
+      );
+
+      const userId = randomUUID();
+      const addedById = randomUUID();
+
+      await prisma.$transaction(async (tx) => {
+        const members = [{ userId, role: "member", joinedBy: addedById }];
+
+        const result = await channelRepository.addMembers(
+          channel.id,
+          members,
+          tx
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result.length).toBeGreaterThanOrEqual(1);
+        expect(result[0]!.userId).toBe(userId);
+      });
+
+      // Verify member was added after transaction
+      const channelMember = await db.channelMember.findUnique({
+        where: {
+          channelId_userId: {
+            channelId: channel.id,
+            userId,
+          },
+        },
+      });
+
+      expect(channelMember).toBeDefined();
+      expect(channelMember.isActive).toBe(true);
+    });
+
+    it("should support create with external transaction", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(
+        db,
+        "create-transaction"
+      );
+      const creatorId = randomUUID();
+
+      let channelId: string | undefined;
+
+      await prisma.$transaction(async (tx) => {
+        const channelData: CreateChannelData = {
+          workspaceId: testWorkspace.id,
+          name: `${TEST_PREFIX}tx-channel-${randomUUID()}`,
+          type: "private",
+          createdBy: creatorId,
+          memberCount: 1,
+          settings: {},
+        };
+
+        const channel = await channelRepository.create(
+          channelData,
+          creatorId,
+          tx
+        );
+
+        channelId = channel.id;
+        expect(channel.name).toBe(channelData.name);
+        expect(channel.type).toBe("private");
+      });
+
+      // Verify channel was created after transaction commits
+      expect(channelId).toBeDefined();
+      const createdChannel = await db.channel.findUnique({
+        where: { id: channelId! },
+      });
+
+      expect(createdChannel).toBeDefined();
+      expect(createdChannel.workspaceId).toBe(testWorkspace.id);
+
+      // Verify creator was added as member
+      const creatorMember = await db.channelMember.findUnique({
+        where: {
+          channelId_userId: {
+            channelId: channelId!,
+            userId: creatorId,
+          },
+        },
+      });
+
+      expect(creatorMember).toBeDefined();
+      expect(creatorMember.role).toBe("owner");
+    });
+
+    it("should rollback addMembers on transaction failure", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "rollback-test");
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "rollback-channel"
+      );
+
+      const initialMemberCount = channel.memberCount;
+      const userId = randomUUID();
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          const members = [
+            { userId, role: "member", joinedBy: randomUUID() },
+          ];
+
+          await channelRepository.addMembers(channel.id, members, tx);
+
+          // Force a rollback by throwing an error
+          throw new Error("Intentional rollback");
+        });
+      } catch (error: any) {
+        expect(error.message).toBe("Intentional rollback");
+      }
+
+      // Verify member was NOT added (transaction rolled back)
+      const channelMember = await db.channelMember.findUnique({
+        where: {
+          channelId_userId: {
+            channelId: channel.id,
+            userId,
+          },
+        },
+      });
+
+      expect(channelMember).toBeNull();
+
+      // Verify member count was NOT incremented
+      const updatedChannel = await db.channel.findUnique({
+        where: { id: channel.id },
+      });
+      expect(updatedChannel.memberCount).toBe(initialMemberCount);
+    });
+  });
 });
