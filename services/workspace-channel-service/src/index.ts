@@ -30,11 +30,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Import routes after dependencies are configured
 import workspaceRoutes from "./routes/workspaceRoutes";
-import inviteRoutes from "./routes/inviteRoutes";
 
-// API routes
-app.use("/api/workspaces/:workspaceId/invites", inviteRoutes);
-app.use("/api/workspaces", workspaceRoutes);
+// API routes - new routing structure
+// Main path: /api/ws-ch
+app.use("/api/ws-ch/workspaces", workspaceRoutes);
 
 // Health check endpoint
 app.get("/health", async (req, res) => {

@@ -4,6 +4,7 @@ import { jwtAuth } from "../middleware/jwtAuth";
 
 /**
  * Workspace routes
+ * Base path: /api/ws-ch/workspaces
  */
 const workspaceRoutes = Router();
 // Instantiate controller directly - controllers don't need DI since they have single implementations
@@ -11,7 +12,7 @@ const workspaceController = new WorkspaceController();
 
 /**
  * Create a new workspace
- * POST /api/workspaces
+ * POST /api/ws-ch/workspaces
  *
  * Body:
  * {
@@ -34,7 +35,7 @@ workspaceRoutes.post("/", jwtAuth, async (req, res) => {
 
 /**
  * Check if workspace name is available
- * GET /api/workspaces/check-name/:name
+ * GET /api/ws-ch/workspaces/check-name/:name
  *
  * Response:
  * {
@@ -52,7 +53,7 @@ workspaceRoutes.get("/check-name/:name", jwtAuth, async (req, res) => {
 
 /**
  * Accept workspace invite
- * POST /api/workspaces/invites/accept
+ * POST /api/ws-ch/workspaces/invites/accept
  *
  * Body:
  * {
@@ -75,8 +76,47 @@ workspaceRoutes.post("/invites/accept", jwtAuth, async (req, res) => {
 });
 
 /**
+ * Create a workspace invite
+ * POST /api/ws-ch/workspaces/:workspaceId/invites
+ *
+ * Authorization: Only workspace owners and admins can create invites
+ *
+ * Body:
+ * {
+ *   "email": "user@example.com", // required
+ *   "role": "member", // optional, defaults to "member" (can be "owner", "admin", "member", "guest")
+ *   "expiresInDays": 7, // optional, defaults to 7 (1-30 days)
+ *   "customMessage": "Welcome to our workspace!" // optional, max 500 characters
+ * }
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "inviteId": "uuid",
+ *     "email": "user@example.com",
+ *     "workspaceId": "uuid",
+ *     "workspaceName": "my-workspace",
+ *     "workspaceDisplayName": "My Workspace",
+ *     "role": "member",
+ *     "invitedBy": "uuid",
+ *     "inviteToken": "secure-token",
+ *     "inviteUrl": "https://app.example.com/invite/secure-token",
+ *     "expiresAt": "2025-10-23T...",
+ *     "customMessage": "Welcome to our workspace!",
+ *     "createdAt": "2025-10-16T..."
+ *   },
+ *   "message": "Workspace invite created successfully",
+ *   "timestamp": "2025-10-16T..."
+ * }
+ */
+workspaceRoutes.post("/:workspaceId/invites", jwtAuth, async (req, res) => {
+  await workspaceController.createWorkspaceInvite(req as any, res);
+});
+
+/**
  * Get workspace details
- * GET /api/workspaces/:workspaceId
+ * GET /api/ws-ch/workspaces/:workspaceId
  *
  * Returns workspace details with user's role and member count
  * Protected - requires JWT authentication
