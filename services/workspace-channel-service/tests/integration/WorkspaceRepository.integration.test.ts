@@ -32,6 +32,16 @@ describe("WorkspaceRepository Integration Tests", () => {
     // Clean up test data after each test to ensure clean state for next test
     const db = prismaClientWithModels(prisma);
 
+    await db.invite.deleteMany({
+      where: {
+        workspace: {
+          name: {
+            startsWith: TEST_PREFIX,
+          },
+        },
+      },
+    });
+
     await db.channelMember.deleteMany({
       where: {
         channel: {

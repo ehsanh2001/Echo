@@ -3,16 +3,20 @@ import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { WorkspaceService } from "../../src/services/WorkspaceService";
 import { IWorkspaceRepository } from "../../src/interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../../src/interfaces/repositories/IChannelRepository";
+import { IInviteRepository } from "../../src/interfaces/repositories/IInviteRepository";
 import { UserServiceClient } from "../../src/services/userServiceClient";
 import { CreateWorkspaceRequest, UserInfo } from "../../src/types";
 import { WorkspaceChannelServiceError } from "../../src/utils/errors";
 import { Workspace } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 describe("WorkspaceService (Unit Tests)", () => {
   let workspaceService: WorkspaceService;
   let mockWorkspaceRepository: jest.Mocked<IWorkspaceRepository>;
   let mockChannelRepository: jest.Mocked<IChannelRepository>;
+  let mockInviteRepository: jest.Mocked<IInviteRepository>;
   let mockUserServiceClient: jest.Mocked<UserServiceClient>;
+  let mockPrisma: jest.Mocked<PrismaClient>;
 
   const mockWorkspace: Workspace = {
     id: "workspace-123",
@@ -48,6 +52,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       findByName: jest.fn(),
       findById: jest.fn(),
       addMember: jest.fn(),
+      addOrReactivateMember: jest.fn(),
       getMembership: jest.fn(),
       countActiveMembers: jest.fn(),
     } as any;
@@ -57,17 +62,30 @@ describe("WorkspaceService (Unit Tests)", () => {
       createInTransaction: jest.fn(),
       findById: jest.fn(),
       addMember: jest.fn(),
+      findPublicChannelsByWorkspace: jest.fn(),
+      addOrReactivateMember: jest.fn(),
+    } as any;
+
+    mockInviteRepository = {
+      findByToken: jest.fn(),
+      markAsAccepted: jest.fn(),
     } as any;
 
     mockUserServiceClient = {
       checkUserExistsById: jest.fn(),
     } as any;
 
+    mockPrisma = {
+      $transaction: jest.fn((callback: any) => callback(mockPrisma)),
+    } as any;
+
     // Create service with mocked dependencies
     workspaceService = new WorkspaceService(
       mockWorkspaceRepository,
       mockChannelRepository,
-      mockUserServiceClient
+      mockInviteRepository,
+      mockUserServiceClient,
+      mockPrisma
     );
 
     // Reset all mocks
@@ -911,6 +929,356 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(result.memberCount).toBe(10000);
+    });
+  });
+
+  describe("acceptInvite", () => {
+    const mockInvite: any = {
+      id: "invite-123",
+      workspaceId: "workspace-123",
+      inviterId: "inviter-456",
+      type: "workspace",
+      email: "test@example.com",
+      inviteToken: "valid-token-123",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+      acceptedAt: null,
+      acceptedBy: null,
+      role: "member",
+      channelId: null,
+      createdAt: new Date(),
+      metadata: {},
+    };
+
+    const mockChannel1: any = {
+      id: "channel-1",
+      name: "general",
+      displayName: "General",
+      workspaceId: "workspace-123",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      description: "General channel",
+      isPrivate: false,
+      isArchived: false,
+      createdBy: "user-123",
+      type: "public",
+      settings: {},
+      memberCount: 10,
+      lastActivity: null,
+      isReadOnly: false,
+    };
+
+    const mockChannel2: any = {
+      id: "channel-2",
+      name: "random",
+      displayName: "Random",
+      workspaceId: "workspace-123",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      description: "Random channel",
+      isPrivate: false,
+      isArchived: false,
+      createdBy: "user-123",
+      type: "public",
+      settings: {},
+      memberCount: 5,
+      lastActivity: null,
+      isReadOnly: false,
+    };
+
+    const mockMembershipResult: any = {
+      id: "membership-123",
+      workspaceId: "workspace-123",
+      userId: "user-789",
+      role: "member",
+      invitedBy: "inviter-456",
+      joinedAt: new Date(),
+      lastSeenAt: null,
+      leftAt: null,
+      isActive: true,
+      preferences: {},
+    };
+
+    const mockChannelMembershipResult: any = {
+      id: "channel-membership-123",
+      userId: "user-789",
+      role: "member",
+      joinedAt: new Date(),
+      isActive: true,
+      channelId: "channel-1",
+      joinedBy: "inviter-456",
+      isMuted: false,
+    };
+
+    const mockUpdatedInvite: any = {
+      ...mockInvite,
+      acceptedBy: "user-789",
+      acceptedAt: new Date(),
+    };
+
+    it("should accept invite and add user to workspace and all public channels", async () => {
+      // Arrange
+      mockInviteRepository.findByToken.mockResolvedValue(mockInvite);
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockChannelRepository.findPublicChannelsByWorkspace.mockResolvedValue([
+        mockChannel1,
+        mockChannel2,
+      ]);
+      mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
+        mockMembershipResult
+      );
+      mockChannelRepository.addOrReactivateMember.mockResolvedValue(
+        mockChannelMembershipResult
+      );
+      mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
+
+      // Act
+      const result = await workspaceService.acceptInvite(
+        "valid-token-123",
+        "user-789"
+      );
+
+      // Assert - Initial lookups happen outside transaction
+      expect(mockInviteRepository.findByToken).toHaveBeenCalledWith(
+        "valid-token-123"
+      );
+      expect(mockWorkspaceRepository.findById).toHaveBeenCalledWith(
+        "workspace-123"
+      );
+
+      // Transaction operations
+      expect(
+        mockWorkspaceRepository.addOrReactivateMember
+      ).toHaveBeenCalledWith(
+        "workspace-123",
+        "user-789",
+        "member",
+        "inviter-456",
+        mockPrisma
+      );
+      expect(mockInviteRepository.markAsAccepted).toHaveBeenCalledWith(
+        "invite-123",
+        "user-789",
+        expect.any(Date),
+        mockPrisma
+      );
+      expect(
+        mockChannelRepository.findPublicChannelsByWorkspace
+      ).toHaveBeenCalledWith("workspace-123", mockPrisma);
+      expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledTimes(
+        2
+      );
+      expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
+        "channel-1",
+        "user-789",
+        "inviter-456",
+        "member",
+        mockPrisma
+      );
+      expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
+        "channel-2",
+        "user-789",
+        "inviter-456",
+        "member",
+        mockPrisma
+      );
+
+      // Verify response structure
+      expect(result.workspace.id).toBe(mockWorkspace.id);
+      expect(result.workspace.name).toBe(mockWorkspace.name);
+      expect(result.workspace.displayName).toBe(mockWorkspace.displayName);
+      expect(result.channels).toHaveLength(2);
+      expect(result.channels[0]!.id).toBe(mockChannel1.id);
+      expect(result.channels[1]!.id).toBe(mockChannel2.id);
+    });
+
+    it("should throw 404 error if invite token not found", async () => {
+      // Arrange
+      mockInviteRepository.findByToken.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        workspaceService.acceptInvite("invalid-token", "user-789")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.acceptInvite("invalid-token", "user-789")
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    });
+
+    it("should throw 400 error if invite is not a workspace invite", async () => {
+      // Arrange
+      const channelInvite = {
+        ...mockInvite,
+        type: "channel",
+      };
+      mockInviteRepository.findByToken.mockResolvedValue(channelInvite);
+
+      // Act & Assert
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: "BAD_REQUEST",
+      });
+    });
+
+    it("should throw 410 error if invite is expired", async () => {
+      // Arrange
+      const expiredInvite = {
+        ...mockInvite,
+        expiresAt: new Date(Date.now() - 1000), // Expired 1 second ago
+      };
+      mockInviteRepository.findByToken.mockResolvedValue(expiredInvite);
+
+      // Act & Assert
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toMatchObject({
+        statusCode: 410,
+        code: "EXPIRED",
+      });
+    });
+
+    it("should throw 404 error if workspace not found", async () => {
+      // Arrange
+      mockInviteRepository.findByToken.mockResolvedValue(mockInvite);
+      mockWorkspaceRepository.findById.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    });
+
+    it("should throw 403 error if workspace is archived", async () => {
+      // Arrange
+      const archivedWorkspace = {
+        ...mockWorkspace,
+        isArchived: true,
+      };
+      mockInviteRepository.findByToken.mockResolvedValue(mockInvite);
+      mockWorkspaceRepository.findById.mockResolvedValue(archivedWorkspace);
+
+      // Act & Assert
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+
+      await expect(
+        workspaceService.acceptInvite("valid-token-123", "user-789")
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: "FORBIDDEN",
+      });
+    });
+
+    it("should handle workspace with no public channels", async () => {
+      // Arrange
+      mockInviteRepository.findByToken.mockResolvedValue(mockInvite);
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockChannelRepository.findPublicChannelsByWorkspace.mockResolvedValue([]);
+      mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
+        mockMembershipResult
+      );
+      mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
+
+      // Act
+      const result = await workspaceService.acceptInvite(
+        "valid-token-123",
+        "user-789"
+      );
+
+      // Assert
+      expect(
+        mockChannelRepository.addOrReactivateMember
+      ).not.toHaveBeenCalled();
+      expect(result.workspace.id).toBe(mockWorkspace.id);
+      expect(result.workspace.name).toBe(mockWorkspace.name);
+      expect(result.channels).toEqual([]);
+    });
+
+    it("should use userId as fallback when inviterId is null", async () => {
+      // Arrange
+      const inviteWithoutInviter = {
+        ...mockInvite,
+        inviterId: null,
+      };
+      mockInviteRepository.findByToken.mockResolvedValue(inviteWithoutInviter);
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockChannelRepository.findPublicChannelsByWorkspace.mockResolvedValue([
+        mockChannel1,
+      ]);
+      mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
+        mockMembershipResult
+      );
+      mockChannelRepository.addOrReactivateMember.mockResolvedValue(
+        mockChannelMembershipResult
+      );
+      mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
+
+      // Act
+      await workspaceService.acceptInvite("valid-token-123", "user-789");
+
+      // Assert - Should use userId when inviterId is null
+      expect(
+        mockWorkspaceRepository.addOrReactivateMember
+      ).toHaveBeenCalledWith(
+        "workspace-123",
+        "user-789",
+        "member",
+        "user-789", // userId used as fallback
+        mockPrisma
+      );
+      expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
+        "channel-1",
+        "user-789",
+        "user-789", // userId used as fallback
+        "member",
+        mockPrisma
+      );
+    });
+
+    it("should execute all operations within a transaction", async () => {
+      // Arrange
+      mockInviteRepository.findByToken.mockResolvedValue(mockInvite);
+      mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
+      mockChannelRepository.findPublicChannelsByWorkspace.mockResolvedValue([
+        mockChannel1,
+      ]);
+      mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
+        mockMembershipResult
+      );
+      mockChannelRepository.addOrReactivateMember.mockResolvedValue(
+        mockChannelMembershipResult
+      );
+      mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
+
+      // Act
+      await workspaceService.acceptInvite("valid-token-123", "user-789");
+
+      // Assert - Verify transaction was used
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
     });
   });
 });

@@ -67,4 +67,23 @@ export interface IWorkspaceRepository {
    * @returns {Promise<number>} The count of active members
    */
   countActiveMembers(workspaceId: string): Promise<number>;
+
+  /**
+   * Adds a member to a workspace or reactivates an inactive membership.
+   * Supports transaction context for atomic operations.
+   *
+   * @param workspaceId - The workspace ID
+   * @param userId - The user ID to add
+   * @param role - The role to assign (default: 'member')
+   * @param invitedBy - Optional user ID who invited this member
+   * @param transaction - Optional Prisma transaction context
+   * @returns {Promise<WorkspaceMember>} The created or reactivated membership
+   */
+  addOrReactivateMember(
+    workspaceId: string,
+    userId: string,
+    role: string,
+    invitedBy: string | null,
+    transaction?: any
+  ): Promise<WorkspaceMember>;
 }

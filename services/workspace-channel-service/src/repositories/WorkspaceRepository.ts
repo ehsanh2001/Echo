@@ -215,4 +215,52 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       );
     }
   }
+
+  /**
+   * Adds a member to a workspace or reactivates an inactive membership.
+   * Supports transaction context for atomic operations.
+   */
+  async addOrReactivateMember(
+    workspaceId: string,
+    userId: string,
+    role: string = "member",
+    invitedBy: string | null = null,
+    transaction?: any
+  ): Promise<WorkspaceMember> {
+    try {
+      const prismaClient = transaction || this.prisma;
+
+      // Upsert the membership (create new or update existing)
+      const member = await prismaClient.workspaceMember.upsert({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId,
+          },
+        },
+        create: {
+          workspaceId,
+          userId,
+          role: role as any,
+          invitedBy,
+          isActive: true,
+        },
+        update: {
+          isActive: true,
+          role: role as any,
+          invitedBy,
+        },
+      });
+
+      return member;
+    } catch (error: any) {
+      console.error("Error adding/reactivating workspace member:", error);
+      this.handleMemberError(error, {
+        workspaceId,
+        userId,
+        role: role as any,
+        invitedBy,
+      });
+    }
+  }
 }

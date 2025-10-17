@@ -28,6 +28,27 @@ services:
       timeout: 10s
       retries: 3
 
+  # RabbitMQ - Message broker for event-driven architecture and async processing
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: echo-rabbitmq
+    ports:
+      - "5672:5672" # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-dev-rabbitmq-password}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # User Service - Handles authentication, user profiles
   user-service:
     build: ./services/user-service
@@ -54,4 +75,6 @@ services:
 
 volumes:
   redis_data:
+    driver: local
+  rabbitmq_data:
     driver: local

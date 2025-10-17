@@ -121,4 +121,24 @@ export class WorkspaceChannelServiceError extends Error {
       details
     );
   }
+
+  /**
+   * Create an expired resource error (410 Gone)
+   */
+  static expired(resource: string, message?: string) {
+    const errorMessage = message || `${resource} has expired`;
+    return new WorkspaceChannelServiceError(errorMessage, "EXPIRED", 410);
+  }
+
+  /**
+   * Create an already exists error (409 Conflict) for when resource already exists
+   */
+  static alreadyExists(resource: string, details?: Record<string, any>) {
+    return new WorkspaceChannelServiceError(
+      `${resource} already exists`,
+      "ALREADY_EXISTS",
+      409,
+      details
+    );
+  }
 }

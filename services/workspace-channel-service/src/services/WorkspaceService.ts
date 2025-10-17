@@ -1,14 +1,17 @@
 import { injectable, inject } from "tsyringe";
 import { Workspace } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
+import { IInviteRepository } from "../interfaces/repositories/IInviteRepository";
 import { UserServiceClient } from "./userServiceClient";
 import {
   CreateWorkspaceRequest,
   WorkspaceResponse,
   WorkspaceDetailsResponse,
   CreateWorkspaceData,
+  AcceptInviteResponse,
 } from "../types";
 import {
   validateCreateWorkspaceRequest,
@@ -25,7 +28,9 @@ export class WorkspaceService implements IWorkspaceService {
     @inject("IWorkspaceRepository")
     private workspaceRepository: IWorkspaceRepository,
     @inject("IChannelRepository") private channelRepository: IChannelRepository,
-    @inject("UserServiceClient") private userServiceClient: UserServiceClient
+    @inject("IInviteRepository") private inviteRepository: IInviteRepository,
+    @inject("UserServiceClient") private userServiceClient: UserServiceClient,
+    @inject(PrismaClient) private prisma: PrismaClient
   ) {}
 
   /**
@@ -315,5 +320,172 @@ export class WorkspaceService implements IWorkspaceService {
       userRole: membership.role,
       memberCount,
     };
+  }
+
+  /**
+   * Accept a workspace invite
+   * Atomically adds user to workspace and all public channels
+   */
+  async acceptInvite(
+    token: string,
+    userId: string
+  ): Promise<AcceptInviteResponse> {
+    try {
+      console.log(`Processing invite acceptance for user: ${userId}`);
+
+      //  Find invite by token
+      const invite = await this.inviteRepository.findByToken(token);
+      if (!invite) {
+        throw WorkspaceChannelServiceError.notFound("Invite", token);
+      }
+
+      //  Validate invite and workspace
+      const workspace = await this.validateInviteAndWorkspace(invite);
+
+      // Execute all operations in a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Add user to workspace and mark invite as accepted
+        await this.addUserToWorkspaceAndAcceptInvite(
+          workspace.id,
+          userId,
+          invite,
+          tx
+        );
+
+        // Add user to all public channels
+        const publicChannels = await this.addUserToPublicChannels(
+          workspace.id,
+          userId,
+          invite.inviterId || userId,
+          tx
+        );
+
+        return { workspace, publicChannels };
+      });
+
+      console.log(
+        `✅ Invite accepted: User ${userId} joined workspace ${workspace.name} and ${result.publicChannels.length} public channels`
+      );
+
+      // Build response
+      return {
+        message: "Invite accepted successfully",
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+          displayName: workspace.displayName,
+        },
+        channels: result.publicChannels.map((channel) => ({
+          id: channel.id,
+          name: channel.name,
+          displayName: channel.displayName,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof WorkspaceChannelServiceError) {
+        throw error;
+      }
+      console.error("Error accepting invite:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to accept invite due to unexpected error"
+      );
+    }
+  }
+
+  /**
+   * Validates invite and workspace
+   * @private
+   */
+  private async validateInviteAndWorkspace(invite: any): Promise<Workspace> {
+    // 2. Validate invite type
+    if (invite.type !== "workspace") {
+      throw WorkspaceChannelServiceError.badRequest(
+        "Invalid invite type for workspace"
+      );
+    }
+
+    // 3. Check if expired
+    if (invite.expiresAt && invite.expiresAt < new Date()) {
+      throw WorkspaceChannelServiceError.expired("Invite");
+    }
+
+    // 4. Find workspace
+    const workspace = await this.workspaceRepository.findById(
+      invite.workspaceId!
+    );
+    if (!workspace) {
+      throw WorkspaceChannelServiceError.notFound(
+        "Workspace",
+        invite.workspaceId || "unknown"
+      );
+    }
+
+    // 5. Check workspace is not archived
+    if (workspace.isArchived) {
+      throw WorkspaceChannelServiceError.forbidden(
+        "Cannot accept invite to archived workspace"
+      );
+    }
+
+    return workspace;
+  }
+
+  /**
+   * Adds user to workspace and marks invite as accepted (steps 6.1-6.2)
+   * @private
+   */
+  private async addUserToWorkspaceAndAcceptInvite(
+    workspaceId: string,
+    userId: string,
+    invite: any,
+    tx: any
+  ): Promise<void> {
+    // 6.1 Add user to workspace (or reactivate)
+    await this.workspaceRepository.addOrReactivateMember(
+      workspaceId,
+      userId,
+      invite.role || "member",
+      invite.inviterId || userId, // Use inviter ID or fallback to user themselves
+      tx
+    );
+
+    // 6.2 Mark invite as accepted
+    await this.inviteRepository.markAsAccepted(
+      invite.id,
+      userId,
+      new Date(),
+      tx
+    );
+  }
+
+  /**
+   * Adds user to all public channels in workspace (steps 6.3-6.4)
+   * @private
+   */
+  private async addUserToPublicChannels(
+    workspaceId: string,
+    userId: string,
+    inviterId: string,
+    tx: any
+  ): Promise<any[]> {
+    // 6.3 Get all public non-archived channels
+    const publicChannels =
+      await this.channelRepository.findPublicChannelsByWorkspace(
+        workspaceId,
+        tx
+      );
+
+    // 6.4 Add user to all public channels
+    for (const channel of publicChannels) {
+      await this.channelRepository.addOrReactivateMember(
+        channel.id,
+        userId,
+        inviterId, // Use inviter or fallback to user themselves
+        "member",
+        tx
+      );
+    }
+
+    return publicChannels;
   }
 }

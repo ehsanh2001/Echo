@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { container } from "tsyringe";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
-import { CreateWorkspaceRequest } from "../types";
+import { CreateWorkspaceRequest, AcceptInviteRequest } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 import { config } from "../config/env";
 
@@ -114,6 +114,45 @@ export class WorkspaceController {
       });
     } catch (error) {
       this.handleControllerError("getWorkspaceDetails", error, res);
+    }
+  }
+
+  /**
+   * Accept workspace invite
+   * POST /api/workspaces/invites/accept
+   *
+   * Protected endpoint - requires JWT authentication
+   * Accepts an invite token and adds user to workspace and all public channels
+   */
+  async acceptInvite(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { token } = req.body;
+
+      if (!token || typeof token !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Invite token is required"
+        );
+      }
+
+      console.log(
+        `Accept invite request from user: ${
+          req.user.userId
+        } with token: ${token.substring(0, 10)}...`
+      );
+
+      const result = await this.workspaceService.acceptInvite(
+        token,
+        req.user.userId
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: "Workspace invite accepted successfully",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("acceptInvite", error, res);
     }
   }
 

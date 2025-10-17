@@ -49,4 +49,36 @@ export interface IChannelRepository {
    * @returns {Promise<ChannelMember>} The created membership
    */
   addMember(data: CreateChannelMemberData): Promise<ChannelMember>;
+
+  /**
+   * Finds all public, non-archived channels in a workspace.
+   * Used when adding a user to all public channels.
+   *
+   * @param workspaceId - The workspace ID
+   * @param transaction - Optional Prisma transaction context
+   * @returns {Promise<Channel[]>} Array of public channels
+   */
+  findPublicChannelsByWorkspace(
+    workspaceId: string,
+    transaction?: any
+  ): Promise<Channel[]>;
+
+  /**
+   * Adds a member to a channel or reactivates an inactive membership.
+   * Supports transaction context for atomic operations.
+   *
+   * @param channelId - The channel ID
+   * @param userId - The user ID to add
+   * @param joinedBy - The user ID who added this member
+   * @param role - The role to assign (default: 'member')
+   * @param transaction - Optional Prisma transaction context
+   * @returns {Promise<ChannelMember>} The created or reactivated membership
+   */
+  addOrReactivateMember(
+    channelId: string,
+    userId: string,
+    joinedBy: string,
+    role: string,
+    transaction?: any
+  ): Promise<ChannelMember>;
 }

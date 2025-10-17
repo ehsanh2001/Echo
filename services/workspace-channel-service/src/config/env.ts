@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { WorkspaceRole } from "@prisma/client";
 
 /**
  * Load environment variables from multiple sources
@@ -97,6 +98,62 @@ export const config = {
     userServiceUrl: getOptionalEnv("USER_SERVICE_URL", "http://localhost:8001"),
   },
 
+  // Frontend Configuration
+  frontend: {
+    baseUrl: getRequiredEnv("FRONTEND_BASE_URL"),
+  },
+
+  // RabbitMQ Configuration
+  rabbitmq: {
+    url: getRequiredEnv("RABBITMQ_URL"),
+    exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "echo.events"),
+  },
+
+  // Invite Configuration & Business Rules
+  invites: {
+    // Configurable via environment (with sensible defaults)
+    defaultExpirationDays: parseInt(
+      getOptionalEnv("INVITE_DEFAULT_EXPIRATION_DAYS", "7")
+    ),
+
+    // Business rules (constants - rarely change)
+    maxExpirationDays: 30,
+    minExpirationDays: 1,
+    defaultRole: WorkspaceRole.member,
+    maxCustomMessageLength: 500,
+    tokenLength: 64,
+  },
+
+  // Outbox Configuration
+  outbox: {
+    // Configurable via environment (with sensible defaults)
+    maxBatchSize: parseInt(getOptionalEnv("OUTBOX_MAX_BATCH_SIZE", "50")),
+    maxRetryAttempts: parseInt(
+      getOptionalEnv("OUTBOX_MAX_RETRY_ATTEMPTS", "3")
+    ),
+    retryDelayMs: parseInt(getOptionalEnv("OUTBOX_RETRY_DELAY_MS", "5000")), // 5 seconds
+    cleanupIntervalMs: parseInt(
+      getOptionalEnv("OUTBOX_CLEANUP_INTERVAL_MS", "3600000")
+    ), // 1 hour
+    cleanupRetentionDays: parseInt(
+      getOptionalEnv("OUTBOX_CLEANUP_RETENTION_DAYS", "7")
+    ), // Keep published events for 7 days
+  },
+
+  // Worker Configuration (Constants - prevent environment variable explosion)
+  worker: {
+    // Outbox publisher polling interval in milliseconds (5 seconds)
+    pollIntervalMs: 5000,
+    // Batch size for processing events (use outbox.maxBatchSize)
+    batchSize: 50,
+    // Maximum retry attempts before marking as failed (use outbox.maxRetryAttempts)
+    maxRetries: 3,
+    // Delay between retries in milliseconds (use outbox.retryDelayMs)
+    retryDelayMs: 5000,
+    // Graceful shutdown timeout in milliseconds (30 seconds)
+    shutdownTimeoutMs: 30000,
+  },
+
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(getOptionalEnv("RATE_LIMIT_WINDOW", "900000")), // 15 minutes
@@ -148,6 +205,21 @@ export function validateConfig() {
     errors.push("USER_SERVICE_URL must be a valid URL");
   }
 
+  // Frontend URL validation
+  try {
+    new URL(config.frontend.baseUrl);
+  } catch {
+    errors.push("FRONTEND_BASE_URL must be a valid URL");
+  }
+
+  // RabbitMQ URL validation
+  if (
+    !config.rabbitmq.url.startsWith("amqp://") &&
+    !config.rabbitmq.url.startsWith("amqps://")
+  ) {
+    errors.push("RABBITMQ_URL must start with amqp:// or amqps://");
+  }
+
   // Throw error if any validation failed
   if (errors.length > 0) {
     throw new Error(
@@ -172,6 +244,21 @@ export function validateConfig() {
   console.log(
     `Database: ${dbUrl.protocol}//${dbUrl.hostname}:${dbUrl.port}${dbUrl.pathname}`
   );
+
+  // Parse and display RabbitMQ connection details (safely, without credentials)
+  try {
+    const rabbitUrl = new URL(config.rabbitmq.url);
+    console.log(
+      `RabbitMQ: ${rabbitUrl.protocol}//${rabbitUrl.hostname}:${
+        rabbitUrl.port || 5672
+      }`
+    );
+    console.log(`RabbitMQ Exchange: ${config.rabbitmq.exchange}`);
+  } catch {
+    console.log(
+      `RabbitMQ: ${config.rabbitmq.url.split("@")[1] || config.rabbitmq.url}`
+    );
+  }
 }
 
 // Automatically validate configuration when this module is loaded
