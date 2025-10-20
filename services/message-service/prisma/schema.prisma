@@ -1,0 +1,236 @@
+// This is your Prisma schema file for Message Service
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE TABLES
+// ============================================================================
+
+/// Messages table - stores all messages (DMs, channels, threads)
+model Message {
+  // Composite Primary Key
+  workspaceId String   @map("workspace_id") @db.Uuid
+  channelId   String   @map("channel_id") @db.Uuid
+  messageNo   BigInt   @map("message_no")
+
+  // Message Identity
+  id String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Message Context
+  userId String @map("user_id") @db.Uuid
+
+  // Threading
+  parentMessageId String? @map("parent_message_id") @db.Uuid
+  threadRootId    String? @map("thread_root_id") @db.Uuid
+  threadDepth     Int     @default(0) @map("thread_depth")
+
+  // Content
+  content     String  @db.Text
+  contentType String  @default("text") @map("content_type") @db.VarChar(10)
+
+  // Message Status
+  isEdited   Boolean @default(false) @map("is_edited")
+  editCount  Int     @default(0) @map("edit_count")
+
+  // Delivery Status
+  deliveryStatus String @default("sent") @map("delivery_status") @db.VarChar(20)
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  // Relationships
+  reactions   MessageReaction[]
+  mentions    MessageMention[]
+  attachments MessageAttachment[]
+
+  @@id([workspaceId, channelId, messageNo])
+  @@unique([id])
+  @@index([workspaceId, channelId, messageNo(sort: Desc)], name: "idx_messages_channel_msgno")
+  @@index([workspaceId, userId], name: "idx_messages_user")
+  @@index([workspaceId, threadRootId], name: "idx_messages_thread_root")
+  @@index([workspaceId, createdAt(sort: Desc)], name: "idx_messages_created")
+  @@map("messages")
+}
+
+/// Channel sequences - manages message_no per channel
+model ChannelSequence {
+  // Composite Primary Key
+  workspaceId String @map("workspace_id") @db.Uuid
+  channelId   String @map("channel_id") @db.Uuid
+
+  // Sequence Counter
+  lastMessageNo BigInt @default(0) @map("last_message_no")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  @@id([workspaceId, channelId])
+  @@map("channel_sequences")
+}
+
+/// Message reactions - emoji reactions to messages
+model MessageReaction {
+  // Composite Primary Key
+  workspaceId String @map("workspace_id") @db.Uuid
+  messageId   String @map("message_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+  emoji       String @db.VarChar(10)
+
+  // Reaction Identity
+  id String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  // Relationships
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, messageId, userId, emoji])
+  @@index([workspaceId, messageId], name: "idx_reactions_message")
+  @@index([workspaceId, userId], name: "idx_reactions_user")
+  @@map("message_reactions")
+}
+
+/// Message mentions - tracks @mentions in messages
+model MessageMention {
+  // Composite Primary Key
+  workspaceId      String @map("workspace_id") @db.Uuid
+  messageId        String @map("message_id") @db.Uuid
+  mentionedUserId  String @map("mentioned_user_id") @db.Uuid
+
+  // Mention Identity
+  id String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Mention Type
+  mentionType String @map("mention_type") @db.VarChar(20) // 'user', 'channel', 'here', 'everyone'
+
+  // Status (per-user read tracking)
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at") @db.Timestamp()
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  // Relationships
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, messageId, mentionedUserId])
+  @@index([workspaceId, mentionedUserId, isRead], name: "idx_mentions_user_unread")
+  @@index([workspaceId, messageId], name: "idx_mentions_message")
+  @@map("message_mentions")
+}
+
+/// Message attachments - file attachments metadata (files in S3)
+model MessageAttachment {
+  // Identity
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Composite Foreign Key
+  workspaceId String @map("workspace_id") @db.Uuid
+  messageId   String @map("message_id") @db.Uuid
+
+  // File Metadata
+  fileName  String @map("file_name") @db.VarChar(255)
+  fileSize  BigInt @map("file_size")
+  mimeType  String @map("mime_type") @db.VarChar(100)
+  s3Key     String @map("s3_key") @db.VarChar(500)
+  s3Bucket  String @map("s3_bucket") @db.VarChar(100)
+
+  // Optional: Thumbnail
+  thumbnailS3Key String? @map("thumbnail_s3_key") @db.VarChar(500)
+
+  // Metadata
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamp()
+
+  // Relationships
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, messageId], name: "idx_attachments_message")
+  @@index([workspaceId, uploadedBy], name: "idx_attachments_user")
+  @@map("message_attachments")
+}
+
+/// Channel read receipts - per-user, per-channel read watermark
+model ChannelReadReceipt {
+  // Composite Primary Key
+  workspaceId String @map("workspace_id") @db.Uuid
+  channelId   String @map("channel_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+
+  // Read Watermark
+  lastReadMessageNo BigInt  @map("last_read_message_no")
+  lastReadMessageId String? @map("last_read_message_id") @db.Uuid
+
+  // Metadata
+  lastReadAt DateTime @default(now()) @map("last_read_at") @db.Timestamp()
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  @@id([workspaceId, channelId, userId])
+  @@index([workspaceId, userId], name: "idx_read_receipts_user")
+  @@index([workspaceId, channelId], name: "idx_read_receipts_channel")
+  @@map("channel_read_receipts")
+}
+
+/// Thread metadata - aggregate data for threads (denormalized)
+model ThreadMetadata {
+  // Composite Primary Key
+  workspaceId  String @map("workspace_id") @db.Uuid
+  threadRootId String @map("thread_root_id") @db.Uuid
+
+  // Thread Statistics
+  replyCount        Int       @default(0) @map("reply_count")
+  participantCount  Int       @default(0) @map("participant_count")
+  lastReplyAt       DateTime? @map("last_reply_at") @db.Timestamp()
+  lastReplyBy       String?   @map("last_reply_by") @db.Uuid
+  lastReplyMessageNo BigInt?  @map("last_reply_message_no")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  @@id([workspaceId, threadRootId])
+  @@index([workspaceId, lastReplyAt(sort: Desc)], name: "idx_thread_metadata_last_reply")
+  @@index([threadRootId], name: "idx_thread_metadata_root")
+  @@map("thread_metadata")
+}
+
+/// Archived messages index - index of messages archived to S3
+model ArchivedMessageIndex {
+  // Composite Primary Key
+  workspaceId String @map("workspace_id") @db.Uuid
+  channelId   String @map("channel_id") @db.Uuid
+  messageNo   BigInt @map("message_no")
+
+  // Message Identity
+  id String @map("id") @db.Uuid
+
+  // S3 Location
+  s3Bucket String @map("s3_bucket") @db.VarChar(100)
+  s3Key    String @map("s3_key") @db.VarChar(500)
+
+  // Message Metadata (for search/display without S3 fetch)
+  userId         String  @map("user_id") @db.Uuid
+  contentPreview String? @map("content_preview") @db.Text
+  createdAt      DateTime @map("created_at") @db.Timestamp()
+
+  // Archiving Metadata
+  archivedAt     DateTime @default(now()) @map("archived_at") @db.Timestamp()
+  archiveBatchId String?  @map("archive_batch_id") @db.Uuid
+
+  @@id([workspaceId, channelId, messageNo])
+  @@index([id], name: "idx_archived_messages_id")
+  @@index([workspaceId, archivedAt(sort: Desc)], name: "idx_archived_messages_workspace")
+  @@index([workspaceId, channelId, messageNo(sort: Desc)], name: "idx_archived_messages_channel")
+  @@map("archived_messages_index")
+}
