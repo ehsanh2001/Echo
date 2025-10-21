@@ -3,6 +3,12 @@ import { container } from "tsyringe";
 import { PrismaClient } from "@prisma/client";
 import { IMessageRepository } from "./interfaces/repositories/IMessageRepository";
 import { MessageRepository } from "./repositories/MessageRepository";
+import { ICacheService } from "./interfaces/services/ICacheService";
+import { CacheService } from "./services/CacheService";
+import { IUserServiceClient } from "./interfaces/external/IUserServiceClient";
+import { UserServiceClient } from "./services/UserServiceClient";
+import { IWorkspaceChannelServiceClient } from "./interfaces/external/IWorkspaceChannelServiceClient";
+import { WorkspaceChannelServiceClient } from "./services/WorkspaceChannelServiceClient";
 
 /**
  * Dependency Injection Container Configuration
@@ -21,6 +27,25 @@ container.registerInstance<PrismaClient>(PrismaClient, prismaClient);
 container.registerSingleton<IMessageRepository>(
   "IMessageRepository",
   MessageRepository
+);
+
+// ===== SERVICES =====
+
+// Register CacheService as ICacheService implementation
+container.registerSingleton<ICacheService>("ICacheService", CacheService);
+
+// ===== EXTERNAL SERVICE CLIENTS =====
+
+// Register UserServiceClient as IUserServiceClient implementation
+container.registerSingleton<IUserServiceClient>(
+  "IUserServiceClient",
+  UserServiceClient
+);
+
+// Register WorkspaceChannelServiceClient as IWorkspaceChannelServiceClient implementation
+container.registerSingleton<IWorkspaceChannelServiceClient>(
+  "IWorkspaceChannelServiceClient",
+  WorkspaceChannelServiceClient
 );
 
 // TODO: Register services when created

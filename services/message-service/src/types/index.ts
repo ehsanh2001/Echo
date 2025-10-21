@@ -16,6 +16,68 @@ export interface JwtPayload {
   exp: number;
 }
 
+// ===== EXTERNAL SERVICE TYPES =====
+
+/**
+ * User profile from user-service (mirrors UserProfile from user-service)
+ */
+export interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  createdAt: Date;
+  lastSeen: Date | null;
+  roles: string[];
+}
+
+/**
+ * User service API response wrapper
+ */
+export interface UserServiceResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+/**
+ * Channel member from workspace-channel-service (mirrors Prisma ChannelMember)
+ */
+export interface ChannelMember {
+  id: string;
+  channelId: string;
+  userId: string;
+  joinedBy: string | null;
+  joinedAt: Date;
+  role: "owner" | "admin" | "member" | "viewer";
+  isMuted: boolean;
+  isActive: boolean;
+}
+
+/**
+ * Workspace-channel service API response wrapper
+ */
+export interface WorkspaceChannelServiceResponse<T> {
+  success: boolean;
+  data: T;
+  message: string;
+  timestamp: string;
+}
+
+/**
+ * Workspace-channel service error response
+ */
+export interface WorkspaceChannelServiceErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  timestamp: string;
+}
+
 // ===== REQUEST TYPES =====
 
 /**

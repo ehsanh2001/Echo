@@ -94,6 +94,17 @@ export const config = {
     ),
   },
 
+  // External Service Client Configuration
+  externalServices: {
+    timeout: 5000, // 5 seconds
+    retryDelay: 5000, // 5 seconds
+    maxRetries: 1, // 1 retry
+    cache: {
+      userProfileTtl: 900, // 15 minutes
+      channelMembershipTtl: 300, // 5 minutes
+    },
+  },
+
   // Redis Configuration (with service prefix)
   redis: {
     url: getRequiredEnv("REDIS_URL"),
