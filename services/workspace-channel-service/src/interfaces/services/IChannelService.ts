@@ -39,4 +39,17 @@ export interface IChannelService {
     role?: ChannelRole,
     transaction?: any
   ): Promise<ChannelMember>;
+
+  /**
+   * Gets a channel member by workspace, channel, and user IDs.
+   * @param workspaceId - The workspace ID
+   * @param channelId - The channel ID
+   * @param userId - The user ID
+   * @returns Promise resolving to the channel member if found, null otherwise
+   */
+  getChannelMember(
+    workspaceId: string,
+    channelId: string,
+    userId: string
+  ): Promise<ChannelMember | null>;
 }

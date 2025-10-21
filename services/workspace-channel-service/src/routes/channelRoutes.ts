@@ -50,4 +50,39 @@ channelRoutes.post("/", jwtAuth, async (req, res) => {
   await channelController.createChannel(req as any, res);
 });
 
+/**
+ * Get a channel member
+ * GET /api/ws-ch/workspaces/:workspaceId/channels/:channelId/members/:userId
+ *
+ * Response (200 - Member found):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "id": "channel-member-id",
+ *     "channelId": "channel-id",
+ *     "userId": "user-id",
+ *     "joinedBy": "inviter-user-id",
+ *     "joinedAt": "2025-10-17T...",
+ *     "role": "member",
+ *     "isMuted": false,
+ *     "isActive": true
+ *   },
+ *   "message": "Channel member retrieved successfully",
+ *   "timestamp": "2025-10-17T..."
+ * }
+ *
+ * Response (404 - Member not found):
+ * {
+ *   "success": false,
+ *   "error": {
+ *     "code": "NOT_FOUND",
+ *     "message": "Channel member not found"
+ *   },
+ *   "timestamp": "2025-10-17T..."
+ * }
+ */
+channelRoutes.get("/:channelId/members/:userId", async (req, res) => {
+  await channelController.getChannelMember(req, res);
+});
+
 export default channelRoutes;
