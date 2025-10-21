@@ -109,6 +109,45 @@ export class MessageServiceError extends Error {
   }
 
   /**
+   * Create a database error with automatic logging
+   *
+   * Logs the internal error details for debugging while only exposing
+   * a safe generic message to the client.
+   *
+   * @param publicMessage - Safe message to show to client
+   * @param logContext - Context string for log identification
+   * @param internalDetails - Internal error details (logged but not exposed)
+   */
+  static databaseWithLogging(
+    publicMessage: string,
+    logContext: string,
+    internalDetails: Record<string, any>
+  ) {
+    // TODO: Replace console.error with proper logger (Winston, Pino, etc.)
+    console.error(`Database error in ${logContext}:`, internalDetails);
+
+    return new MessageServiceError(publicMessage, "DATABASE_ERROR", 500);
+  }
+
+  /**
+   * Create a validation error with automatic logging
+   *
+   * @param publicMessage - Safe message to show to client
+   * @param logContext - Context string for log identification
+   * @param internalDetails - Internal error details (logged but not exposed)
+   */
+  static validationWithLogging(
+    publicMessage: string,
+    logContext: string,
+    internalDetails: Record<string, any>
+  ) {
+    // TODO: Replace console.error with proper logger (Winston, Pino, etc.)
+    console.error(`Validation error in ${logContext}:`, internalDetails);
+
+    return new MessageServiceError(publicMessage, "VALIDATION_ERROR", 400);
+  }
+
+  /**
    * Create a message too long error
    */
   static messageTooLong(maxLength: number, actualLength: number) {

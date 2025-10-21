@@ -29,12 +29,13 @@ export interface CreateMessageRequest {
 
 /**
  * Message response (main message data returned to client)
+ * Matches the Message model from Prisma schema
  */
 export interface MessageResponse {
   id: string;
   workspaceId: string;
   channelId: string;
-  messageNo: bigint | number; // bigint from DB, convert to number for JSON
+  messageNo: number; // Converted from bigint for JSON serialization
   userId: string;
   content: string;
   contentType: string;
@@ -93,11 +94,11 @@ export interface ApiErrorResponse {
 
 /**
  * Data required to create a message in the repository
+ * messageNo is automatically generated internally
  */
 export interface CreateMessageData {
   workspaceId: string;
   channelId: string;
-  messageNo: bigint;
   userId: string;
   content: string;
   contentType?: string;

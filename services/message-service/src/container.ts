@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
 import { PrismaClient } from "@prisma/client";
+import { IMessageRepository } from "./interfaces/repositories/IMessageRepository";
+import { MessageRepository } from "./repositories/MessageRepository";
 
 /**
  * Dependency Injection Container Configuration
@@ -13,7 +15,14 @@ import { PrismaClient } from "@prisma/client";
 const prismaClient = new PrismaClient();
 container.registerInstance<PrismaClient>(PrismaClient, prismaClient);
 
-// TODO: Register repositories when created
+// ===== REPOSITORIES =====
+
+// Register MessageRepository as IMessageRepository implementation
+container.registerSingleton<IMessageRepository>(
+  "IMessageRepository",
+  MessageRepository
+);
+
 // TODO: Register services when created
 // TODO: Register workers when created
 
