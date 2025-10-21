@@ -105,4 +105,17 @@ export interface IChannelRepository {
     workspaceId: string,
     name: string
   ): Promise<Channel | null>;
+
+  /**
+   * Gets a channel member by channel, and user IDs.
+   * Used to check if a user is a member of a specific channel.
+   *
+   * @param channelId - The channel ID
+   * @param userId - The user ID
+   * @returns {Promise<ChannelMember | null>} The channel member if found, null otherwise
+   */
+  getChannelMember(
+    channelId: string,
+    userId: string
+  ): Promise<ChannelMember | null>;
 }

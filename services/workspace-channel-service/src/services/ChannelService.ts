@@ -297,4 +297,25 @@ export class ChannelService implements IChannelService {
       );
     }
   }
+
+  /**
+   * Gets a channel member by workspace, channel, and user IDs.
+   */
+  async getChannelMember(
+    workspaceId: string,
+    channelId: string,
+    userId: string
+  ): Promise<ChannelMember | null> {
+    try {
+      return await this.channelRepository.getChannelMember(channelId, userId);
+    } catch (error) {
+      if (error instanceof WorkspaceChannelServiceError) {
+        throw error;
+      }
+      console.error("Error getting channel member:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to get channel member"
+      );
+    }
+  }
 }
