@@ -302,4 +302,24 @@ export class ChannelRepository implements IChannelRepository {
       );
     }
   }
+
+  async getChannelMember(
+    channelId: string,
+    userId: string
+  ): Promise<ChannelMember | null> {
+    try {
+      return await this.prisma.channelMember.findFirst({
+        where: {
+          userId,
+          channelId,
+          isActive: true, // Only return active memberships
+        },
+      });
+    } catch (error: any) {
+      console.error("Error finding channel member:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find channel member: ${error.message}`
+      );
+    }
+  }
 }

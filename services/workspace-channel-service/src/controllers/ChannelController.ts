@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { container } from "tsyringe";
 import { IChannelService } from "../interfaces/services/IChannelService";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
@@ -153,6 +153,72 @@ export class ChannelController {
       description,
       participants,
     };
+  }
+
+  /**
+   * Get a channel member by workspace, channel, and user IDs
+   * GET /api/ws-ch/workspaces/:workspaceId/channels/:channelId/members/:userId
+   */
+  async getChannelMember(req: Request, res: Response): Promise<void> {
+    try {
+      const { workspaceId, channelId, userId } = req.params;
+
+      console.log(
+        `Get channel member request for workspace ${workspaceId}, channel ${channelId}, user ${userId}`
+      );
+
+      // Validate parameters
+      if (!workspaceId || typeof workspaceId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid workspace ID is required"
+        );
+      }
+
+      if (!channelId || typeof channelId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid channel ID is required"
+        );
+      }
+
+      if (!userId || typeof userId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid user ID is required"
+        );
+      }
+
+      // Get the channel member
+      const channelMember = await this.channelService.getChannelMember(
+        workspaceId,
+        channelId,
+        userId
+      );
+
+      // Return 404 if member not found (as per requirements)
+      if (!channelMember) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Channel member not found",
+          },
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      console.log(
+        `Channel member found: ${channelMember.userId} in channel ${channelMember.channelId}`
+      );
+
+      res.status(200).json({
+        success: true,
+        data: channelMember,
+        message: "Channel member retrieved successfully",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("getChannelMember", error, res);
+    }
   }
 
   /**
