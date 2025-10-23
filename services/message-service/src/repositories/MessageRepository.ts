@@ -160,4 +160,146 @@ export class MessageRepository implements IMessageRepository {
       );
     }
   }
+
+  /**
+   * Helper function for cursor-based pagination
+   *
+   * Shared logic for getting messages before or after a cursor.
+   * Handles the WHERE condition, ordering, and bigint conversion.
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param cursor - Message number to paginate from
+   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
+   * @param direction - 'before' for older messages (DESC), 'after' for newer messages (ASC)
+   * @returns Array of messages
+   * @throws MessageServiceError if query fails
+   */
+  private async getMessagesWithCursor(
+    workspaceId: string,
+    channelId: string,
+    cursor: number,
+    limit: number,
+    direction: "before" | "after"
+  ): Promise<MessageResponse[]> {
+    try {
+      // Build WHERE condition based on direction
+      const whereCondition = {
+        workspaceId,
+        channelId,
+        messageNo:
+          direction === "before"
+            ? { lt: BigInt(cursor) }
+            : { gt: BigInt(cursor) },
+      };
+
+      // Query messages with cursor and limit
+      const messages = await this.prisma.message.findMany({
+        where: whereCondition,
+        orderBy: {
+          messageNo: direction === "before" ? "desc" : "asc",
+        },
+        take: limit,
+        select: {
+          id: true,
+          workspaceId: true,
+          channelId: true,
+          messageNo: true,
+          userId: true,
+          content: true,
+          contentType: true,
+          isEdited: true,
+          editCount: true,
+          deliveryStatus: true,
+          parentMessageId: true,
+          threadRootId: true,
+          threadDepth: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // Convert bigint messageNo to number for JSON serialization
+      return messages.map((message) => ({
+        ...message,
+        messageNo: Number(message.messageNo),
+      }));
+    } catch (error) {
+      // Re-throw if already a MessageServiceError
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      // Wrap other errors as database errors with automatic logging
+      throw MessageServiceError.databaseWithLogging(
+        `Failed to get messages ${direction} cursor due to internal error`,
+        `getMessagesByChannelWithCursor (${direction})`,
+        {
+          workspaceId,
+          channelId,
+          cursor,
+          limit,
+          direction,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        }
+      );
+    }
+  }
+
+  /**
+   * Get messages before a cursor (scroll up to see older messages)
+   *
+   * Returns messages with messageNo < cursor, ordered by messageNo DESC
+   * Used for backward pagination (loading older messages)
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param cursor - Message number to paginate from
+   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
+   * @returns Array of messages
+   * @throws MessageServiceError if query fails
+   */
+  async getMessagesBeforeCursor(
+    workspaceId: string,
+    channelId: string,
+    cursor: number,
+    limit: number
+  ): Promise<MessageResponse[]> {
+    return this.getMessagesWithCursor(
+      workspaceId,
+      channelId,
+      cursor,
+      limit,
+      "before"
+    );
+  }
+
+  /**
+   * Get messages after a cursor (scroll down to see newer messages)
+   *
+   * Returns messages with messageNo > cursor, ordered by messageNo ASC
+   * Used for forward pagination (loading newer messages)
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param cursor - Message number to paginate from
+   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
+   * @returns Array of messages
+   * @throws MessageServiceError if query fails
+   */
+  async getMessagesAfterCursor(
+    workspaceId: string,
+    channelId: string,
+    cursor: number,
+    limit: number
+  ): Promise<MessageResponse[]> {
+    return this.getMessagesWithCursor(
+      workspaceId,
+      channelId,
+      cursor,
+      limit,
+      "after"
+    );
+  }
 }

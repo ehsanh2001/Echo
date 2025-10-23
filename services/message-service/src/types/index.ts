@@ -247,3 +247,40 @@ export interface MessageCreatedEvent {
  * Generic message event type
  */
 export type MessageEvent = MessageCreatedEvent;
+
+// ===== MESSAGE HISTORY & PAGINATION TYPES =====
+
+/**
+ * Direction for cursor-based pagination
+ */
+export enum PaginationDirection {
+  BEFORE = "before",
+  AFTER = "after",
+}
+
+/**
+ * Query parameters for message history endpoint
+ */
+export interface MessageHistoryQueryParams {
+  cursor?: number; // messageNo to paginate from
+  limit?: number; // Number of messages to fetch
+  direction?: PaginationDirection; // Direction to paginate
+}
+
+/**
+ * Message history response structure
+ */
+export interface MessageHistoryResponse {
+  messages: MessageWithAuthorResponse[];
+  nextCursor: number | null; // Cursor for next page (forward in time)
+  prevCursor: number | null; // Cursor for previous page (backward in time)
+}
+
+/**
+ * Internal pagination options (after validation and normalization)
+ */
+export interface PaginationOptions {
+  cursor: number | null;
+  limit: number;
+  direction: PaginationDirection | null;
+}
