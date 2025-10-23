@@ -45,8 +45,8 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 3s
       retries: 3
 
   # User Service - Handles authentication, user profiles
@@ -68,6 +68,77 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    restart: unless-stopped
+    # Allow container to access host machine's PostgreSQL
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Workspace-Channel Service - Handles workspaces, channels, and memberships
+  workspace-channel-service:
+    build: ./services/workspace-channel-service
+    container_name: echo-workspace-channel-service
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env # Load shared variables
+      - ./services/workspace-channel-service/.env # Load service-specific variables (overrides shared)
+    environment:
+      # Override specific variables for Docker environment
+      # Database points to host machine's PostgreSQL
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/workspace_channels_db
+
+      # Redis points to redis container
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
+
+      # RabbitMQ points to rabbitmq container
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
+
+      # Internal service URLs
+      - USER_SERVICE_URL=http://user-service:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    restart: unless-stopped
+    # Allow container to access host machine's PostgreSQL
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Message Service - Handles messages, threads, reactions, and mentions
+  message-service:
+    build: ./services/message-service
+    container_name: echo-message-service
+    ports:
+      - "8003:8003"
+    env_file:
+      - .env # Load shared variables
+      - ./services/message-service/.env # Load service-specific variables (overrides shared)
+    environment:
+      # Override specific variables for Docker environment
+      # Database points to host machine's PostgreSQL
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/message_db
+
+      # Redis points to redis container
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
+
+      # RabbitMQ points to rabbitmq container
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
+
+      # Internal service URLs
+      - USER_SERVICE_URL=http://user-service:8001
+      - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      workspace-channel-service:
+        condition: service_started
     restart: unless-stopped
     # Allow container to access host machine's PostgreSQL
     extra_hosts:
