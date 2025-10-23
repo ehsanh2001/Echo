@@ -348,8 +348,12 @@ describe("MessageService - Unit Tests", () => {
       parentMessageId: null,
       threadRootId: null,
       threadDepth: 0,
-      createdAt: new Date(`2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`),
-      updatedAt: new Date(`2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`),
+      createdAt: new Date(
+        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`
+      ),
+      updatedAt: new Date(
+        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`
+      ),
     });
 
     describe("authorization", () => {
@@ -401,7 +405,9 @@ describe("MessageService - Unit Tests", () => {
           {}
         );
 
-        expect(mockMessageRepository.getMessagesWithCursor).toHaveBeenCalledWith(
+        expect(
+          mockMessageRepository.getMessagesWithCursor
+        ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           Number.MAX_SAFE_INTEGER,
@@ -423,7 +429,9 @@ describe("MessageService - Unit Tests", () => {
           {}
         );
 
-        expect(mockMessageRepository.getMessagesWithCursor).toHaveBeenCalledWith(
+        expect(
+          mockMessageRepository.getMessagesWithCursor
+        ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           expect.any(Number),
@@ -473,7 +481,9 @@ describe("MessageService - Unit Tests", () => {
           }
         );
 
-        expect(mockMessageRepository.getMessagesWithCursor).toHaveBeenCalledWith(
+        expect(
+          mockMessageRepository.getMessagesWithCursor
+        ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           5,
@@ -504,7 +514,9 @@ describe("MessageService - Unit Tests", () => {
           }
         );
 
-        expect(mockMessageRepository.getMessagesWithCursor).toHaveBeenCalledWith(
+        expect(
+          mockMessageRepository.getMessagesWithCursor
+        ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           5,
