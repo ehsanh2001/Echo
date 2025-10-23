@@ -1,4 +1,8 @@
-import { CreateMessageData, MessageResponse } from "../../types";
+import {
+  CreateMessageData,
+  MessageResponse,
+  PaginationDirection,
+} from "../../types";
 
 /**
  * Interface for message repository operations
@@ -26,64 +30,46 @@ export interface IMessageRepository {
   create(data: CreateMessageData): Promise<MessageResponse>;
 
   /**
-   * Get messages before a cursor (scroll up to see older messages)
+   * Get messages with cursor-based pagination
    *
-   * Returns messages with messageNo < cursor, ordered by messageNo DESC
-   * Used for backward pagination (loading older messages)
+   * Returns messages before or after a cursor based on direction parameter
    *
    * @param workspaceId - Workspace UUID
    * @param channelId - Channel UUID
    * @param cursor - Message number to paginate from
    * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @returns Array of messages (excluding archived messages)
+   * @param direction - PaginationDirection.BEFORE for older messages (DESC), PaginationDirection.AFTER for newer messages (ASC)
+   * @returns Array of messages
    * @throws MessageServiceError if query fails
    *
    * @example
    * ```typescript
-   * const messages = await messageRepository.getMessagesByChannelWithCursorBefore(
+   * // Get older messages (scroll up)
+   * const olderMessages = await messageRepository.getMessagesWithCursor(
    *   'workspace-uuid',
    *   'channel-uuid',
    *   1000,
-   *   50
+   *   50,
+   *   PaginationDirection.BEFORE
    * );
    * // Returns messages 999, 998, 997, ... (up to 50 messages)
-   * ```
-   */
-  getMessagesBeforeCursor(
-    workspaceId: string,
-    channelId: string,
-    cursor: number,
-    limit: number
-  ): Promise<MessageResponse[]>;
-
-  /**
-   * Get messages after a cursor (scroll down to see newer messages)
    *
-   * Returns messages with messageNo > cursor, ordered by messageNo ASC
-   * Used for forward pagination (loading newer messages)
-   *
-   * @param workspaceId - Workspace UUID
-   * @param channelId - Channel UUID
-   * @param cursor - Message number to paginate from
-   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @returns Array of messages (excluding archived messages)
-   * @throws MessageServiceError if query fails
-   *
-   * @example
-   * ```typescript
-   * const messages = await messageRepository.getMessagesByChannelWithCursorAfter(
+   * // Get newer messages (scroll down)
+   * const newerMessages = await messageRepository.getMessagesWithCursor(
    *   'workspace-uuid',
    *   'channel-uuid',
    *   1000,
-   *   50
+   *   50,
+   *   PaginationDirection.AFTER
    * );
    * // Returns messages 1001, 1002, 1003, ... (up to 50 messages)
    * ```
    */
-  getMessagesAfterCursor(
+  getMessagesWithCursor(
     workspaceId: string,
     channelId: string,
     cursor: number,
-    limit: number
+    limit: number,
+    direction: PaginationDirection
   ): Promise<MessageResponse[]>;
 }

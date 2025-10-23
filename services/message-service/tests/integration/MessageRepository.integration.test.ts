@@ -2,7 +2,11 @@ import "reflect-metadata";
 import { PrismaClient } from "@prisma/client";
 import { MessageRepository } from "../../src/repositories/MessageRepository";
 import { IMessageRepository } from "../../src/interfaces/repositories/IMessageRepository";
-import { CreateMessageData, MessageResponse } from "../../src/types";
+import {
+  CreateMessageData,
+  MessageResponse,
+  PaginationDirection,
+} from "../../src/types";
 import { MessageServiceError } from "../../src/utils/errors";
 import { randomUUID } from "crypto";
 import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
@@ -390,7 +394,7 @@ describe("MessageRepository Integration Tests", () => {
       return messages;
     };
 
-    describe("getMessagesBeforeCursor", () => {
+    describe("getMessagesWithCursor - before direction", () => {
       it("should retrieve messages before a cursor in descending order", async () => {
         const workspaceId = createTestUUID();
         const channelId = createTestUUID();
@@ -399,11 +403,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 10);
 
         // Get messages before messageNo 8 (should return 7, 6, 5, 4, 3)
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           8,
-          5
+          5,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(5);
@@ -424,11 +429,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Get messages before messageNo 1 (should return empty)
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           1,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(0);
@@ -442,11 +448,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 20);
 
         // Get only 3 messages before messageNo 10
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           10,
-          3
+          3,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(3);
@@ -463,11 +470,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Request 10 messages before messageNo 4 (only 3 exist: 3, 2, 1)
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           4,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(3);
@@ -486,11 +494,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId2, 5);
 
         // Get messages from channel1 only
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId1,
           6,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(5);
@@ -508,11 +517,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Get messages before messageNo 100 (should return all 5)
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           100,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(5);
@@ -521,7 +531,7 @@ describe("MessageRepository Integration Tests", () => {
       });
     });
 
-    describe("getMessagesAfterCursor", () => {
+    describe("getMessagesWithCursor - after direction", () => {
       it("should retrieve messages after a cursor in ascending order", async () => {
         const workspaceId = createTestUUID();
         const channelId = createTestUUID();
@@ -530,11 +540,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 10);
 
         // Get messages after messageNo 3 (should return 4, 5, 6, 7, 8)
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           3,
-          5
+          5,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(5);
@@ -555,11 +566,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Get messages after messageNo 5 (should return empty)
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           5,
-          10
+          10,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(0);
@@ -573,11 +585,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 20);
 
         // Get only 3 messages after messageNo 5
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           5,
-          3
+          3,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(3);
@@ -594,11 +607,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Request 10 messages after messageNo 3 (only 2 exist: 4, 5)
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           3,
-          10
+          10,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(2);
@@ -616,11 +630,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId2, 5);
 
         // Get messages from channel1 only
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId1,
           0,
-          10
+          10,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(5);
@@ -638,11 +653,12 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
         // Get messages after messageNo 0 (should return all 5)
-        const results = await messageRepository.getMessagesAfterCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           0,
-          10
+          10,
+          PaginationDirection.AFTER
         );
 
         expect(results).toHaveLength(5);
@@ -658,18 +674,20 @@ describe("MessageRepository Integration Tests", () => {
 
         // No messages seeded
 
-        const resultsBefore = await messageRepository.getMessagesBeforeCursor(
+        const resultsBefore = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           10,
-          5
+          5,
+          PaginationDirection.BEFORE
         );
 
-        const resultsAfter = await messageRepository.getMessagesAfterCursor(
+        const resultsAfter = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           10,
-          5
+          5,
+          PaginationDirection.AFTER
         );
 
         expect(resultsBefore).toHaveLength(0);
@@ -682,18 +700,20 @@ describe("MessageRepository Integration Tests", () => {
 
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
-        const resultsBefore = await messageRepository.getMessagesBeforeCursor(
+        const resultsBefore = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           3,
-          1
+          1,
+          PaginationDirection.BEFORE
         );
 
-        const resultsAfter = await messageRepository.getMessagesAfterCursor(
+        const resultsAfter = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           3,
-          1
+          1,
+          PaginationDirection.AFTER
         );
 
         expect(resultsBefore).toHaveLength(1);
@@ -709,11 +729,12 @@ describe("MessageRepository Integration Tests", () => {
 
         await seedMessagesForPagination(workspaceId, channelId, 10);
 
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           11,
-          1000
+          1000,
+          PaginationDirection.BEFORE
         );
 
         // Should return all 10 messages even though limit is 1000
@@ -728,23 +749,26 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 30);
 
         // Paginate backwards from message 31 in chunks of 10
-        const page1 = await messageRepository.getMessagesBeforeCursor(
+        const page1 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           31,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
-        const page2 = await messageRepository.getMessagesBeforeCursor(
+        const page2 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           at(page1, page1.length - 1).messageNo,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
-        const page3 = await messageRepository.getMessagesBeforeCursor(
+        const page3 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           at(page2, page2.length - 1).messageNo,
-          10
+          10,
+          PaginationDirection.BEFORE
         );
 
         // Verify we got all 30 messages across 3 pages
@@ -778,23 +802,26 @@ describe("MessageRepository Integration Tests", () => {
         await seedMessagesForPagination(workspaceId, channelId, 30);
 
         // Paginate forwards from message 0 in chunks of 10
-        const page1 = await messageRepository.getMessagesAfterCursor(
+        const page1 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           0,
-          10
+          10,
+          PaginationDirection.AFTER
         );
-        const page2 = await messageRepository.getMessagesAfterCursor(
+        const page2 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           at(page1, page1.length - 1).messageNo,
-          10
+          10,
+          PaginationDirection.AFTER
         );
-        const page3 = await messageRepository.getMessagesAfterCursor(
+        const page3 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           at(page2, page2.length - 1).messageNo,
-          10
+          10,
+          PaginationDirection.AFTER
         );
 
         // Verify we got all 30 messages across 3 pages
@@ -828,18 +855,20 @@ describe("MessageRepository Integration Tests", () => {
 
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
-        const resultsBefore = await messageRepository.getMessagesBeforeCursor(
+        const resultsBefore = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           6,
-          5
+          5,
+          PaginationDirection.BEFORE
         );
 
-        const resultsAfter = await messageRepository.getMessagesAfterCursor(
+        const resultsAfter = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           0,
-          5
+          5,
+          PaginationDirection.AFTER
         );
 
         // Verify all messageNo values are numbers (not bigint)
@@ -858,11 +887,12 @@ describe("MessageRepository Integration Tests", () => {
 
         await seedMessagesForPagination(workspaceId, channelId, 3);
 
-        const results = await messageRepository.getMessagesBeforeCursor(
+        const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
           4,
-          5
+          5,
+          PaginationDirection.BEFORE
         );
 
         expect(results).toHaveLength(3);

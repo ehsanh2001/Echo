@@ -1,7 +1,11 @@
 import { inject, injectable } from "tsyringe";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { IMessageRepository } from "../interfaces/repositories/IMessageRepository";
-import { CreateMessageData, MessageResponse } from "../types";
+import {
+  CreateMessageData,
+  MessageResponse,
+  PaginationDirection,
+} from "../types";
 import { MessageServiceError } from "../utils/errors";
 
 /**
@@ -162,25 +166,25 @@ export class MessageRepository implements IMessageRepository {
   }
 
   /**
-   * Helper function for cursor-based pagination
+   * Get messages with cursor-based pagination
    *
-   * Shared logic for getting messages before or after a cursor.
+   * Handles cursor-based pagination for getting messages before or after a cursor.
    * Handles the WHERE condition, ordering, and bigint conversion.
    *
    * @param workspaceId - Workspace UUID
    * @param channelId - Channel UUID
    * @param cursor - Message number to paginate from
    * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @param direction - 'before' for older messages (DESC), 'after' for newer messages (ASC)
+   * @param direction - PaginationDirection.BEFORE for older messages (DESC), PaginationDirection.AFTER for newer messages (ASC)
    * @returns Array of messages
    * @throws MessageServiceError if query fails
    */
-  private async getMessagesWithCursor(
+  async getMessagesWithCursor(
     workspaceId: string,
     channelId: string,
     cursor: number,
     limit: number,
-    direction: "before" | "after"
+    direction: PaginationDirection
   ): Promise<MessageResponse[]> {
     try {
       // Build WHERE condition based on direction
@@ -188,7 +192,7 @@ export class MessageRepository implements IMessageRepository {
         workspaceId,
         channelId,
         messageNo:
-          direction === "before"
+          direction === PaginationDirection.BEFORE
             ? { lt: BigInt(cursor) }
             : { gt: BigInt(cursor) },
       };
@@ -197,7 +201,7 @@ export class MessageRepository implements IMessageRepository {
       const messages = await this.prisma.message.findMany({
         where: whereCondition,
         orderBy: {
-          messageNo: direction === "before" ? "desc" : "asc",
+          messageNo: direction === PaginationDirection.BEFORE ? "desc" : "asc",
         },
         take: limit,
         select: {
@@ -233,7 +237,7 @@ export class MessageRepository implements IMessageRepository {
       // Wrap other errors as database errors with automatic logging
       throw MessageServiceError.databaseWithLogging(
         `Failed to get messages ${direction} cursor due to internal error`,
-        `getMessagesByChannelWithCursor (${direction})`,
+        `getMessagesWithCursor (${direction})`,
         {
           workspaceId,
           channelId,
@@ -245,61 +249,5 @@ export class MessageRepository implements IMessageRepository {
         }
       );
     }
-  }
-
-  /**
-   * Get messages before a cursor (scroll up to see older messages)
-   *
-   * Returns messages with messageNo < cursor, ordered by messageNo DESC
-   * Used for backward pagination (loading older messages)
-   *
-   * @param workspaceId - Workspace UUID
-   * @param channelId - Channel UUID
-   * @param cursor - Message number to paginate from
-   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @returns Array of messages
-   * @throws MessageServiceError if query fails
-   */
-  async getMessagesBeforeCursor(
-    workspaceId: string,
-    channelId: string,
-    cursor: number,
-    limit: number
-  ): Promise<MessageResponse[]> {
-    return this.getMessagesWithCursor(
-      workspaceId,
-      channelId,
-      cursor,
-      limit,
-      "before"
-    );
-  }
-
-  /**
-   * Get messages after a cursor (scroll down to see newer messages)
-   *
-   * Returns messages with messageNo > cursor, ordered by messageNo ASC
-   * Used for forward pagination (loading newer messages)
-   *
-   * @param workspaceId - Workspace UUID
-   * @param channelId - Channel UUID
-   * @param cursor - Message number to paginate from
-   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @returns Array of messages
-   * @throws MessageServiceError if query fails
-   */
-  async getMessagesAfterCursor(
-    workspaceId: string,
-    channelId: string,
-    cursor: number,
-    limit: number
-  ): Promise<MessageResponse[]> {
-    return this.getMessagesWithCursor(
-      workspaceId,
-      channelId,
-      cursor,
-      limit,
-      "after"
-    );
   }
 }
