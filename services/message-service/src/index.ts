@@ -5,7 +5,9 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
-import "./container"; // Auto-configure dependency injection
+import { container } from "./container"; // Auto-configure dependency injection
+import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
+import { messageRoutes } from "./routes/messageRoutes";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -53,8 +55,8 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// API routes will be added here
-// app.use("/api/messages", messageRoutes);
+// API routes
+app.use("/api/messages", messageRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {
@@ -107,6 +109,12 @@ const startServer = async () => {
         console.log("✅ HTTP server closed");
 
         try {
+          // Get RabbitMQ service for cleanup
+          const rabbitMQService =
+            container.resolve<IRabbitMQService>("IRabbitMQService");
+          await rabbitMQService.close();
+          console.log("✅ RabbitMQ disconnected");
+
           await prisma.$disconnect();
           console.log("✅ Database disconnected");
           process.exit(0);
