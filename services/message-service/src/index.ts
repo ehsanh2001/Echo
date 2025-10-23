@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
 import { container } from "./container"; // Auto-configure dependency injection
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
+import { messageRoutes } from "./routes/messageRoutes";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -54,8 +55,8 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// API routes will be added here
-// app.use("/api/messages", messageRoutes);
+// API routes
+app.use("/api/messages", messageRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {

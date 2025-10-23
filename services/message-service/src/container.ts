@@ -13,6 +13,7 @@ import { IUserServiceClient } from "./interfaces/external/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
 import { IWorkspaceChannelServiceClient } from "./interfaces/external/IWorkspaceChannelServiceClient";
 import { WorkspaceChannelServiceClient } from "./services/WorkspaceChannelServiceClient";
+import { MessageController } from "./controllers/MessageController";
 
 /**
  * Dependency Injection Container Configuration
@@ -66,7 +67,11 @@ container.registerSingleton<IWorkspaceChannelServiceClient>(
   WorkspaceChannelServiceClient
 );
 
-// TODO: Register controllers when created
+// ===== CONTROLLERS =====
+
+// Register MessageController
+container.registerSingleton<MessageController>(MessageController);
+
 // TODO: Register workers when created
 
 export { container };
