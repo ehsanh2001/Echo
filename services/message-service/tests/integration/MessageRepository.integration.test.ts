@@ -395,14 +395,14 @@ describe("MessageRepository Integration Tests", () => {
     };
 
     describe("getMessagesWithCursor - before direction", () => {
-      it("should retrieve messages before a cursor in descending order", async () => {
+      it("should retrieve messages before a cursor in ascending order", async () => {
         const workspaceId = createTestUUID();
         const channelId = createTestUUID();
 
         // Seed 10 messages (messageNo: 1-10)
         await seedMessagesForPagination(workspaceId, channelId, 10);
 
-        // Get messages before messageNo 8 (should return 7, 6, 5, 4, 3)
+        // Get messages before messageNo 8 (should return 3, 4, 5, 6, 7 in ASC order)
         const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
@@ -412,13 +412,13 @@ describe("MessageRepository Integration Tests", () => {
         );
 
         expect(results).toHaveLength(5);
-        expect(at(results, 0).messageNo).toBe(7);
-        expect(at(results, 1).messageNo).toBe(6);
+        expect(at(results, 0).messageNo).toBe(3);
+        expect(at(results, 1).messageNo).toBe(4);
         expect(at(results, 2).messageNo).toBe(5);
-        expect(at(results, 3).messageNo).toBe(4);
-        expect(at(results, 4).messageNo).toBe(3);
-        expect(at(results, 0).content).toBe("Message 7");
-        expect(at(results, 4).content).toBe("Message 3");
+        expect(at(results, 3).messageNo).toBe(6);
+        expect(at(results, 4).messageNo).toBe(7);
+        expect(at(results, 0).content).toBe("Message 3");
+        expect(at(results, 4).content).toBe("Message 7");
       });
 
       it("should return empty array when cursor is at the beginning", async () => {
@@ -457,9 +457,9 @@ describe("MessageRepository Integration Tests", () => {
         );
 
         expect(results).toHaveLength(3);
-        expect(at(results, 0).messageNo).toBe(9);
+        expect(at(results, 0).messageNo).toBe(7);
         expect(at(results, 1).messageNo).toBe(8);
-        expect(at(results, 2).messageNo).toBe(7);
+        expect(at(results, 2).messageNo).toBe(9);
       });
 
       it("should return less than limit if not enough messages exist", async () => {
@@ -469,7 +469,7 @@ describe("MessageRepository Integration Tests", () => {
         // Seed only 5 messages
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
-        // Request 10 messages before messageNo 4 (only 3 exist: 3, 2, 1)
+        // Request 10 messages before messageNo 4 (only 3 exist: 1, 2, 3 in ASC order)
         const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
@@ -479,9 +479,9 @@ describe("MessageRepository Integration Tests", () => {
         );
 
         expect(results).toHaveLength(3);
-        expect(at(results, 0).messageNo).toBe(3);
+        expect(at(results, 0).messageNo).toBe(1);
         expect(at(results, 1).messageNo).toBe(2);
-        expect(at(results, 2).messageNo).toBe(1);
+        expect(at(results, 2).messageNo).toBe(3);
       });
 
       it("should only return messages from the specified channel", async () => {
@@ -516,7 +516,7 @@ describe("MessageRepository Integration Tests", () => {
         // Seed 5 messages (messageNo: 1-5)
         await seedMessagesForPagination(workspaceId, channelId, 5);
 
-        // Get messages before messageNo 100 (should return all 5)
+        // Get messages before messageNo 100 (should return all 5 in ASC order)
         const results = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
@@ -526,8 +526,8 @@ describe("MessageRepository Integration Tests", () => {
         );
 
         expect(results).toHaveLength(5);
-        expect(at(results, 0).messageNo).toBe(5);
-        expect(at(results, 4).messageNo).toBe(1);
+        expect(at(results, 0).messageNo).toBe(1);
+        expect(at(results, 4).messageNo).toBe(5);
       });
     });
 
@@ -759,14 +759,14 @@ describe("MessageRepository Integration Tests", () => {
         const page2 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
-          at(page1, page1.length - 1).messageNo,
+          at(page1, 0).messageNo, // Use first (oldest) message as cursor
           10,
           PaginationDirection.BEFORE
         );
         const page3 = await messageRepository.getMessagesWithCursor(
           workspaceId,
           channelId,
-          at(page2, page2.length - 1).messageNo,
+          at(page2, 0).messageNo, // Use first (oldest) message as cursor
           10,
           PaginationDirection.BEFORE
         );
@@ -776,13 +776,13 @@ describe("MessageRepository Integration Tests", () => {
         expect(page2).toHaveLength(10);
         expect(page3).toHaveLength(10);
 
-        // Verify order and content
-        expect(at(page1, 0).messageNo).toBe(30);
-        expect(at(page1, 9).messageNo).toBe(21);
-        expect(at(page2, 0).messageNo).toBe(20);
-        expect(at(page2, 9).messageNo).toBe(11);
-        expect(at(page3, 0).messageNo).toBe(10);
-        expect(at(page3, 9).messageNo).toBe(1);
+        // Verify order and content (now in ASC order within each page)
+        expect(at(page1, 0).messageNo).toBe(21); // Oldest in page1
+        expect(at(page1, 9).messageNo).toBe(30); // Newest in page1
+        expect(at(page2, 0).messageNo).toBe(11); // Oldest in page2
+        expect(at(page2, 9).messageNo).toBe(20); // Newest in page2
+        expect(at(page3, 0).messageNo).toBe(1); // Oldest in page3
+        expect(at(page3, 9).messageNo).toBe(10); // Newest in page3
 
         // No duplicates
         const allMessageNos = [

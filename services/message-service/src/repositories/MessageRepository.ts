@@ -168,15 +168,18 @@ export class MessageRepository implements IMessageRepository {
   /**
    * Get messages with cursor-based pagination
    *
-   * Handles cursor-based pagination for getting messages before or after a cursor.
-   * Handles the WHERE condition, ordering, and bigint conversion.
+   * Always returns messages in ascending order (oldest to newest) by messageNo.
+   * This provides a consistent, predictable interface regardless of direction.
+   *
+   * For BEFORE direction, fetches in DESC order first to get the most recent N messages
+   * before the cursor, then reverses to return in ASC order.
    *
    * @param workspaceId - Workspace UUID
    * @param channelId - Channel UUID
    * @param cursor - Message number to paginate from
    * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
-   * @param direction - PaginationDirection.BEFORE for older messages (DESC), PaginationDirection.AFTER for newer messages (ASC)
-   * @returns Array of messages
+   * @param direction - PaginationDirection.BEFORE for older messages (< cursor), PaginationDirection.AFTER for newer messages (> cursor)
+   * @returns Array of messages in ascending order (oldest to newest)
    * @throws MessageServiceError if query fails
    */
   async getMessagesWithCursor(
@@ -197,7 +200,8 @@ export class MessageRepository implements IMessageRepository {
             : { gt: BigInt(cursor) },
       };
 
-      // Query messages with cursor and limit
+      // For BEFORE: Query DESC to get most recent messages before cursor, then reverse
+      // For AFTER: Query ASC directly
       const messages = await this.prisma.message.findMany({
         where: whereCondition,
         orderBy: {
@@ -224,10 +228,16 @@ export class MessageRepository implements IMessageRepository {
       });
 
       // Convert bigint messageNo to number for JSON serialization
-      return messages.map((message) => ({
+      const convertedMessages = messages.map((message) => ({
         ...message,
         messageNo: Number(message.messageNo),
       }));
+
+      // For BEFORE direction, reverse to return in ASC order (oldest to newest)
+      // For AFTER direction, already in ASC order
+      return direction === PaginationDirection.BEFORE
+        ? convertedMessages.reverse()
+        : convertedMessages;
     } catch (error) {
       // Re-throw if already a MessageServiceError
       if (error instanceof MessageServiceError) {
