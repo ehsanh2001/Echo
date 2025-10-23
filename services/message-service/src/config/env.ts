@@ -132,4 +132,13 @@ export const config = {
     ), // 10MB
     maxThreadDepth: parseInt(getOptionalEnv("MAX_THREAD_DEPTH", "5")),
   },
+
+  // Pagination Configuration
+  pagination: {
+    defaultLimit: parseInt(
+      getOptionalEnv("MESSAGE_PAGINATION_DEFAULT_LIMIT", "50")
+    ),
+    minLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MIN_LIMIT", "1")),
+    maxLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MAX_LIMIT", "100")),
+  },
 } as const;

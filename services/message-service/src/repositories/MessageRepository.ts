@@ -1,7 +1,11 @@
 import { inject, injectable } from "tsyringe";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { IMessageRepository } from "../interfaces/repositories/IMessageRepository";
-import { CreateMessageData, MessageResponse } from "../types";
+import {
+  CreateMessageData,
+  MessageResponse,
+  PaginationDirection,
+} from "../types";
 import { MessageServiceError } from "../utils/errors";
 
 /**
@@ -154,6 +158,102 @@ export class MessageRepository implements IMessageRepository {
         {
           workspaceId: data.workspaceId,
           channelId: data.channelId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        }
+      );
+    }
+  }
+
+  /**
+   * Get messages with cursor-based pagination
+   *
+   * Always returns messages in ascending order (oldest to newest) by messageNo.
+   * This provides a consistent, predictable interface regardless of direction.
+   *
+   * For BEFORE direction, fetches in DESC order first to get the most recent N messages
+   * before the cursor, then reverses to return in ASC order.
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param cursor - Message number to paginate from
+   * @param limit - Maximum number of messages to return (+ 1 to check hasMore)
+   * @param direction - PaginationDirection.BEFORE for older messages (< cursor), PaginationDirection.AFTER for newer messages (> cursor)
+   * @returns Array of messages in ascending order (oldest to newest)
+   * @throws MessageServiceError if query fails
+   */
+  async getMessagesWithCursor(
+    workspaceId: string,
+    channelId: string,
+    cursor: number,
+    limit: number,
+    direction: PaginationDirection
+  ): Promise<MessageResponse[]> {
+    try {
+      // Build WHERE condition based on direction
+      const whereCondition = {
+        workspaceId,
+        channelId,
+        messageNo:
+          direction === PaginationDirection.BEFORE
+            ? { lt: BigInt(cursor) }
+            : { gt: BigInt(cursor) },
+      };
+
+      // For BEFORE: Query DESC to get most recent messages before cursor, then reverse
+      // For AFTER: Query ASC directly
+      const messages = await this.prisma.message.findMany({
+        where: whereCondition,
+        orderBy: {
+          messageNo: direction === PaginationDirection.BEFORE ? "desc" : "asc",
+        },
+        take: limit,
+        select: {
+          id: true,
+          workspaceId: true,
+          channelId: true,
+          messageNo: true,
+          userId: true,
+          content: true,
+          contentType: true,
+          isEdited: true,
+          editCount: true,
+          deliveryStatus: true,
+          parentMessageId: true,
+          threadRootId: true,
+          threadDepth: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // Convert bigint messageNo to number for JSON serialization
+      const convertedMessages = messages.map((message) => ({
+        ...message,
+        messageNo: Number(message.messageNo),
+      }));
+
+      // For BEFORE direction, reverse to return in ASC order (oldest to newest)
+      // For AFTER direction, already in ASC order
+      return direction === PaginationDirection.BEFORE
+        ? convertedMessages.reverse()
+        : convertedMessages;
+    } catch (error) {
+      // Re-throw if already a MessageServiceError
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      // Wrap other errors as database errors with automatic logging
+      throw MessageServiceError.databaseWithLogging(
+        `Failed to get messages ${direction} cursor due to internal error`,
+        `getMessagesWithCursor (${direction})`,
+        {
+          workspaceId,
+          channelId,
+          cursor,
+          limit,
+          direction,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         }
