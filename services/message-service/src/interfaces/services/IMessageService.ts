@@ -1,4 +1,8 @@
-import { MessageWithAuthorResponse } from "../../types";
+import {
+  MessageWithAuthorResponse,
+  MessageHistoryQueryParams,
+  MessageHistoryResponse,
+} from "../../types";
 
 /**
  * Interface for message service business logic
@@ -19,4 +23,20 @@ export interface IMessageService {
     userId: string,
     content: string
   ): Promise<MessageWithAuthorResponse>;
+
+  /**
+   * Get message history for a channel with cursor-based pagination
+   * @param workspaceId - The workspace ID where the channel belongs
+   * @param channelId - The channel ID to retrieve messages from
+   * @param userId - The ID of the user requesting messages (for access control)
+   * @param params - Pagination parameters (cursor, limit, direction)
+   * @returns Promise resolving to message history with pagination cursors
+   * @throws MessageServiceError if user is not a member or invalid parameters
+   */
+  getMessageHistory(
+    workspaceId: string,
+    channelId: string,
+    userId: string,
+    params: MessageHistoryQueryParams
+  ): Promise<MessageHistoryResponse>;
 }
