@@ -5,6 +5,10 @@ import { IMessageRepository } from "./interfaces/repositories/IMessageRepository
 import { MessageRepository } from "./repositories/MessageRepository";
 import { ICacheService } from "./interfaces/services/ICacheService";
 import { CacheService } from "./services/CacheService";
+import { IMessageService } from "./interfaces/services/IMessageService";
+import { MessageService } from "./services/MessageService";
+import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
+import { RabbitMQService } from "./services/RabbitMQService";
 import { IUserServiceClient } from "./interfaces/external/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
 import { IWorkspaceChannelServiceClient } from "./interfaces/external/IWorkspaceChannelServiceClient";
@@ -34,6 +38,20 @@ container.registerSingleton<IMessageRepository>(
 // Register CacheService as ICacheService implementation
 container.registerSingleton<ICacheService>("ICacheService", CacheService);
 
+// Register MessageService as IMessageService implementation
+container.registerSingleton<IMessageService>("IMessageService", MessageService);
+
+// Register RabbitMQService as IRabbitMQService implementation and initialize
+const rabbitMQService = new RabbitMQService();
+rabbitMQService.initialize().catch((error) => {
+  console.error("❌ Failed to initialize RabbitMQ during startup:", error);
+  // Don't throw - allow service to start even if RabbitMQ is unavailable
+});
+container.registerInstance<IRabbitMQService>(
+  "IRabbitMQService",
+  rabbitMQService
+);
+
 // ===== EXTERNAL SERVICE CLIENTS =====
 
 // Register UserServiceClient as IUserServiceClient implementation
@@ -48,7 +66,7 @@ container.registerSingleton<IWorkspaceChannelServiceClient>(
   WorkspaceChannelServiceClient
 );
 
-// TODO: Register services when created
+// TODO: Register controllers when created
 // TODO: Register workers when created
 
 export { container };

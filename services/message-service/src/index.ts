@@ -5,7 +5,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
-import "./container"; // Auto-configure dependency injection
+import { container } from "./container"; // Auto-configure dependency injection
+import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -107,6 +108,12 @@ const startServer = async () => {
         console.log("✅ HTTP server closed");
 
         try {
+          // Get RabbitMQ service for cleanup
+          const rabbitMQService =
+            container.resolve<IRabbitMQService>("IRabbitMQService");
+          await rabbitMQService.close();
+          console.log("✅ RabbitMQ disconnected");
+
           await prisma.$disconnect();
           console.log("✅ Database disconnected");
           process.exit(0);

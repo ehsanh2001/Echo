@@ -115,7 +115,7 @@ export const config = {
   // RabbitMQ Configuration
   rabbitmq: {
     url: getRequiredEnv("RABBITMQ_URL"),
-    exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "message"),
+    exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "echo.events"),
   },
 
   // Rate Limiting
