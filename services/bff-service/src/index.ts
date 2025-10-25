@@ -15,6 +15,7 @@ import { IRedisService } from "./interfaces/services/IRedisService";
 import { RabbitMQConsumer } from "./workers/RabbitMQConsumer";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { socketAuth, AuthenticatedSocket } from "./middleware/auth";
+import bffRoutes from "./routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -73,10 +74,8 @@ app.get("/health", async (req, res) => {
   res.status(200).json(healthInfo);
 });
 
-// Import routes after dependencies are configured
-// TODO: Import routes when created
-// import bffRoutes from "./routes";
-// app.use("/api/bff", bffRoutes);
+// Mount API routes
+app.use("/api", bffRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {
@@ -267,7 +266,12 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection", { reason, promise });
+  logger.error("Unhandled Rejection", {
+    reason: reason instanceof Error ? reason.message : reason,
+    stack: reason instanceof Error ? reason.stack : undefined,
+    promise,
+  });
+  console.error("Unhandled Rejection Details:", reason);
   gracefulShutdown("unhandledRejection");
 });
 

@@ -56,13 +56,18 @@ const extractBearerToken = (authHeader: string | undefined): string | null => {
 
 /**
  * Verify JWT token and extract payload
+ * @param token - JWT token string
+ * @param expectedType - Expected token type ('access' or 'refresh'), or undefined to allow any
  */
-const verifyToken = (token: string): JwtPayload => {
+const verifyToken = (
+  token: string,
+  expectedType?: "access" | "refresh"
+): JwtPayload => {
   try {
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
 
-    // Validate token type
-    if (decoded.type !== "access") {
+    // Validate token type if specified
+    if (expectedType && decoded.type !== expectedType) {
       throw new Error("INVALID_TOKEN_TYPE");
     }
 
@@ -79,6 +84,94 @@ const verifyToken = (token: string): JwtPayload => {
 };
 
 /**
+ * Generic JWT authentication middleware factory
+ * Creates middleware for validating either access or refresh tokens
+ *
+ * @param tokenType - The expected token type ('access' or 'refresh')
+ * @returns Express middleware function
+ */
+const createJwtAuthMiddleware = (tokenType: "access" | "refresh") => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const authHeader = req.headers.authorization;
+
+      // Check for missing auth header
+      if (!authHeader) {
+        res.status(401).json({
+          success: false,
+          message: "Authorization header is required",
+          code: "MISSING_AUTH_HEADER",
+        });
+        return;
+      }
+
+      // Extract token
+      const token = extractBearerToken(authHeader);
+      if (!token) {
+        res.status(401).json({
+          success: false,
+          message: "Invalid authorization header format. Use 'Bearer <token>'",
+          code: "INVALID_AUTH_FORMAT",
+        });
+        return;
+      }
+
+      // Verify token with expected type
+      const payload = verifyToken(token, tokenType);
+
+      // Attach user info to request
+      (req as AuthenticatedRequest).user = {
+        userId: payload.userId,
+        email: payload.email,
+        roles: payload.roles,
+      };
+
+      next();
+    } catch (error: any) {
+      logger.warn(`JWT ${tokenType} token authentication failed`, {
+        error: error.message,
+        path: req.path,
+      });
+
+      if (error.message === "TOKEN_EXPIRED") {
+        res.status(401).json({
+          success: false,
+          message: `${
+            tokenType === "access" ? "Access" : "Refresh"
+          } token has expired`,
+          code: "TOKEN_EXPIRED",
+        });
+        return;
+      }
+
+      if (error.message === "INVALID_TOKEN") {
+        res.status(401).json({
+          success: false,
+          message: `Invalid ${tokenType} token`,
+          code: "INVALID_TOKEN",
+        });
+        return;
+      }
+
+      if (error.message === "INVALID_TOKEN_TYPE") {
+        res.status(401).json({
+          success: false,
+          message: `Token type mismatch. Expected ${tokenType} token`,
+          code: "INVALID_TOKEN_TYPE",
+        });
+        return;
+      }
+
+      res.status(401).json({
+        success: false,
+        message: "Authentication failed",
+        code: "AUTH_FAILED",
+      });
+    }
+  };
+};
+
+/**
  * JWT Authentication Middleware for HTTP routes
  *
  * Validates JWT access tokens and attaches user info to the request.
@@ -91,86 +184,23 @@ const verifyToken = (token: string): JwtPayload => {
  * });
  * ```
  */
-export const jwtAuth = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  try {
-    const authHeader = req.headers.authorization;
+export const jwtAuth = createJwtAuthMiddleware("access");
 
-    // Check for missing auth header
-    if (!authHeader) {
-      res.status(401).json({
-        success: false,
-        message: "Authorization header is required",
-        code: "MISSING_AUTH_HEADER",
-      });
-      return;
-    }
-
-    // Extract token
-    const token = extractBearerToken(authHeader);
-    if (!token) {
-      res.status(401).json({
-        success: false,
-        message: "Invalid authorization header format. Use 'Bearer <token>'",
-        code: "INVALID_AUTH_FORMAT",
-      });
-      return;
-    }
-
-    // Verify token
-    const payload = verifyToken(token);
-
-    // Attach user info to request
-    (req as AuthenticatedRequest).user = {
-      userId: payload.userId,
-      email: payload.email,
-      roles: payload.roles,
-    };
-
-    next();
-  } catch (error: any) {
-    logger.warn("JWT authentication failed", {
-      error: error.message,
-      path: req.path,
-    });
-
-    if (error.message === "TOKEN_EXPIRED") {
-      res.status(401).json({
-        success: false,
-        message: "Access token has expired",
-        code: "TOKEN_EXPIRED",
-      });
-      return;
-    }
-
-    if (error.message === "INVALID_TOKEN") {
-      res.status(401).json({
-        success: false,
-        message: "Invalid access token",
-        code: "INVALID_TOKEN",
-      });
-      return;
-    }
-
-    if (error.message === "INVALID_TOKEN_TYPE") {
-      res.status(401).json({
-        success: false,
-        message: "Token type mismatch. Expected access token",
-        code: "INVALID_TOKEN_TYPE",
-      });
-      return;
-    }
-
-    res.status(401).json({
-      success: false,
-      message: "Authentication failed",
-      code: "AUTH_FAILED",
-    });
-  }
-};
+/**
+ * JWT Refresh Token Authentication Middleware for HTTP routes
+ *
+ * Validates JWT refresh tokens and attaches user info to the request.
+ * Used specifically for token refresh endpoint.
+ *
+ * @example
+ * ```typescript
+ * router.post('/auth/refresh', jwtRefreshAuth, (req: AuthenticatedRequest, res) => {
+ *   const userId = req.user?.userId;
+ *   // ...
+ * });
+ * ```
+ */
+export const jwtRefreshAuth = createJwtAuthMiddleware("refresh");
 
 /**
  * Socket.IO Authentication Middleware

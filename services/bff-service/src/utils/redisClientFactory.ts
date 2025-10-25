@@ -16,6 +16,7 @@ export function createRedisClient(
 ): RedisClientType {
   const client = createClient({
     url: config.redis.url,
+    password: config.redis.password,
     socket: {
       reconnectStrategy: (retries) => {
         if (retries > 10) {

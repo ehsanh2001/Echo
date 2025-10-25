@@ -67,14 +67,21 @@ export const config = {
   // Redis configuration
   redis: {
     url: getOptionalEnv("REDIS_URL", "redis://localhost:6379"),
+    password: getOptionalEnv("REDIS_PASSWORD", "dev-redis-password"),
     keyPrefix: getOptionalEnv("REDIS_KEY_PREFIX", "BFF_SERVICE:"),
   },
 
   // RabbitMQ configuration
   rabbitmq: {
-    url: getOptionalEnv("RABBITMQ_URL", "amqp://localhost:5672"),
-    user: getOptionalEnv("RABBITMQ_USER", "guest"),
-    password: getOptionalEnv("RABBITMQ_PASSWORD", "guest"),
+    // If RABBITMQ_URL is provided with credentials (e.g., amqp://user:pass@host:port), use it
+    // Otherwise, construct URL from separate components
+    url: getOptionalEnv(
+      "RABBITMQ_URL",
+      `amqp://${getOptionalEnv("RABBITMQ_USER", "guest")}:${getOptionalEnv(
+        "RABBITMQ_PASSWORD",
+        "guest"
+      )}@localhost:5672`
+    ),
     // BFF consumes from multiple exchanges
     exchanges: {
       message: "message",
