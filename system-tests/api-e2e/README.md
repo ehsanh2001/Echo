@@ -7,8 +7,28 @@ Comprehensive end-to-end API tests for Echo microservices architecture.
 These tests validate the complete user workflow across all Echo microservices:
 
 1. **User Service** - User signup and authentication
-2. **Workspace-Channel Service** - Workspace and channel management
+2. **Workspace-Channel Service** - Workspace and channel management, invitations
 3. **Message Service** - Message creation and management
+4. **BFF Service** - Real-time messaging via WebSocket
+
+## Test Suites
+
+### 1. Message Workflow Test (`message-workflow.test.ts`)
+
+Basic workflow testing HTTP APIs across services:
+
+- User signup and login
+- Workspace and channel creation
+- Message sending
+
+### 2. BFF WebSocket Workflow Test (`bff-websocket-workflow.test.ts`)
+
+Complete real-time messaging workflow:
+
+- User1 creates workspace and invite
+- User2 joins workspace via invite
+- User2 connects to BFF WebSocket
+- User2 receives real-time message from User1
 
 ## Prerequisites
 
@@ -23,7 +43,7 @@ docker-compose up -d
 
 ### 2. Database Setup
 
-Ensure all three databases are created and migrated:
+Ensure all databases are created and migrated:
 
 - `users_db` (port 5432)
 - `workspaces_channels_db` (port 5432)
@@ -42,6 +62,9 @@ curl http://localhost:8002/health
 
 # Message Service
 curl http://localhost:8003/health
+
+# BFF Service
+curl http://localhost:8004/health
 ```
 
 ## Installation
@@ -59,6 +82,16 @@ npm install
 npm test
 ```
 
+### Run specific test suite
+
+```bash
+# Basic message workflow
+npm test message-workflow
+
+# BFF WebSocket workflow
+npm test bff-websocket-workflow
+```
+
 ### Run tests in watch mode
 
 ```bash
@@ -71,19 +104,19 @@ npm run test:watch
 npm run test:verbose
 ```
 
-## Test Workflow
+## Test Workflows
 
-The e2e test validates the following workflow:
+### Basic Message Workflow (`message-workflow.test.ts`)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   E2E Test Workflow                     │
+│            Basic Message Workflow (HTTP)                │
 └─────────────────────────────────────────────────────────┘
 
 Step 1: User Signup
   POST /api/users/auth/register
   ✓ Creates new user account
-  ✓ Returns user profile and tokens
+  ✓ Returns user profile
 
 Step 2: User Login
   POST /api/users/auth/login
@@ -108,26 +141,90 @@ Step 5: Send Message
   ✓ Message assigned sequential number
 ```
 
+### BFF WebSocket Workflow (`bff-websocket-workflow.test.ts`)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│        Real-Time Messaging Workflow (WebSocket)         │
+└─────────────────────────────────────────────────────────┘
+
+Step 1: User1 Signup
+  POST /api/users/auth/register
+  ✓ Creates user1 account
+
+Step 2: User1 Login
+  POST /api/users/auth/login
+  ✓ Authenticates user1
+
+Step 3: User1 Creates Workspace
+  POST /api/ws-ch/workspaces
+  ✓ Creates workspace with auto-generated 'general' channel
+
+Step 4: User1 Creates Invite
+  POST /api/ws-ch/workspaces/:workspaceId/invites
+  ✓ Generates invite token for user2
+
+Step 5: User2 Signup
+  POST /api/users/auth/register
+  ✓ Creates user2 account
+
+Step 6: User2 Login
+  POST /api/users/auth/login
+  ✓ Authenticates user2
+
+Step 7: User2 Accepts Invite
+  POST /api/ws-ch/invites/:token/accept
+  ✓ User2 joins workspace
+  ✓ User2 added to 'general' channel
+
+Step 8: User2 Connects to BFF WebSocket
+  WebSocket connection to BFF Service
+  ✓ Authenticates with JWT token
+  ✓ Joins workspace room
+  ✓ Joins general channel room
+
+Step 9: Real-Time Message Delivery
+  User1: POST /api/messages/... (HTTP)
+  User2: Receives 'message:created' event (WebSocket)
+  ✓ Message delivered in real-time
+  ✓ Message includes full author info
+  ✓ RabbitMQ → BFF → Socket.IO pipeline verified
+```
+
 ## Test Data
 
-The test uses hardcoded test data:
+Tests use timestamped data to avoid conflicts:
+
+### Basic Message Workflow
 
 ```typescript
 User:
   email: e2e.test@example.com
   username: e2e_test_user
-  displayName: E2E Test User
 
 Workspace:
   name: e2e-test-workspace
-  displayName: E2E Test Workspace
 
 Channel:
   name: e2e-test-channel
-  type: public
+```
 
-Message:
-  content: "Hello! This is an E2E test message."
+### BFF WebSocket Workflow
+
+```typescript
+User1:
+  email: e2e.user1.{timestamp}@example.com
+  username: e2e_user1_{timestamp}
+
+User2:
+  email: e2e.user2.{timestamp}@example.com
+  username: e2e_user2_{timestamp}
+
+Workspace:
+  name: e2e-ws-{timestamp}
+
+Channel:
+  name: general (auto-created)
 ```
 
 ## Cleanup
