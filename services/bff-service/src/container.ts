@@ -14,6 +14,7 @@ container.register<IRedisService>("IRedisService", {
   useClass: RedisService,
 });
 
-// RabbitMQ service will be registered when implemented
+// Note: RabbitMQConsumer is registered manually in index.ts with Socket.IO instance
+// It requires the io instance which is created during server initialization
 
 export { container };

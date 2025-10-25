@@ -12,6 +12,9 @@ import { container } from "./container";
 import logger from "./utils/logger";
 import { createRedisClient } from "./utils/redisClientFactory";
 import { IRedisService } from "./interfaces/services/IRedisService";
+import { RabbitMQConsumer } from "./workers/RabbitMQConsumer";
+import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
+import { socketAuth, AuthenticatedSocket } from "./middleware/auth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,18 +109,57 @@ app.use(
 );
 
 // Socket.IO connection handling
-io.on("connection", (socket) => {
-  logger.info(`Socket connected: ${socket.id}`);
+// Socket.IO connection handling with authentication
+io.use(socketAuth);
+logger.info("Socket.IO authentication middleware configured");
 
-  // TODO: Add authentication middleware for sockets
-  // TODO: Handle socket events (join workspace, join channel, etc.)
+io.on("connection", (socket: AuthenticatedSocket) => {
+  const userId = socket.user!.userId;
+  logger.info(`Socket connected: ${socket.id}, User: ${userId}`);
+
+  // Auto-join user-specific room for direct notifications
+  socket.join(`user:${userId}`);
+
+  // Handle joining workspace rooms
+  socket.on("join_workspace", (workspaceId: string) => {
+    socket.join(`workspace:${workspaceId}`);
+    logger.info(`User ${userId} joined workspace: ${workspaceId}`);
+  });
+
+  // Handle joining channel rooms
+  socket.on(
+    "join_channel",
+    (data: { workspaceId: string; channelId: string }) => {
+      const room = `workspace:${data.workspaceId}:channel:${data.channelId}`;
+      socket.join(room);
+      logger.info(`User ${userId} joined channel: ${data.channelId}`);
+    }
+  );
+
+  // Handle leaving workspace rooms
+  socket.on("leave_workspace", (workspaceId: string) => {
+    socket.leave(`workspace:${workspaceId}`);
+    logger.info(`User ${userId} left workspace: ${workspaceId}`);
+  });
+
+  // Handle leaving channel rooms
+  socket.on(
+    "leave_channel",
+    (data: { workspaceId: string; channelId: string }) => {
+      const room = `workspace:${data.workspaceId}:channel:${data.channelId}`;
+      socket.leave(room);
+      logger.info(`User ${userId} left channel: ${data.channelId}`);
+    }
+  );
 
   socket.on("disconnect", (reason) => {
-    logger.info(`Socket disconnected: ${socket.id}, reason: ${reason}`);
+    logger.info(
+      `Socket disconnected: ${socket.id}, User: ${userId}, reason: ${reason}`
+    );
   });
 
   socket.on("error", (error) => {
-    logger.error(`Socket error: ${socket.id}`, { error });
+    logger.error(`Socket error: ${socket.id}, User: ${userId}`, { error });
   });
 });
 
@@ -160,7 +202,14 @@ async function gracefulShutdown(signal: string) {
     logger.error("Error closing Socket.IO Redis clients", { error });
   }
 
-  // TODO: Close RabbitMQ connections when implemented
+  // Close RabbitMQ consumer
+  try {
+    if (rabbitmqConsumer) {
+      await rabbitmqConsumer.close();
+    }
+  } catch (error) {
+    logger.error("Error closing RabbitMQ consumer", { error });
+  }
 
   // Give pending operations time to complete
   setTimeout(() => {
@@ -175,6 +224,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 // Socket.IO Redis clients for horizontal scaling (module-level to access in shutdown)
 let socketIOPubClient: ReturnType<typeof createRedisClient>;
 let socketIOSubClient: ReturnType<typeof createRedisClient>;
+let rabbitmqConsumer: IRabbitMQConsumer;
 
 // Start server
 async function startServer() {
@@ -192,7 +242,9 @@ async function startServer() {
     io.adapter(createAdapter(socketIOPubClient, socketIOSubClient));
     logger.info("✅ Socket.IO Redis adapter configured for horizontal scaling");
 
-    // TODO: Initialize RabbitMQ consumer
+    // Initialize RabbitMQ consumer to broadcast events to Socket.IO clients
+    rabbitmqConsumer = new RabbitMQConsumer(io);
+    await rabbitmqConsumer.initialize();
 
     httpServer.listen(config.port, () => {
       logger.info(`✅ BFF Service listening on port ${config.port}`);
