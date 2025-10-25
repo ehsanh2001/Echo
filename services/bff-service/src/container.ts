@@ -1,13 +1,19 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
 import logger from "./utils/logger";
+import { RedisService } from "./services/RedisService";
+import { IRedisService } from "./interfaces/services/IRedisService";
 
 // Register logger as singleton
 container.register("Logger", {
   useValue: logger,
 });
 
-// Redis client and RabbitMQ connection will be registered in their respective config files
-// They will be imported and used in src/index.ts during startup
+// Register RedisService with interface pattern
+container.register<IRedisService>("IRedisService", {
+  useClass: RedisService,
+});
+
+// RabbitMQ service will be registered when implemented
 
 export { container };

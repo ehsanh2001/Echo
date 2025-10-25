@@ -5,10 +5,11 @@
 - Follow SOLID principles and clean architecture.
 - Follow DRY - avoid code duplication.
 - Follow YAGNI - don't implement unused features.
-- When ever implementing a class/method or updating it, after implementation read the whole class and its package to ensure it follows best practices and is clean.
+- When implementing a class/method or updating it, after implementation read the whole class and its package to ensure it follows best practices and is clean.
 - Extract common logic into reusable functions or classes.
 - When you need new types/interfaces, define them in a dedicated `types` or `interfaces` file. But before that, check if similar types/interfaces already exist.
 - Check existing service patterns (especially message-service for complete examples).
+- Before implementing ask any clarifying questions if requirements are ambiguous or missing.
 
 ## 🏗️ Architecture Overview
 
