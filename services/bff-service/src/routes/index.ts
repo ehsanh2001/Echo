@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authRoutes from "./authRoutes";
+import workspaceRoutes from "./workspaceRoutes";
 
 /**
  * Main BFF routes
@@ -10,8 +11,10 @@ const router = Router();
 // Mount auth routes
 router.use("/auth", authRoutes);
 
+// Mount workspace routes
+router.use("/workspaces", workspaceRoutes);
+
 // TODO: Add more route modules:
-// router.use("/workspaces", workspaceRoutes);
 // router.use("/channels", channelRoutes);
 // router.use("/messages", messageRoutes);
 // router.use("/users", userRoutes);
