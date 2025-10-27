@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ChannelController } from "../controllers/ChannelController";
 import { jwtAuth } from "../middleware/auth";
+import messageRoutes from "./messageRoutes";
 
 /**
  * Channel routes
@@ -58,5 +59,9 @@ const channelRoutes = Router({ mergeParams: true }); // mergeParams to access wo
  * - group_dm: Group direct message (requires 2+ participants)
  */
 channelRoutes.post("/", jwtAuth, ChannelController.createChannel);
+
+// Mount message routes under /:channelId/messages
+// This creates nested routes like /api/workspaces/:workspaceId/channels/:channelId/messages
+channelRoutes.use("/:channelId/messages", messageRoutes);
 
 export default channelRoutes;
