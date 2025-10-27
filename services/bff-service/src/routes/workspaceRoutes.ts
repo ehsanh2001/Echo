@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { WorkspaceController } from "../controllers/WorkspaceController";
 import { jwtAuth } from "../middleware/auth";
+import channelRoutes from "./channelRoutes";
 
 /**
  * Workspace routes
@@ -176,5 +177,9 @@ workspaceRoutes.post("/:id/invites", jwtAuth, WorkspaceController.createInvite);
  * }
  */
 workspaceRoutes.get("/:id", jwtAuth, WorkspaceController.getWorkspaceDetails);
+
+// Mount channel routes under /:workspaceId/channels
+// This creates nested routes like /api/workspaces/:workspaceId/channels
+workspaceRoutes.use("/:workspaceId/channels", channelRoutes);
 
 export default workspaceRoutes;
