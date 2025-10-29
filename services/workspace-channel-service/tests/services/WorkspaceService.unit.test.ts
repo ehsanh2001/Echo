@@ -55,6 +55,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       addOrReactivateMember: jest.fn(),
       getMembership: jest.fn(),
       countActiveMembers: jest.fn(),
+      findWorkspacesByUserId: jest.fn(),
     } as any;
 
     mockChannelRepository = {
@@ -64,6 +65,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       addMember: jest.fn(),
       findPublicChannelsByWorkspace: jest.fn(),
       addOrReactivateMember: jest.fn(),
+      getChannelMembershipsByUserId: jest.fn(),
     } as any;
 
     mockInviteRepository = {
@@ -1279,6 +1281,259 @@ describe("WorkspaceService (Unit Tests)", () => {
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
         expect.any(Function)
       );
+    });
+  });
+
+  describe("getUserMemberships", () => {
+    const userId = "user-123";
+
+    const mockWorkspacesData = [
+      {
+        workspace: {
+          id: "workspace-1",
+          name: "alpha-workspace",
+          displayName: "Alpha Workspace",
+          description: "First workspace",
+          ownerId: "owner-1",
+          isArchived: false,
+          maxMembers: null,
+          isPublic: true,
+          vanityUrl: null,
+          settings: {},
+          createdAt: new Date("2023-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2023-01-01T00:00:00.000Z"),
+        },
+        memberCount: 5,
+        userRole: "admin",
+      },
+      {
+        workspace: {
+          id: "workspace-2",
+          name: "beta-workspace",
+          displayName: "Beta Workspace",
+          description: "Second workspace",
+          ownerId: "owner-2",
+          isArchived: false,
+          maxMembers: 100,
+          isPublic: false,
+          vanityUrl: "beta",
+          settings: { theme: "dark" },
+          createdAt: new Date("2023-01-02T00:00:00.000Z"),
+          updatedAt: new Date("2023-01-02T00:00:00.000Z"),
+        },
+        memberCount: 3,
+        userRole: "member",
+      },
+    ];
+
+    const mockChannelMemberships = [
+      {
+        channel: {
+          id: "channel-1",
+          workspaceId: "workspace-1",
+          name: "general",
+          displayName: "General",
+          description: "General discussion",
+          type: "public" as any,
+          isArchived: false,
+          isReadOnly: false,
+          createdBy: "user-456",
+          memberCount: 10,
+          lastActivity: new Date("2023-01-01T12:00:00.000Z"),
+          settings: {},
+          createdAt: new Date("2023-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2023-01-01T00:00:00.000Z"),
+        },
+        membership: {
+          id: "membership-1",
+          channelId: "channel-1",
+          userId: "user-123",
+          role: "admin" as any,
+          joinedAt: new Date("2023-01-01T00:00:00.000Z"),
+          isMuted: false,
+          isActive: true,
+          joinedBy: "user-456",
+        },
+      },
+    ];
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("should return user memberships without channels when includeChannels is false", async () => {
+      // Arrange
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
+        mockWorkspacesData
+      );
+
+      // Act
+      const result = await workspaceService.getUserMemberships(userId, false);
+
+      // Assert
+      expect(
+        mockWorkspaceRepository.findWorkspacesByUserId
+      ).toHaveBeenCalledWith(userId);
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).not.toHaveBeenCalled();
+
+      expect(result.workspaces).toHaveLength(2);
+      expect(result.workspaces[0]).toEqual({
+        ...mockWorkspacesData[0]!.workspace,
+        userRole: "admin",
+        memberCount: 5,
+      });
+      expect(result.workspaces[0]?.channels).toBeUndefined();
+
+      expect(result.workspaces[1]).toEqual({
+        ...mockWorkspacesData[1]!.workspace,
+        userRole: "member",
+        memberCount: 3,
+      });
+      expect(result.workspaces[1]?.channels).toBeUndefined();
+    });
+
+    it("should return user memberships with channels when includeChannels is true", async () => {
+      // Arrange
+      const firstWorkspace = mockWorkspacesData[0];
+      if (!firstWorkspace) throw new Error("Test data missing");
+
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue([
+        firstWorkspace,
+      ]);
+      mockChannelRepository.getChannelMembershipsByUserId.mockResolvedValue(
+        mockChannelMemberships
+      );
+
+      // Act
+      const result = await workspaceService.getUserMemberships(userId, true);
+
+      // Assert
+      expect(
+        mockWorkspaceRepository.findWorkspacesByUserId
+      ).toHaveBeenCalledWith(userId);
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).toHaveBeenCalledWith(userId, "workspace-1");
+
+      expect(result.workspaces).toHaveLength(1);
+      expect(result.workspaces[0]?.channels).toHaveLength(1);
+      expect(result.workspaces[0]?.channels![0]).toEqual({
+        ...mockChannelMemberships[0]!.channel,
+        role: "admin",
+        joinedAt: mockChannelMemberships[0]!.membership.joinedAt,
+        isMuted: false,
+        joinedBy: "user-456",
+      });
+    });
+
+    it("should default to includeChannels=false when parameter is not provided", async () => {
+      // Arrange
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
+        mockWorkspacesData
+      );
+
+      // Act
+      const result = await workspaceService.getUserMemberships(userId);
+
+      // Assert
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).not.toHaveBeenCalled();
+      expect(result.workspaces[0]?.channels).toBeUndefined();
+    });
+
+    it("should return empty array when user has no workspace memberships", async () => {
+      // Arrange
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue([]);
+
+      // Act
+      const result = await workspaceService.getUserMemberships(userId, true);
+
+      // Assert
+      expect(result.workspaces).toHaveLength(0);
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).not.toHaveBeenCalled();
+    });
+
+    it("should handle workspaces with no channel memberships when includeChannels is true", async () => {
+      // Arrange
+      const firstWorkspace = mockWorkspacesData[0];
+      if (!firstWorkspace) throw new Error("Test data missing");
+
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue([
+        firstWorkspace,
+      ]);
+      mockChannelRepository.getChannelMembershipsByUserId.mockResolvedValue([]);
+
+      // Act
+      const result = await workspaceService.getUserMemberships(userId, true);
+
+      // Assert
+      expect(result.workspaces).toHaveLength(1);
+      expect(result.workspaces[0]?.channels).toHaveLength(0);
+    });
+
+    it("should throw WorkspaceChannelServiceError when repository throws error", async () => {
+      // Arrange
+      const error = new Error("Database connection failed");
+      mockWorkspaceRepository.findWorkspacesByUserId.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(workspaceService.getUserMemberships(userId)).rejects.toThrow(
+        WorkspaceChannelServiceError
+      );
+      expect(
+        mockWorkspaceRepository.findWorkspacesByUserId
+      ).toHaveBeenCalledWith(userId);
+    });
+
+    it("should throw WorkspaceChannelServiceError when channel repository throws error", async () => {
+      // Arrange
+      const firstWorkspace = mockWorkspacesData[0];
+      if (!firstWorkspace) throw new Error("Test data missing");
+
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue([
+        firstWorkspace,
+      ]);
+      const error = new Error("Channel query failed");
+      mockChannelRepository.getChannelMembershipsByUserId.mockRejectedValue(
+        error
+      );
+
+      // Act & Assert
+      await expect(
+        workspaceService.getUserMemberships(userId, true)
+      ).rejects.toThrow(WorkspaceChannelServiceError);
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).toHaveBeenCalledWith(userId, "workspace-1");
+    });
+
+    it("should call getChannelMembershipsByUserId for each workspace when includeChannels is true", async () => {
+      // Arrange
+      mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
+        mockWorkspacesData
+      );
+      mockChannelRepository.getChannelMembershipsByUserId
+        .mockResolvedValueOnce([]) // workspace-1
+        .mockResolvedValueOnce([]); // workspace-2
+
+      // Act
+      await workspaceService.getUserMemberships(userId, true);
+
+      // Assert
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).toHaveBeenCalledTimes(2);
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).toHaveBeenCalledWith(userId, "workspace-1");
+      expect(
+        mockChannelRepository.getChannelMembershipsByUserId
+      ).toHaveBeenCalledWith(userId, "workspace-2");
     });
   });
 });

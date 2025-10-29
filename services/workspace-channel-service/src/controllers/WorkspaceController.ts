@@ -308,6 +308,37 @@ export class WorkspaceController {
   }
 
   /**
+   * Get user's workspace and channel memberships
+   * GET /api/ws-ch/me/memberships?includeChannels=true
+   */
+  async getUserMemberships(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      console.log(`📝 Get memberships request from user: ${req.user.userId}`);
+
+      // Parse includeChannels query parameter (defaults to false)
+      const includeChannels =
+        req.query.includeChannels === "true" ||
+        req.query.includeChannels === "1";
+
+      const memberships = await this.workspaceService.getUserMemberships(
+        req.user.userId,
+        includeChannels
+      );
+
+      res.status(200).json({
+        success: true,
+        data: memberships,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("getUserMemberships", error, res);
+    }
+  }
+
+  /**
    * Handles controller errors with consistent error response format
    */
   private handleControllerError(

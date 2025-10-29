@@ -63,6 +63,7 @@ describe("InviteService", () => {
       getMembership: jest.fn(),
       countActiveMembers: jest.fn(),
       addOrReactivateMember: jest.fn(),
+      findWorkspacesByUserId: jest.fn(),
     };
 
     mockOutboxService = {

@@ -31,9 +31,23 @@ app.use(express.urlencoded({ extended: true }));
 // Import routes after dependencies are configured
 import workspaceRoutes from "./routes/workspaceRoutes";
 import channelRoutes from "./routes/channelRoutes";
+import { WorkspaceController } from "./controllers/WorkspaceController";
+import { jwtAuth } from "./middleware/jwtAuth";
+
+// Instantiate controllers for direct routes
+const workspaceController = new WorkspaceController();
 
 // API routes - new routing structure
 // Main path: /api/ws-ch
+
+/**
+ * Get user's workspace and channel memberships
+ * GET /api/ws-ch/me/memberships?includeChannels=true
+ */
+app.get("/api/ws-ch/me/memberships", jwtAuth, async (req, res) => {
+  await workspaceController.getUserMemberships(req as any, res);
+});
+
 app.use("/api/ws-ch/workspaces", workspaceRoutes);
 // Mount channel routes under each workspace
 // This creates the path: /api/ws-ch/workspaces/:workspaceId/channels

@@ -118,4 +118,23 @@ export interface IChannelRepository {
     channelId: string,
     userId: string
   ): Promise<ChannelMember | null>;
+
+  /**
+   * Gets all channel memberships for a user in a specific workspace.
+   * Excludes archived channels and direct channels.
+   * Results are sorted alphabetically by channel name.
+   *
+   * @param userId - The user ID
+   * @param workspaceId - The workspace ID
+   * @returns {Promise<Array<{channel: Channel, membership: ChannelMember}>>}
+   */
+  getChannelMembershipsByUserId(
+    userId: string,
+    workspaceId: string
+  ): Promise<
+    Array<{
+      channel: Channel;
+      membership: ChannelMember;
+    }>
+  >;
 }

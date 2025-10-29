@@ -322,4 +322,54 @@ export class ChannelRepository implements IChannelRepository {
       );
     }
   }
+
+  /**
+   * Gets all channel memberships for a user in a specific workspace.
+   * Excludes archived channels and direct channels.
+   * Results are sorted alphabetically by channel name.
+   * Returns channel data + the user's ChannelMember data.
+   */
+  async getChannelMembershipsByUserId(
+    userId: string,
+    workspaceId: string
+  ): Promise<
+    Array<{
+      channel: Channel;
+      membership: ChannelMember;
+    }>
+  > {
+    try {
+      const memberships = await this.prisma.channelMember.findMany({
+        where: {
+          userId,
+          isActive: true,
+          channel: {
+            workspaceId,
+            isArchived: false,
+            type: {
+              not: "direct", // Exclude direct channels
+            },
+          },
+        },
+        include: {
+          channel: true,
+        },
+        orderBy: {
+          channel: {
+            name: "asc", // Sort alphabetically by channel name
+          },
+        },
+      });
+
+      return memberships.map((m) => ({
+        channel: m.channel,
+        membership: m,
+      }));
+    } catch (error: any) {
+      console.error("Error finding channel memberships by user ID:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find channel memberships: ${error.message}`
+      );
+    }
+  }
 }

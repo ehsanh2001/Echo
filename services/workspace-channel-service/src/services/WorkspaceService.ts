@@ -12,6 +12,9 @@ import {
   WorkspaceDetailsResponse,
   CreateWorkspaceData,
   AcceptInviteResponse,
+  UserMembershipsResponse,
+  WorkspaceMembershipResponse,
+  ChannelMembershipResponse,
 } from "../types";
 import {
   validateCreateWorkspaceRequest,
@@ -487,5 +490,76 @@ export class WorkspaceService implements IWorkspaceService {
     }
 
     return publicChannels;
+  }
+
+  /**
+   * Gets all workspaces and optionally channels that a user is a member of.
+   * Only includes active memberships, non-archived channels, and excludes direct channels.
+   * Results are sorted alphabetically.
+   *
+   * @param userId - The ID of the user to get memberships for
+   * @param includeChannels - Whether to include channels in each workspace
+   * @returns {Promise<UserMembershipsResponse>} User's workspace and channel memberships
+   */
+  async getUserMemberships(
+    userId: string,
+    includeChannels: boolean = false
+  ): Promise<UserMembershipsResponse> {
+    try {
+      console.log(
+        `📝 Getting memberships for user: ${userId}, includeChannels: ${includeChannels}`
+      );
+
+      // Get all workspaces the user is a member of
+      const workspacesData =
+        await this.workspaceRepository.findWorkspacesByUserId(userId);
+
+      // Map to workspace membership responses
+      const workspaces: WorkspaceMembershipResponse[] = await Promise.all(
+        workspacesData.map(async ({ workspace, memberCount, userRole }) => {
+          const workspaceResponse: WorkspaceMembershipResponse = {
+            ...this.mapWorkspaceToResponse(workspace),
+            userRole: userRole as any,
+            memberCount,
+          };
+
+          // If includeChannels is true, fetch channel memberships
+          if (includeChannels) {
+            const channelMemberships =
+              await this.channelRepository.getChannelMembershipsByUserId(
+                userId,
+                workspace.id
+              );
+
+            workspaceResponse.channels = channelMemberships.map(
+              ({ channel, membership }) => ({
+                // Spread all channel fields
+                ...channel,
+                // Override type casting for enum compatibility
+                type: channel.type as any,
+                // Spread membership fields (excluding id and channelId to avoid conflicts)
+                role: membership.role as any,
+                joinedAt: membership.joinedAt,
+                isMuted: membership.isMuted,
+                joinedBy: membership.joinedBy,
+              })
+            );
+          }
+
+          return workspaceResponse;
+        })
+      );
+
+      console.log(`✅ Found ${workspaces.length} workspace memberships`);
+
+      return {
+        workspaces,
+      };
+    } catch (error) {
+      console.error("Error getting user memberships:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to get user memberships"
+      );
+    }
   }
 }

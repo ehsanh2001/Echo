@@ -3,6 +3,7 @@ import {
   WorkspaceResponse,
   WorkspaceDetailsResponse,
   AcceptInviteResponse,
+  UserMembershipsResponse,
 } from "../../types";
 
 /**
@@ -50,4 +51,15 @@ export interface IWorkspaceService {
    * All operations are atomic (in a transaction)
    */
   acceptInvite(token: string, userId: string): Promise<AcceptInviteResponse>;
+
+  /**
+   * Get all workspaces and optionally channels that a user is a member of
+   * - Returns only active memberships
+   * - Excludes archived channels and direct channels
+   * - Results sorted alphabetically
+   */
+  getUserMemberships(
+    userId: string,
+    includeChannels?: boolean
+  ): Promise<UserMembershipsResponse>;
 }

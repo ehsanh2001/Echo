@@ -678,4 +678,273 @@ describe("ChannelRepository Integration Tests", () => {
       expect(updatedChannel.memberCount).toBe(initialMemberCount);
     });
   });
+
+  describe("getChannelMembershipsByUserId", () => {
+    let testWorkspace: any;
+
+    beforeEach(async () => {
+      // Create a test workspace for all channel tests
+      testWorkspace = await createTestWorkspace(
+        prismaClientWithModels(prisma),
+        "membership-test"
+      );
+    });
+
+    it("should return user's channel memberships sorted alphabetically", async () => {
+      const userId = randomUUID();
+
+      // Create multiple channels
+      const channel1 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "middle-channel",
+        {
+          name: `${TEST_PREFIX}middle-${randomUUID()}`,
+          type: "public",
+        }
+      );
+
+      const channel2 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "alpha-channel",
+        {
+          name: `${TEST_PREFIX}alpha-${randomUUID()}`,
+          type: "private",
+        }
+      );
+
+      const channel3 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "zulu-channel",
+        {
+          name: `${TEST_PREFIX}zulu-${randomUUID()}`,
+          type: "public",
+        }
+      );
+
+      // Add user to channels 2 and 3 (user is already member of channel1 as creator)
+      await channelRepository.addOrReactivateMember(
+        channel2.id,
+        userId,
+        randomUUID(),
+        "admin"
+      );
+
+      await channelRepository.addOrReactivateMember(
+        channel3.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        testWorkspace.id
+      );
+
+      expect(result).toHaveLength(2); // Should not include channel1 as user is not a member
+
+      // Should be sorted alphabetically by channel name
+      const firstResult = result[0];
+      const secondResult = result[1];
+      if (!firstResult || !secondResult) throw new Error("Test data missing");
+
+      expect(firstResult.channel.name).toContain("alpha");
+      expect(secondResult.channel.name).toContain("zulu");
+
+      // Check channel and membership data
+      expect(firstResult.channel.id).toBe(channel2.id);
+      expect(firstResult.membership.role).toBe("admin");
+      expect(firstResult.membership.userId).toBe(userId);
+
+      expect(secondResult.channel.id).toBe(channel3.id);
+      expect(secondResult.membership.role).toBe("member");
+      expect(secondResult.membership.userId).toBe(userId);
+    });
+
+    it("should exclude archived channels", async () => {
+      const userId = randomUUID();
+
+      const activeChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "active",
+        {
+          type: "public",
+        }
+      );
+
+      const archivedChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "archived",
+        {
+          type: "public",
+        }
+      );
+
+      // Add user to both channels
+      await channelRepository.addOrReactivateMember(
+        activeChannel.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      await channelRepository.addOrReactivateMember(
+        archivedChannel.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      // Archive one channel
+      const db = prismaClientWithModels(prisma);
+      await db.channel.update({
+        where: { id: archivedChannel.id },
+        data: { isArchived: true },
+      });
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        testWorkspace.id
+      );
+
+      // Should only return the active channel
+      expect(result).toHaveLength(1);
+      const firstResult = result[0];
+      if (!firstResult) throw new Error("Test data missing");
+      expect(firstResult.channel.id).toBe(activeChannel.id);
+    });
+
+    it("should exclude direct channels", async () => {
+      const userId = randomUUID();
+
+      const publicChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "public",
+        {
+          type: "public",
+        }
+      );
+
+      const directChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "direct",
+        {
+          type: "direct",
+        }
+      );
+
+      // Add user to both channels
+      await channelRepository.addOrReactivateMember(
+        publicChannel.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      await channelRepository.addOrReactivateMember(
+        directChannel.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        testWorkspace.id
+      );
+
+      // Should only return the public channel (direct channel excluded)
+      expect(result).toHaveLength(1);
+      const firstResult = result[0];
+      if (!firstResult) throw new Error("Test data missing");
+      expect(firstResult.channel.id).toBe(publicChannel.id);
+      expect(firstResult.channel.type).toBe("public");
+    });
+
+    it("should only return active memberships", async () => {
+      const userId = randomUUID();
+
+      const channel1 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "active-membership",
+        {
+          type: "public",
+        }
+      );
+
+      const channel2 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "inactive-membership",
+        {
+          type: "public",
+        }
+      );
+
+      // Add user to both channels
+      const membership1 = await channelRepository.addOrReactivateMember(
+        channel1.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      const membership2 = await channelRepository.addOrReactivateMember(
+        channel2.id,
+        userId,
+        randomUUID(),
+        "member"
+      );
+
+      // Deactivate one membership
+      const db = prismaClientWithModels(prisma);
+      await db.channelMember.update({
+        where: { id: membership2.id },
+        data: { isActive: false },
+      });
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        testWorkspace.id
+      );
+
+      // Should only return the active membership
+      expect(result).toHaveLength(1);
+      const firstResult = result[0];
+      if (!firstResult) throw new Error("Test data missing");
+      expect(firstResult.channel.id).toBe(channel1.id);
+      expect(firstResult.membership.isActive).toBe(true);
+    });
+
+    it("should return empty array for user with no memberships", async () => {
+      const userId = randomUUID();
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        testWorkspace.id
+      );
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should return empty array for non-existent workspace", async () => {
+      const userId = randomUUID();
+      const nonExistentWorkspaceId = randomUUID();
+
+      const result = await channelRepository.getChannelMembershipsByUserId(
+        userId,
+        nonExistentWorkspaceId
+      );
+
+      expect(result).toHaveLength(0);
+    });
+  });
 });

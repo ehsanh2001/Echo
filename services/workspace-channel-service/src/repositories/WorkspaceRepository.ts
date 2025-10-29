@@ -263,4 +263,57 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       });
     }
   }
+
+  /**
+   * Finds all workspaces where the user is an active member,
+   * including workspace details and user's role.
+   * Results are sorted alphabetically by workspace name.
+   */
+  async findWorkspacesByUserId(userId: string): Promise<
+    Array<{
+      workspace: Workspace;
+      memberCount: number;
+      userRole: string;
+    }>
+  > {
+    try {
+      // Find all active memberships for the user
+      const memberships = await this.prisma.workspaceMember.findMany({
+        where: {
+          userId,
+          isActive: true,
+        },
+        include: {
+          workspace: true,
+        },
+        orderBy: {
+          workspace: {
+            name: "asc", // Sort alphabetically by workspace name
+          },
+        },
+      });
+
+      // For each workspace, get the member count
+      const results = await Promise.all(
+        memberships.map(async (membership) => {
+          const memberCount = await this.countActiveMembers(
+            membership.workspaceId
+          );
+
+          return {
+            workspace: membership.workspace,
+            memberCount,
+            userRole: membership.role,
+          };
+        })
+      );
+
+      return results;
+    } catch (error: any) {
+      console.error("Error finding workspaces by user ID:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find workspaces: ${error.message}`
+      );
+    }
+  }
 }

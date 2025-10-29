@@ -126,6 +126,42 @@ export interface CreateChannelMemberData {
   joinedBy?: string | null;
 }
 
+// ===== USER MEMBERSHIP TYPES =====
+
+// Channel membership response (includes Channel model + ChannelMember data)
+export interface ChannelMembershipResponse {
+  // Channel model fields
+  id: string;
+  workspaceId: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  type: ChannelType;
+  isArchived: boolean;
+  isReadOnly: boolean;
+  createdBy: string | null;
+  memberCount: number;
+  lastActivity: Date | null;
+  settings: any;
+  createdAt: Date;
+  updatedAt: Date;
+  // ChannelMember fields for this user
+  role: ChannelRole;
+  joinedAt: Date;
+  isMuted: boolean;
+  joinedBy: string | null;
+}
+
+// Workspace membership response (extends WorkspaceDetailsResponse with optional channels)
+export interface WorkspaceMembershipResponse extends WorkspaceDetailsResponse {
+  channels?: ChannelMembershipResponse[];
+}
+
+// User memberships response (all workspaces user belongs to)
+export interface UserMembershipsResponse {
+  workspaces: WorkspaceMembershipResponse[];
+}
+
 // ===== INVITE TYPES =====
 
 // Create workspace invite request

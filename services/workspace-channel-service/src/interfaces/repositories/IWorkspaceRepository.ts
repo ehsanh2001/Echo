@@ -86,4 +86,19 @@ export interface IWorkspaceRepository {
     invitedBy: string | null,
     transaction?: any
   ): Promise<WorkspaceMember>;
+
+  /**
+   * Finds all workspaces where the user is an active member.
+   * Results are sorted alphabetically by workspace name.
+   *
+   * @param userId - The user ID
+   * @returns {Promise<Array<{workspace: Workspace, memberCount: number, userRole: string}>>}
+   */
+  findWorkspacesByUserId(userId: string): Promise<
+    Array<{
+      workspace: Workspace;
+      memberCount: number;
+      userRole: string;
+    }>
+  >;
 }

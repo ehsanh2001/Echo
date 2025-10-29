@@ -717,4 +717,148 @@ describe("WorkspaceRepository Integration Tests", () => {
       expect(count).toBe(4); // owner + admin + member + guest
     });
   });
+
+  describe("findWorkspacesByUserId", () => {
+    it("should return user's active workspace memberships sorted alphabetically", async () => {
+      const userId = randomUUID();
+      const otherUserId = randomUUID();
+
+      // Create multiple workspaces with the user as member
+      const workspace1 = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}middle-${randomUUID()}`,
+          displayName: "Middle Workspace",
+          ownerId: userId,
+        },
+        userId
+      );
+
+      const workspace2 = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}alpha-${randomUUID()}`, // Should come first alphabetically
+          displayName: "Alpha Workspace",
+          ownerId: otherUserId,
+        },
+        otherUserId
+      );
+
+      const workspace3 = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}zulu-${randomUUID()}`, // Should come last alphabetically
+          displayName: "Zulu Workspace",
+          ownerId: otherUserId,
+        },
+        otherUserId
+      );
+
+      // Add user to workspace2 and workspace3
+      await workspaceRepository.addMember({
+        workspaceId: workspace2.id,
+        userId: userId,
+        role: "admin",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace3.id,
+        userId: userId,
+        role: "member",
+      });
+
+      // Add some other members to verify member counts
+      await workspaceRepository.addMember({
+        workspaceId: workspace2.id,
+        userId: randomUUID(),
+        role: "member",
+      });
+
+      const result = await workspaceRepository.findWorkspacesByUserId(userId);
+
+      expect(result).toHaveLength(3);
+
+      // Should be sorted alphabetically by workspace name
+      expect(result[0]?.workspace.name).toContain("alpha");
+      expect(result[1]?.workspace.name).toBe(workspace1.name);
+      expect(result[2]?.workspace.name).toContain("zulu");
+
+      // Check workspace details
+      expect(result[0]).toEqual({
+        workspace: workspace2,
+        memberCount: 3, // owner + user + 1 other member
+        userRole: "admin",
+      });
+
+      expect(result[1]).toEqual({
+        workspace: workspace1,
+        memberCount: 1, // user is owner
+        userRole: "owner",
+      });
+
+      expect(result[2]).toEqual({
+        workspace: workspace3,
+        memberCount: 2, // owner + user
+        userRole: "member",
+      });
+    });
+
+    it("should return empty array for user with no memberships", async () => {
+      const userId = randomUUID();
+
+      const result = await workspaceRepository.findWorkspacesByUserId(userId);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should only return active memberships", async () => {
+      const userId = randomUUID();
+
+      const workspace1 = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}active-ws-${randomUUID()}`,
+          displayName: "Active Workspace",
+          ownerId: userId,
+        },
+        userId
+      );
+
+      const workspace2 = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}inactive-ws-${randomUUID()}`,
+          displayName: "Inactive Workspace",
+          ownerId: randomUUID(),
+        },
+        randomUUID()
+      );
+
+      // Add user to workspace2 then deactivate the membership
+      const membership = await workspaceRepository.addMember({
+        workspaceId: workspace2.id,
+        userId: userId,
+        role: "member",
+      });
+
+      // Manually deactivate membership in database
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: { id: membership.id },
+        data: { isActive: false },
+      });
+
+      const result = await workspaceRepository.findWorkspacesByUserId(userId);
+
+      // Should only return the active membership (workspace1)
+      expect(result).toHaveLength(1);
+      expect(result[0]?.workspace.id).toBe(workspace1.id);
+      expect(result[0]?.userRole).toBe("owner");
+    });
+
+    it("should handle user with no workspaces gracefully", async () => {
+      const nonExistentUserId = randomUUID();
+
+      const result = await workspaceRepository.findWorkspacesByUserId(
+        nonExistentUserId
+      );
+
+      expect(result).toHaveLength(0);
+    });
+  });
 });
