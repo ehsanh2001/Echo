@@ -110,6 +110,50 @@ workspaceRoutes.post(
 );
 
 /**
+ * GET /api/workspaces/me/memberships?includeChannels=true
+ * Get current user's workspace and channel memberships
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Query Parameters:
+ *   includeChannels: boolean (optional) - Whether to include channels for each workspace
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspaces": [
+ *       {
+ *         "id": "uuid",
+ *         "name": "my-workspace",
+ *         "displayName": "My Workspace",
+ *         "userRole": "admin",
+ *         "memberCount": 5,
+ *         "channels": [  // Only if includeChannels=true
+ *           {
+ *             "id": "uuid",
+ *             "name": "general",
+ *             "displayName": "General",
+ *             "type": "public",
+ *             "role": "admin",
+ *             "joinedAt": "2025-10-27T...",
+ *             ...
+ *           }
+ *         ]
+ *       }
+ *     ]
+ *   },
+ *   "timestamp": "2025-10-27T..."
+ * }
+ */
+workspaceRoutes.get(
+  "/me/memberships",
+  jwtAuth,
+  WorkspaceController.getUserMemberships
+);
+
+/**
  * POST /api/workspaces/:id/invites
  * Create a workspace invite
  *

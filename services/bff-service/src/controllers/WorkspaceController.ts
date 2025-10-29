@@ -154,6 +154,36 @@ export class WorkspaceController {
   };
 
   /**
+   * GET /api/ws-ch/me/memberships
+   * Forward get user memberships to workspace-channel service
+   */
+  static getUserMemberships = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const authHeader = req.headers.authorization;
+      const { includeChannels } = req.query;
+
+      const response = await axios.get(
+        `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/me/memberships`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+          params: {
+            ...(includeChannels && { includeChannels }),
+          },
+        }
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      WorkspaceController.handleError(error, res, "Get user memberships");
+    }
+  };
+
+  /**
    * Handle errors from workspace-channel service
    * Maps axios errors to appropriate HTTP responses
    */

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import authRoutes from "./authRoutes";
 import workspaceRoutes from "./workspaceRoutes";
-
+import messageRoutes from "./messageRoutes";
 /**
  * Main BFF routes
  * Base path: /api
@@ -14,9 +14,7 @@ router.use("/auth", authRoutes);
 // Mount workspace routes
 router.use("/workspaces", workspaceRoutes);
 
-// TODO: Add more route modules:
-// router.use("/channels", channelRoutes);
-// router.use("/messages", messageRoutes);
-// router.use("/users", userRoutes);
+// Mount message routes
+router.use("/messages", messageRoutes);
 
 export default router;
