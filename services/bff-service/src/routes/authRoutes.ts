@@ -20,7 +20,8 @@ const authRoutes = Router();
  *   "email": "user@example.com",
  *   "password": "SecureP@ssw0rd",
  *   "username": "username",
- *   "displayName": "Display Name"
+ *   "displayName": "Display Name"  // Optional, defaults to username
+ *   "bio": "User bio"              // Optional
  * }
  *
  * Response (201):
@@ -32,12 +33,15 @@ const authRoutes = Router();
  *     "email": "user@example.com",
  *     "username": "username",
  *     "displayName": "Display Name",
+ *     "bio": "User bio" | null,
  *     "avatarUrl": null,
  *     "createdAt": "2025-10-25T...",
- *     "access_token": "jwt-token",
- *     "refresh_token": "jwt-refresh-token"
+ *     "lastSeen": null,
+ *     "roles": ["user"]
  *   }
  * }
+ *
+ * Note: Registration does NOT return tokens. User must login separately.
  */
 authRoutes.post("/register", AuthController.register);
 
