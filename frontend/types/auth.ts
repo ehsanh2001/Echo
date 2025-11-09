@@ -7,13 +7,9 @@
  * Display name is optional and will default to username if not provided.
  */
 export interface RegisterData {
-  /** User's email address (must be unique) */
   email: string;
-  /** User's password (min 8 chars, must include upper, lower, number, different from username) */
   password: string;
-  /** User's username (must be unique, alphanumeric with hyphens/underscores) */
   username: string;
-  /** Optional display name shown to other users */
   displayName?: string;
 }
 
@@ -24,32 +20,30 @@ export interface RegisterData {
  * Users must log in separately after successful registration.
  */
 export interface RegisterResponse {
-  /** Whether the registration was successful */
   success: boolean;
-  /** Human-readable message about the registration result */
   message: string;
   /** Created user profile (only present on success) */
-  user?: UserProfile;
+  data?: UserProfile;
 }
 
 /**
  * User profile information
  *
  * Contains all public information about a user.
+ * Matches the UserProfile type from user-service.
  */
 export interface UserProfile {
-  /** Unique user identifier */
   id: string;
-  /** User's email address */
   email: string;
-  /** User's username */
   username: string;
-  /** User's display name (defaults to username if not set) */
-  displayName?: string;
-  /** Timestamp when the user account was created */
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
   createdAt: string;
-  /** Timestamp when the user account was last updated */
-  updatedAt: string;
+  /** Timestamp when the user was last seen */
+  lastSeen: string | null;
+  /** User's roles (e.g., ["user"], ["admin"]) */
+  roles: string[];
 }
 
 /**
@@ -58,9 +52,7 @@ export interface UserProfile {
 export interface LoginData {
   /** Email address or username */
   identifier: string;
-  /** User's password */
   password: string;
-  /** Whether to extend the session duration (optional) */
   rememberMe?: boolean;
 }
 
@@ -68,21 +60,20 @@ export interface LoginData {
  * Login API response
  *
  * Contains authentication tokens and user profile on successful login.
+ * Note: Backend returns data object with access_token, refresh_token, expires_in, and user.
  */
 export interface LoginResponse {
-  /** Whether the login was successful */
   success: boolean;
   /** Human-readable message about the login result */
   message: string;
-  /** Authentication tokens (only present on success) */
-  tokens?: {
-    /** JWT access token for authenticated requests */
+  /** Login data (only present on success) */
+  data?: {
     access_token: string;
-    /** JWT refresh token for obtaining new access tokens */
     refresh_token: string;
+    /** Token expiration time in seconds */
+    expires_in: number;
+    user: UserProfile;
   };
-  /** User profile information (only present on success) */
-  user?: UserProfile;
 }
 
 /**
@@ -91,15 +82,10 @@ export interface LoginResponse {
  * Tracks which password requirements have been met.
  */
 export interface PasswordValidation {
-  /** Password is at least 8 characters */
   minLength: boolean;
-  /** Password contains at least one uppercase letter */
   hasUppercase: boolean;
-  /** Password contains at least one lowercase letter */
   hasLowercase: boolean;
-  /** Password contains at least one number */
   hasNumbers: boolean;
-  /** Password is different from username */
   differentFromUsername: boolean;
 }
 
@@ -109,10 +95,7 @@ export interface PasswordValidation {
  * Provides an overall assessment of password strength.
  */
 export interface ValidationResult {
-  /** Whether the password meets all requirements */
   isValid: boolean;
-  /** Password strength score (0-5 scale) */
   score: number;
-  /** List of validation error messages */
   errors: string[];
 }

@@ -17,6 +17,27 @@ export class AuthController {
   /**
    * POST /api/auth/register
    * Forward user registration to user service
+   *
+   * @param req.body.email - User email
+   * @param req.body.username - Desired username
+   * @param req.body.password - User password
+   * @param req.body.displayName - Optional display name
+   * @returns {Promise<Object>} Registration response
+   * {
+   *   success: boolean;
+   *   message: string;
+   *   data?: {
+   *     id: string;
+   *     email: string;
+   *     username: string;
+   *     displayName: string;
+   *     bio: string | null;
+   *     avatarUrl: string | null;
+   *     createdAt: string;
+   *     lastSeen: string | null;
+   *     roles: string[];
+   *   };
+   * }
    */
   static register = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -39,6 +60,30 @@ export class AuthController {
   /**
    * POST /api/auth/login
    * Forward user login to user service
+   *
+   * @param req.body.identifier - Email or username
+   * @param req.body.password - User password
+   * @returns {Promise<Object>} Login response
+   * {
+   *   success: boolean;
+   *   message: string;
+   *   data?: {
+   *     access_token: string;
+   *     refresh_token: string;
+   *     expires_in: number;  // Expiration time in seconds
+   *     user: {
+   *       id: string;
+   *       email: string;
+   *       username: string;
+   *       displayName: string;
+   *       bio: string | null;
+   *       avatarUrl: string | null;
+   *       createdAt: string;
+   *       lastSeen: string | null;
+   *       roles: string[];
+   *     };
+   *   };
+   * }
    */
   static login = async (req: Request, res: Response): Promise<void> => {
     try {
