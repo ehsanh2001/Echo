@@ -190,6 +190,7 @@ export function RegisterForm() {
                         placeholder="Create a password"
                         {...field}
                         disabled={registerMutation.isPending}
+                        className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
                       <Button
                         type="button"
@@ -231,6 +232,7 @@ export function RegisterForm() {
                         placeholder="Re-type your password"
                         {...field}
                         disabled={registerMutation.isPending}
+                        className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
                       <Button
                         type="button"

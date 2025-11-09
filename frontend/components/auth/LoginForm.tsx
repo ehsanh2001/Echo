@@ -134,6 +134,7 @@ function LoginFormContent() {
                         autoComplete="current-password"
                         {...field}
                         disabled={loginMutation.isPending}
+                        className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
                       <Button
                         type="button"
