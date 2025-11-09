@@ -1,6 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 
+/**
+ * Home page / Landing page component
+ *
+ * Displays the Echo landing page with:
+ * - Responsive background images (wide for desktop, vertical for mobile)
+ * - Top-right navigation with Login and Sign Up buttons
+ * - Positioned "Get Started" CTA buttons (desktop and mobile versions)
+ * - All buttons use #99B8F8 gradient color scheme
+ * - All navigation links point to /register page
+ *
+ * @returns Landing page layout
+ */
 export default function Home() {
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -31,14 +43,14 @@ export default function Home() {
       {/* Top Right Navigation Buttons */}
       <nav className="absolute top-6 right-6 z-10 flex gap-4">
         <Link
-          href="#"
-          className="px-6 py-2 bg-blue-900 text-white font-medium rounded-md transition-all hover:brightness-75"
+          href="/login"
+          className="px-6 py-2 bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] text-white font-medium rounded-md shadow-md hover:shadow-lg hover:from-[#89A8E8] hover:to-[#5B7DC6] transition-all"
         >
           Login
         </Link>
         <Link
-          href="#"
-          className="px-6 py-2 bg-blue-900 text-white font-medium rounded-md transition-all hover:brightness-75"
+          href="/register"
+          className="px-6 py-2 bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] text-white font-medium rounded-md shadow-md hover:shadow-lg hover:from-[#89A8E8] hover:to-[#5B7DC6] transition-all"
         >
           Sign Up
         </Link>
@@ -46,14 +58,14 @@ export default function Home() {
 
       {/* Get Started Button - Desktop (at 7%, 68%) */}
       <Link
-        href="#"
-        className="hidden lg:flex absolute z-10 items-center justify-center rounded-lg transition-all hover:brightness-75"
+        href="/register"
+        className="hidden lg:flex absolute z-10 items-center justify-center rounded-lg shadow-lg hover:shadow-xl transition-all hover:brightness-110"
         style={{
           left: "7%",
           top: "68%",
           width: "20%",
           height: "8%",
-          backgroundColor: "#6A93F7",
+          background: "linear-gradient(to right, #99B8F8, #6B8DD6)",
         }}
       >
         <span className="text-white font-semibold text-xl">Get Started</span>
@@ -61,14 +73,14 @@ export default function Home() {
 
       {/* Get Started Button - Mobile (at 10%, 47%) */}
       <Link
-        href="#"
-        className="flex lg  :hidden absolute z-10 items-center justify-center rounded-lg transition-all hover:brightness-75"
+        href="/register"
+        className="flex lg:hidden absolute z-10 items-center justify-center rounded-lg shadow-lg hover:shadow-xl transition-all hover:brightness-110"
         style={{
           left: "10%",
           top: "47%",
           width: "36%",
           height: "6%",
-          backgroundColor: "#6A93F7",
+          background: "linear-gradient(to right, #99B8F8, #6B8DD6)",
         }}
       >
         <span className="text-white font-semibold text-lg">Get Started</span>
