@@ -77,6 +77,32 @@ export interface LoginResponse {
 }
 
 /**
+ * Token refresh API response
+ *
+ * Contains new authentication tokens on successful refresh.
+ */
+export interface RefreshResponse {
+  success: boolean;
+  message: string;
+  /** Refresh data (only present on success) */
+  data?: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  };
+}
+
+/**
+ * Logout API response
+ *
+ * Simple confirmation response for logout operation.
+ */
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
  * Password validation results
  *
  * Tracks which password requirements have been met.

@@ -105,8 +105,19 @@ export class AuthController {
 
   /**
    * POST /api/auth/refresh
-   * Forward token refresh to user service
-   * Requires jwtRefreshAuth middleware (refresh token in Authorization header)
+   * Forward refresh request to user service
+   * Requires jwtAuth middleware (refresh token in Authorization header)
+   *
+   * @returns Response format from user-service:
+   * {
+   *   success: boolean;
+   *   message: string;
+   *   data: {
+   *     access_token: string;
+   *     refresh_token: string;
+   *     expires_in: number;
+   *   };
+   * }
    */
   static refresh = async (
     req: AuthenticatedRequest,
@@ -145,6 +156,12 @@ export class AuthController {
    * POST /api/auth/logout
    * Forward logout request to user service
    * Requires jwtAuth middleware (access token in Authorization header)
+   *
+   * @returns Response format from user-service:
+   * {
+   *   success: boolean;
+   *   message: string;
+   * }
    */
   static logout = async (
     req: AuthenticatedRequest,
