@@ -65,8 +65,8 @@ function LoginFormContent() {
       });
 
       if (result.success) {
-        // Redirect to intended page or default to workspaces
-        const destination = redirectTo || "/app/workspaces";
+        // Redirect to intended page or default to /app
+        const destination = redirectTo || "/app";
         router.push(destination);
       }
     } catch (error: any) {

@@ -43,7 +43,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         {/* Form Content with enhanced card styling */}
-        <div className="bg-white shadow-2xl rounded-2xl p-8 border border-[#99B8F8]/20">
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-2xl rounded-2xl p-8 border border-white/40 dark:border-slate-700/40">
           {children}
         </div>
 
