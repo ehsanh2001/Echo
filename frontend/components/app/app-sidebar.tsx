@@ -15,21 +15,26 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 
 interface AppSidebarProps {
   collapsed: boolean;
   selectedChannel: string | null;
   onSelectChannel: (channel: string | null) => void;
+  onWorkspaceCreated?: (workspaceId: string) => void;
 }
 
 export function AppSidebar({
   collapsed,
   selectedChannel,
   onSelectChannel,
+  onWorkspaceCreated,
 }: AppSidebarProps) {
   const [workspacesExpanded, setWorkspacesExpanded] = useState(true);
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [dmsExpanded, setDmsExpanded] = useState(true);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
+    useState(false);
 
   // Mock data - will be replaced with real data later
   const workspaces = [
@@ -101,7 +106,12 @@ export function AppSidebar({
               </button>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors">
+                  <button
+                    type="button"
+                    aria-label="Add Workspace"
+                    onClick={() => setShowCreateWorkspaceModal(true)}
+                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
+                  >
                     <Plus className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
@@ -145,7 +155,11 @@ export function AppSidebar({
               </button>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors">
+                  <button
+                    type="button"
+                    aria-label="Add Channel"
+                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
+                  >
                     <Plus className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
@@ -203,7 +217,11 @@ export function AppSidebar({
               </button>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors">
+                  <button
+                    type="button"
+                    aria-label="Start Direct Message"
+                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
+                  >
                     <Plus className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
@@ -250,6 +268,15 @@ export function AppSidebar({
           </div>
         </div>
       </aside>
+
+      <CreateWorkspaceModal
+        open={showCreateWorkspaceModal}
+        onOpenChange={setShowCreateWorkspaceModal}
+        onSuccess={(workspaceId) => {
+          setShowCreateWorkspaceModal(false);
+          onWorkspaceCreated?.(workspaceId);
+        }}
+      />
     </TooltipProvider>
   );
 }

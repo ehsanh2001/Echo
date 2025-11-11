@@ -5,6 +5,7 @@ import { AppTopBar } from "@/components/app/app-topbar";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { AppMainContent } from "@/components/app/app-main-content";
 import { AppMembersSidebar } from "@/components/app/app-members-sidebar";
+import { SuccessAlert } from "@/components/workspace/SuccessAlert";
 import { useState, useEffect } from "react";
 import {
   loadSelectedChannel,
@@ -16,6 +17,7 @@ export default function AppPage() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Set initial sidebar state based on screen size
   useEffect(() => {
@@ -52,9 +54,28 @@ export default function AppPage() {
     }
   };
 
+  // Handle successful workspace creation
+  const handleWorkspaceCreated = (workspaceId: string) => {
+    setSuccessMessage("Workspace created successfully!");
+    // Auto-hide success message after 5 seconds
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 5000);
+  };
+
   return (
     <AuthGuard>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
+        {/* Success Alert */}
+        {successMessage && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
+            <SuccessAlert
+              message={successMessage}
+              onClose={() => setSuccessMessage(null)}
+            />
+          </div>
+        )}
+
         {/* Top Navigation Bar */}
         <AppTopBar
           selectedChannel={selectedChannel}
@@ -89,6 +110,7 @@ export default function AppPage() {
               collapsed={!showLeftSidebar}
               selectedChannel={selectedChannel}
               onSelectChannel={handleSelectChannel}
+              onWorkspaceCreated={handleWorkspaceCreated}
             />
           </div>
 
