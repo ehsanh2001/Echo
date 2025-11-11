@@ -92,8 +92,9 @@ export function PasswordStrengthIndicator({
 
   return (
     <div className="mt-2 space-y-2">
-      {/* Strength Bar */}
+      {/* Strength Bar - Visual indicator of password strength (1-5 bars) */}
       <div className="space-y-1">
+        {/* Strength Label */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Password strength:</span>
           <span
@@ -109,6 +110,7 @@ export function PasswordStrengthIndicator({
             {getStrengthText(result.score)}
           </span>
         </div>
+        {/* Strength Bars - 5 bars colored based on score */}
         <div className="flex space-x-1">
           {[...Array(5)].map((_, index) => (
             <div
@@ -122,10 +124,11 @@ export function PasswordStrengthIndicator({
         </div>
       </div>
 
-      {/* Requirements Checklist */}
+      {/* Requirements Checklist - Shows which password criteria are met */}
       <div className="space-y-1">
         {requirements.map((req) => (
           <div key={req.key} className="flex items-center space-x-2 text-sm">
+            {/* Requirement Status Icon - Check or X */}
             <div
               className={cn(
                 "flex h-4 w-4 items-center justify-center rounded-full",
@@ -140,6 +143,7 @@ export function PasswordStrengthIndicator({
                 <X className="h-3 w-3" />
               )}
             </div>
+            {/* Requirement Text */}
             <span
               className={cn(req.passed ? "text-green-600" : "text-red-600")}
             >

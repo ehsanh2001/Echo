@@ -191,6 +191,7 @@ export function CreateWorkspaceModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
+        {/* Modal Header */}
         <DialogHeader>
           <DialogTitle>Create New Workspace</DialogTitle>
           <DialogDescription>
@@ -199,9 +200,10 @@ export function CreateWorkspaceModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Workspace Creation Form */}
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            {/* Display Name Field */}
+            {/* Display Name Field - User-friendly name shown in UI */}
             <div className="space-y-2">
               <Label htmlFor="displayName">
                 Display Name <span className="text-destructive">*</span>
@@ -216,6 +218,7 @@ export function CreateWorkspaceModal({
                 }}
                 className={displayNameError ? "border-destructive" : ""}
               />
+              {/* Display Name Error Message */}
               {displayNameError && (
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
@@ -227,12 +230,13 @@ export function CreateWorkspaceModal({
               </p>
             </div>
 
-            {/* Name Field (URL-friendly identifier) */}
+            {/* Workspace Name Field - Auto-generated URL-friendly identifier */}
             <div className="space-y-2">
               <Label htmlFor="name">
                 Workspace Name <span className="text-destructive">*</span>
               </Label>
               <div className="flex gap-2">
+                {/* Name Input with Validation Status */}
                 <div className="flex-1 space-y-2">
                   <Input
                     id="name"
@@ -242,12 +246,14 @@ export function CreateWorkspaceModal({
                     onBlur={handleNameBlur}
                     className={nameError ? "border-destructive" : ""}
                   />
+                  {/* Name Error Message */}
                   {nameError && (
                     <p className="text-sm text-destructive flex items-center gap-1">
                       <X className="h-3 w-3" />
                       {nameError}
                     </p>
                   )}
+                  {/* Name Available Success Message */}
                   {nameAvailable === true && !nameError && (
                     <p className="text-sm text-green-600 flex items-center gap-1">
                       <Check className="h-3 w-3" />
@@ -255,12 +261,14 @@ export function CreateWorkspaceModal({
                     </p>
                   )}
                 </div>
+                {/* Check Availability Button */}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleCheckAvailability}
                   disabled={!name || isCheckingName || !!nameError}
                   className="shrink-0"
+                  aria-label="Check workspace name availability"
                 >
                   {isCheckingName ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -274,7 +282,7 @@ export function CreateWorkspaceModal({
               </p>
             </div>
 
-            {/* Description Field */}
+            {/* Description Field - Optional workspace description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea
@@ -290,16 +298,22 @@ export function CreateWorkspaceModal({
             </div>
           </div>
 
+          {/* Form Actions */}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              aria-label="Cancel workspace creation"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !!nameError}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !!nameError}
+              aria-label="Create new workspace"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

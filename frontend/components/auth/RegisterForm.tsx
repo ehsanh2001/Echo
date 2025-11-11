@@ -116,15 +116,16 @@ export function RegisterForm() {
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
-      {/* Success Alert */}
+      {/* Success Alert - Shown after successful registration */}
       <RegistrationSuccessAlert
         isVisible={showSuccess}
         onClose={handleCloseSuccess}
         userEmail={registeredEmail}
       />
 
-      {/* Registration Form */}
+      {/* Registration Form Container */}
       <div className="space-y-4">
+        {/* Form Header */}
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] bg-clip-text text-transparent">
             Create your account
@@ -134,9 +135,10 @@ export function RegisterForm() {
           </p>
         </div>
 
+        {/* Registration Form with Validation */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Email Field */}
+            {/* Email Field - Required */}
             <FormField
               control={form.control}
               name="email"
@@ -156,7 +158,7 @@ export function RegisterForm() {
               )}
             />
 
-            {/* Username Field */}
+            {/* Username Field - Required */}
             <FormField
               control={form.control}
               name="username"
@@ -176,7 +178,7 @@ export function RegisterForm() {
               )}
             />
 
-            {/* Password Field */}
+            {/* Password Field - Required with Strength Indicator */}
             <FormField
               control={form.control}
               name="password"
@@ -192,12 +194,16 @@ export function RegisterForm() {
                         disabled={registerMutation.isPending}
                         className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
+                      {/* Toggle Password Visibility Button */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -218,7 +224,7 @@ export function RegisterForm() {
               )}
             />
 
-            {/* Confirm Password Field */}
+            {/* Confirm Password Field - Required */}
             <FormField
               control={form.control}
               name="confirmPassword"
@@ -234,6 +240,7 @@ export function RegisterForm() {
                         disabled={registerMutation.isPending}
                         className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
+                      {/* Toggle Confirm Password Visibility Button */}
                       <Button
                         type="button"
                         variant="ghost"
@@ -241,6 +248,11 @@ export function RegisterForm() {
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() =>
                           setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        aria-label={
+                          showConfirmPassword
+                            ? "Hide confirm password"
+                            : "Show confirm password"
                         }
                       >
                         {showConfirmPassword ? (
@@ -256,7 +268,7 @@ export function RegisterForm() {
               )}
             />
 
-            {/* Display Name Field (Optional) */}
+            {/* Display Name Field - Optional */}
             <FormField
               control={form.control}
               name="displayName"
@@ -276,7 +288,7 @@ export function RegisterForm() {
               )}
             />
 
-            {/* Error Alert */}
+            {/* Error Alert - Shows when registration fails */}
             {registerMutation.isError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -292,6 +304,7 @@ export function RegisterForm() {
               type="submit"
               className="w-full bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] hover:from-[#89A8E8] hover:to-[#5B7DC6] text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={registerMutation.isPending}
+              aria-label="Create new account"
             >
               {registerMutation.isPending ? (
                 <>
@@ -305,7 +318,7 @@ export function RegisterForm() {
           </form>
         </Form>
 
-        {/* Login Link */}
+        {/* Login Link - For existing users */}
         <div className="text-center text-sm">
           <span className="text-muted-foreground">
             Already have an account?{" "}

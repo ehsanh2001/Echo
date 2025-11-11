@@ -104,8 +104,9 @@ export function AppMembersSidebar({
           collapsed ? "hidden" : "block"
         }`}
       >
-        {/* Header with toggle */}
+        {/* Header - Shows member count and toggle button */}
         <div className="p-4 border-b border-sidebar-border shrink-0">
+          {/* Member Count Header */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-sidebar-foreground">
               {showWorkspaceMembers ? "Workspace Members" : "Channel Members"}
@@ -114,9 +115,15 @@ export function AppMembersSidebar({
               {members.length}
             </span>
           </div>
+          {/* Toggle Between Channel and Workspace Members Button */}
           <button
             onClick={() => setShowWorkspaceMembers(!showWorkspaceMembers)}
             className="w-full text-xs text-primary hover:text-primary/80 transition-colors text-left"
+            aria-label={
+              showWorkspaceMembers
+                ? "Show channel members only"
+                : "Show all workspace members"
+            }
           >
             {showWorkspaceMembers
               ? "Show Channel Members"
@@ -124,15 +131,20 @@ export function AppMembersSidebar({
           </button>
         </div>
 
-        {/* Members List - Scrollable */}
+        {/* Members List - Scrollable list of team members */}
         <div className="flex-1 overflow-y-auto py-4 min-h-0">
           {members.map((member) => (
             <Tooltip key={member.id}>
               <TooltipTrigger asChild>
-                <button className="w-full px-4 py-2 flex items-center gap-3 hover:bg-sidebar-accent transition-colors">
+                <button
+                  className="w-full px-4 py-2 flex items-center gap-3 hover:bg-sidebar-accent transition-colors"
+                  aria-label={`View ${member.name}'s profile`}
+                >
+                  {/* Member Avatar */}
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-primary flex items-center justify-center font-bold text-xs text-white flex-shrink-0">
                     {member.avatar}
                   </div>
+                  {/* Member Info */}
                   <div className="flex-1 min-w-0 text-left">
                     <div className="font-medium text-sm text-sidebar-foreground truncate">
                       {member.name}
@@ -141,6 +153,7 @@ export function AppMembersSidebar({
                       {member.role}
                     </div>
                   </div>
+                  {/* Status Indicator */}
                   <Circle
                     className={`w-2 h-2 flex-shrink-0 fill-current ${getStatusColor(
                       member.status

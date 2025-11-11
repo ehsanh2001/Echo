@@ -90,12 +90,13 @@ export function AppSidebar({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Workspaces Section */}
+          {/* Workspaces Section - List of all workspaces with add button */}
           <div className="py-4 border-b border-sidebar-border">
             <div className="px-4 pb-2 flex items-center justify-between">
               <button
                 onClick={() => setWorkspacesExpanded(!workspacesExpanded)}
                 className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
+                aria-label="Toggle workspaces section"
               >
                 {workspacesExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -104,6 +105,7 @@ export function AppSidebar({
                 )}
                 Workspaces
               </button>
+              {/* Add Workspace Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -120,6 +122,7 @@ export function AppSidebar({
                 </TooltipContent>
               </Tooltip>
             </div>
+            {/* Workspace List */}
             {workspacesExpanded && (
               <nav className="max-h-48 overflow-y-auto">
                 {workspaces.map((workspace) => (
@@ -139,12 +142,13 @@ export function AppSidebar({
             )}
           </div>
 
-          {/* Channels Section */}
+          {/* Channels Section - List of all channels in current workspace */}
           <div className="py-4 border-b border-sidebar-border">
             <div className="px-4 pb-2 flex items-center justify-between">
               <button
                 onClick={() => setChannelsExpanded(!channelsExpanded)}
                 className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
+                aria-label="Toggle channels section"
               >
                 {channelsExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -153,6 +157,7 @@ export function AppSidebar({
                 )}
                 Channels
               </button>
+              {/* Add Channel Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -168,6 +173,7 @@ export function AppSidebar({
                 </TooltipContent>
               </Tooltip>
             </div>
+            {/* Channel List */}
             {channelsExpanded && (
               <nav className="max-h-48 overflow-y-auto">
                 {channels.map((channel) => (
@@ -201,12 +207,13 @@ export function AppSidebar({
             )}
           </div>
 
-          {/* Direct Messages Section */}
+          {/* Direct Messages Section - Private conversations with team members */}
           <div className="py-4 border-b border-sidebar-border">
             <div className="px-4 pb-2 flex items-center justify-between">
               <button
                 onClick={() => setDmsExpanded(!dmsExpanded)}
                 className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
+                aria-label="Toggle direct messages section"
               >
                 {dmsExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -215,6 +222,7 @@ export function AppSidebar({
                 )}
                 Direct Messages
               </button>
+              {/* Start New DM Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -230,6 +238,7 @@ export function AppSidebar({
                 </TooltipContent>
               </Tooltip>
             </div>
+            {/* DM List */}
             {dmsExpanded && (
               <nav className="max-h-48 overflow-y-auto">
                 {directMessages.map((dm) => (
@@ -269,6 +278,7 @@ export function AppSidebar({
         </div>
       </aside>
 
+      {/* Create Workspace Modal - Opens when + button is clicked in Workspaces section */}
       <CreateWorkspaceModal
         open={showCreateWorkspaceModal}
         onOpenChange={setShowCreateWorkspaceModal}

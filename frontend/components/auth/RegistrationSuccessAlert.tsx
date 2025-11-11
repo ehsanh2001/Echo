@@ -46,24 +46,32 @@ export function RegistrationSuccessAlert({
   if (!isVisible) return null;
 
   return (
+    // Registration Success Alert - Blue themed with login link
     <Alert className="border-[#99B8F8] bg-[#E8F0FF] text-[#2D3748]">
+      {/* Success Icon */}
       <CheckCircle className="h-4 w-4 text-[#6B8DD6]" />
+
       <div className="flex justify-between items-start w-full">
+        {/* Alert Content */}
         <AlertDescription className="flex-1">
           <div className="space-y-2">
+            {/* Success Title */}
             <p className="font-medium text-[#2D3748]">
               Registration successful!
             </p>
+            {/* Success Message */}
             <p className="text-sm text-[#4A5568]">
               Your account has been created successfully
               {userEmail && ` for ${userEmail}`}. You can now log in to access
               your account.
             </p>
+            {/* Login Link Button */}
             <div className="flex items-center space-x-2 mt-3">
               <Link href="/login">
                 <Button
                   size="sm"
                   className="bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] hover:from-[#89A8E8] hover:to-[#5B7DC6] text-white shadow-md"
+                  aria-label="Navigate to login page"
                 >
                   Go to Login
                 </Button>
@@ -71,11 +79,14 @@ export function RegistrationSuccessAlert({
             </div>
           </div>
         </AlertDescription>
+
+        {/* Close Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={onClose}
           className="h-6 w-6 p-0 text-[#6B8DD6] hover:text-[#5B7DC6] hover:bg-[#D0E0FF]"
+          aria-label="Close success alert"
         >
           <X className="h-4 w-4" />
         </Button>

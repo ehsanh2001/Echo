@@ -77,8 +77,9 @@ function LoginFormContent() {
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
-      {/* Login Form */}
+      {/* Login Form Container */}
       <div className="space-y-4">
+        {/* Form Header */}
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] bg-clip-text text-transparent">
             Welcome back
@@ -86,9 +87,10 @@ function LoginFormContent() {
           <p className="text-muted-foreground">Sign in to your Echo account</p>
         </div>
 
+        {/* Login Form with Validation */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Error Alert */}
+            {/* Error Alert - Shows when login fails */}
             {loginMutation.isError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -119,7 +121,7 @@ function LoginFormContent() {
               )}
             />
 
-            {/* Password Field */}
+            {/* Password Field with Visibility Toggle */}
             <FormField
               control={form.control}
               name="password"
@@ -136,12 +138,16 @@ function LoginFormContent() {
                         disabled={loginMutation.isPending}
                         className="pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
                       />
+                      {/* Toggle Password Visibility Button */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -161,6 +167,7 @@ function LoginFormContent() {
               type="submit"
               className="w-full bg-gradient-to-r from-[#99B8F8] to-[#6B8DD6] hover:from-[#89A8E8] hover:to-[#5B7DC6] text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={loginMutation.isPending}
+              aria-label="Sign in to your account"
             >
               {loginMutation.isPending ? (
                 <>
@@ -174,7 +181,7 @@ function LoginFormContent() {
           </form>
         </Form>
 
-        {/* Link to Registration */}
+        {/* Link to Registration Page */}
         <div className="text-center text-sm">
           <span className="text-muted-foreground">Don't have an account? </span>
           <Link

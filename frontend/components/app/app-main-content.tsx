@@ -85,9 +85,10 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
   return (
     <TooltipProvider>
       <main className="flex-1 flex flex-col bg-background h-full overflow-hidden">
-        {/* Channel Header */}
+        {/* Channel Header - Shows channel name and action buttons */}
         <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
+            {/* Channel Name and Description */}
             <div>
               <h1 className="font-semibold text-lg text-foreground">
                 # {selectedChannel}
@@ -97,10 +98,15 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
               </p>
             </div>
           </div>
+          {/* Channel Action Buttons */}
           <div className="flex items-center gap-2">
+            {/* Star Channel Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
+                  aria-label="Star channel"
+                >
                   <Star className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
@@ -108,9 +114,13 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                 <p>Star Channel</p>
               </TooltipContent>
             </Tooltip>
+            {/* Invite Members Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
+                  aria-label="Invite members to channel"
+                >
                   <UserPlus className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
@@ -118,9 +128,13 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                 <p>Invite Members</p>
               </TooltipContent>
             </Tooltip>
+            {/* Channel Info Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
+                  aria-label="Show channel information"
+                >
                   <Info className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
@@ -131,7 +145,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
           </div>
         </div>
 
-        {/* Messages Container - Scrollable, takes remaining space */}
+        {/* Messages Container - Scrollable message history */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
           {messages.map((message) => (
             <div
@@ -140,6 +154,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                 message.isOwn ? "ml-auto flex-row-reverse" : ""
               }`}
             >
+              {/* User Avatar */}
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
                   message.isOwn
@@ -149,6 +164,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
               >
                 {message.avatar}
               </div>
+              {/* Message Bubble */}
               <div
                 className={`rounded-2xl px-4 py-3 ${
                   message.isOwn
@@ -156,6 +172,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                     : "bg-muted"
                 }`}
               >
+                {/* Sender Name and Timestamp */}
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-semibold text-sm">
                     {message.sender}
@@ -170,18 +187,23 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                     {message.time}
                   </span>
                 </div>
+                {/* Message Text */}
                 <p className="text-sm leading-relaxed">{message.text}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Message Input - Always at bottom */}
+        {/* Message Input - Compose and send new messages */}
         <div className="p-5 border-t border-border shrink-0">
           <div className="flex items-center gap-3 bg-muted rounded-3xl px-4 py-3">
+            {/* Emoji Picker Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
+                  aria-label="Add emoji"
+                >
                   <Smile className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
@@ -189,14 +211,19 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                 <p>Add Emoji</p>
               </TooltipContent>
             </Tooltip>
+            {/* Message Input Field */}
             <input
               type="text"
               placeholder="Message #general"
               className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
             />
+            {/* Attach File Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
+                  aria-label="Attach file"
+                >
                   <Paperclip className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
@@ -204,9 +231,13 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
                 <p>Attach File</p>
               </TooltipContent>
             </Tooltip>
+            {/* Send Message Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors">
+                <button
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
+                  aria-label="Send message"
+                >
                   <Send className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
