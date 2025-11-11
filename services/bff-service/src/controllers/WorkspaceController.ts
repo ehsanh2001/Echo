@@ -156,6 +156,50 @@ export class WorkspaceController {
   /**
    * GET /api/ws-ch/me/memberships
    * Forward get user memberships to workspace-channel service
+   *
+   * @param {boolean} includeChannels - Query parameter to include channel memberships in each workspace
+   *
+   * @returns {UserMembershipsResponse} Response containing:
+   * - workspaces: WorkspaceMembershipResponse[] - Array of workspaces user belongs to
+   *
+   * Each WorkspaceMembershipResponse contains:
+   * - id, name, displayName, description, ownerId, isArchived, maxMembers, isPublic, vanityUrl, settings, createdAt, updatedAt
+   * - userRole: WorkspaceRole - User's role in this workspace (owner, admin, member)
+   * - memberCount: number - Total active members in workspace
+   * - channels?: ChannelMembershipResponse[] - Optional array of channels (if includeChannels=true)
+   *
+   * Each ChannelMembershipResponse contains:
+   * - Channel fields: id, workspaceId, name, displayName, description, type, isArchived, isReadOnly, createdBy, memberCount, lastActivity, settings, createdAt, updatedAt
+   * - Membership fields: role (owner, admin, member), joinedAt, isMuted, joinedBy
+   *
+   * @example
+   * GET /api/workspaces/me/memberships?includeChannels=true
+   * Response:
+   * {
+   *   "success": true,
+   *   "data": {
+   *     "workspaces": [
+   *       {
+   *         "id": "ws_123",
+   *         "name": "my-team",
+   *         "displayName": "My Team",
+   *         "userRole": "owner",
+   *         "memberCount": 5,
+   *         "channels": [
+   *           {
+   *             "id": "ch_456",
+   *             "name": "general",
+   *             "displayName": "General",
+   *             "type": "public",
+   *             "role": "admin",
+   *             "joinedAt": "2024-01-01T00:00:00Z",
+   *             "isMuted": false
+   *           }
+   *         ]
+   *       }
+   *     ]
+   *   }
+   * }
    */
   static getUserMemberships = async (
     req: AuthenticatedRequest,

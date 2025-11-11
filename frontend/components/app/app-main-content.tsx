@@ -7,12 +7,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useWorkspaceContext } from "@/lib/providers/workspace-provider";
+import { useState } from "react";
+import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 
 interface AppMainContentProps {
   selectedChannel: string | null;
 }
 
 export function AppMainContent({ selectedChannel }: AppMainContentProps) {
+  const { workspaces } = useWorkspaceContext();
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
+    useState(false);
+
   // Mock data - will be replaced with real data later
   const messages = [
     {
@@ -51,33 +58,71 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
 
   // Empty state when no channel is selected
   if (!selectedChannel) {
+    // Distinguish between "no workspaces" and "no channel selected"
+    const hasNoWorkspaces = workspaces.length === 0;
+
     return (
       <main className="flex-1 flex flex-col items-center justify-center p-8 text-center">
         <div className="max-w-md space-y-4">
-          <h2 className="text-2xl font-bold text-foreground">
-            Welcome to Echo!
-          </h2>
-          <div className="space-y-2 text-muted-foreground">
-            <p>Get started by:</p>
-            <ul className="text-left space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>Creating or joining a workspace</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>Creating a channel for team communication</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>Inviting team members to collaborate</span>
-              </li>
-            </ul>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Select a channel from the sidebar to start messaging
-          </p>
+          {hasNoWorkspaces ? (
+            <>
+              {/* No workspaces state */}
+              <h2 className="text-2xl font-bold text-foreground">
+                Welcome to Echo!
+              </h2>
+              <p className="text-muted-foreground">
+                You're not a member of any workspace yet.
+              </p>
+              <p className="text-muted-foreground">
+                Create your first workspace to start collaborating with your
+                team.
+              </p>
+              <button
+                onClick={() => setShowCreateWorkspaceModal(true)}
+                className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
+              >
+                Create Workspace
+              </button>
+            </>
+          ) : (
+            <>
+              {/* No channel selected state */}
+              <h2 className="text-2xl font-bold text-foreground">
+                Welcome to Echo!
+              </h2>
+              <div className="space-y-2 text-muted-foreground">
+                <p>Get started by:</p>
+                <ul className="text-left space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span>Selecting a channel from the sidebar</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span>Creating a new channel for your team</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span>Inviting team members to collaborate</span>
+                  </li>
+                </ul>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Select a channel from the sidebar to start messaging
+              </p>
+            </>
+          )}
         </div>
+
+        {/* Create Workspace Modal */}
+        <CreateWorkspaceModal
+          open={showCreateWorkspaceModal}
+          onOpenChange={setShowCreateWorkspaceModal}
+          onSuccess={(workspaceId) => {
+            setShowCreateWorkspaceModal(false);
+            // Parent component will show success message
+          }}
+        />
       </main>
     );
   }

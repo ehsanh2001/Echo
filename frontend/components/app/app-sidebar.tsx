@@ -7,6 +7,8 @@ import {
   Circle,
   ChevronDown,
   ChevronRight,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -16,6 +18,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
+import { useWorkspaceContext } from "@/lib/providers/workspace-provider";
+import { ChannelType, WorkspaceRole } from "@/types/workspace";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -35,40 +39,46 @@ export function AppSidebar({
   const [dmsExpanded, setDmsExpanded] = useState(true);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
+    null
+  );
 
-  // Mock data - will be replaced with real data later
-  const workspaces = [
-    { id: "1", name: "Design Team", icon: "D" },
-    { id: "2", name: "Dev Team", icon: "DT" },
-    { id: "3", name: "Marketing", icon: "M" },
-  ];
+  // Get workspace data from context
+  const { workspaces, isLoading, error, refetch } = useWorkspaceContext();
 
-  const channels = [
-    { id: "general", name: "general", unread: 0 },
-    { id: "design", name: "design", unread: 3 },
-    { id: "development", name: "development", unread: 0 },
-    { id: "marketing", name: "marketing", unread: 0 },
-    { id: "random", name: "random", unread: 0 },
-  ];
+  // Auto-select first workspace if none selected and workspaces exist
+  if (!selectedWorkspaceId && workspaces.length > 0) {
+    setSelectedWorkspaceId(workspaces[0].id);
+  }
 
-  const directMessages = [
-    { id: "dm1", name: "Alex Johnson", status: "online", unread: 0 },
-    { id: "dm2", name: "Sam Rivera", status: "away", unread: 1 },
-    { id: "dm3", name: "Taylor Kim", status: "online", unread: 0 },
-    { id: "dm4", name: "Jordan Smith", status: "busy", unread: 0 },
-  ];
+  // Get the currently selected workspace
+  const selectedWorkspace = workspaces.find(
+    (workspace) => workspace.id === selectedWorkspaceId
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "text-green-500";
-      case "away":
-        return "text-yellow-500";
-      case "busy":
-        return "text-red-500";
-      default:
-        return "text-gray-500";
-    }
+  // Get channels from the selected workspace only (only public channels for now)
+  const channels =
+    selectedWorkspace?.channels
+      ?.filter((channel) => channel.type === ChannelType.PUBLIC)
+      .map((channel) => ({
+        ...channel,
+        workspaceId: selectedWorkspace.id,
+        workspaceName: selectedWorkspace.displayName || selectedWorkspace.name,
+      })) || [];
+
+  // Check if user can create channels in the selected workspace
+  const canCreateChannel =
+    selectedWorkspace &&
+    (selectedWorkspace.userRole === WorkspaceRole.OWNER ||
+      selectedWorkspace.userRole === WorkspaceRole.ADMIN);
+
+  // Handle refresh with visual feedback
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    // Add small delay for better UX
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   return (
@@ -78,14 +88,34 @@ export function AppSidebar({
           collapsed ? "hidden" : "block"
         }`}
       >
-        {/* Workspace Header */}
+        {/* Workspace Header - Shows currently active workspace */}
         <div className="p-4 border-b border-sidebar-border flex items-center gap-2 shrink-0">
-          <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center font-bold text-lg text-primary-foreground">
-            C
-          </div>
-          <div className="font-semibold text-lg text-sidebar-foreground">
-            ConnectHub
-          </div>
+          {selectedWorkspace ? (
+            <>
+              <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center font-bold text-lg text-primary-foreground">
+                {(selectedWorkspace.displayName || selectedWorkspace.name)
+                  .charAt(0)
+                  .toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-base text-sidebar-foreground truncate">
+                  {selectedWorkspace.displayName || selectedWorkspace.name}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedWorkspace.memberCount} members
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center font-bold text-lg text-primary-foreground">
+                E
+              </div>
+              <div className="font-semibold text-lg text-sidebar-foreground">
+                Echo
+              </div>
+            </>
+          )}
         </div>
 
         {/* Scrollable content */}
@@ -105,44 +135,108 @@ export function AppSidebar({
                 )}
                 Workspaces
               </button>
-              {/* Add Workspace Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Add Workspace"
-                    onClick={() => setShowCreateWorkspaceModal(true)}
-                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Add Workspace</p>
-                </TooltipContent>
-              </Tooltip>
+              {/* Add Workspace and Refresh Buttons */}
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Refresh Workspaces"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing || isLoading}
+                      className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isRefreshing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Refresh Workspaces</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Add Workspace"
+                      onClick={() => setShowCreateWorkspaceModal(true)}
+                      className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Add Workspace</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
             {/* Workspace List */}
             {workspacesExpanded && (
               <nav className="max-h-48 overflow-y-auto">
-                {workspaces.map((workspace) => (
-                  <Tooltip key={workspace.id}>
-                    <TooltipTrigger asChild>
-                      <button className="w-full px-4 py-2 flex items-center gap-2 hover:bg-sidebar-accent text-sidebar-foreground transition-colors text-sm">
-                        <Building2 className="w-5 h-5 flex-shrink-0" />
-                        <span className="truncate">{workspace.name}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{workspace.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
+                {isLoading ? (
+                  <div className="px-4 py-6 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : error ? (
+                  <div className="px-4 py-2 text-sm text-destructive">
+                    Failed to load workspaces
+                  </div>
+                ) : workspaces.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      No workspaces yet
+                    </p>
+                    <button
+                      onClick={() => setShowCreateWorkspaceModal(true)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Create your first workspace
+                    </button>
+                  </div>
+                ) : (
+                  workspaces.map((workspace) => (
+                    <Tooltip key={workspace.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setSelectedWorkspaceId(workspace.id)}
+                          className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm ${
+                            selectedWorkspaceId === workspace.id
+                              ? "bg-sidebar-accent/50 border-l-2 border-primary"
+                              : "hover:bg-sidebar-accent"
+                          }`}
+                        >
+                          <Building2 className="w-5 h-5 flex-shrink-0" />
+                          <span className="truncate flex-1 text-left">
+                            {workspace.displayName || workspace.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {workspace.memberCount}
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <div className="text-left">
+                          <p className="font-semibold">
+                            {workspace.displayName || workspace.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {workspace.memberCount} members •{" "}
+                            {workspace.userRole}
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))
+                )}
               </nav>
             )}
           </div>
 
-          {/* Channels Section - List of all channels in current workspace */}
+          {/* Channels Section - Shows channels from the selected workspace */}
           <div className="py-4 border-b border-sidebar-border">
             <div className="px-4 pb-2 flex items-center justify-between">
               <button
@@ -156,125 +250,99 @@ export function AppSidebar({
                   <ChevronRight className="w-3 h-3" />
                 )}
                 Channels
+                {selectedWorkspace && channels.length > 0 && (
+                  <span className="ml-1 text-xs">({channels.length})</span>
+                )}
               </button>
-              {/* Add Channel Button */}
+              {/* Add Channel Button - only show if user has permission */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     aria-label="Add Channel"
-                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
+                    disabled={!canCreateChannel}
+                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Add Channel</p>
+                  <p>
+                    {canCreateChannel
+                      ? "Add Channel"
+                      : "Only workspace owners and admins can create channels"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>
             {/* Channel List */}
             {channelsExpanded && (
               <nav className="max-h-48 overflow-y-auto">
-                {channels.map((channel) => (
-                  <Tooltip key={channel.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => onSelectChannel(channel.id)}
-                        className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm relative ${
-                          selectedChannel === channel.id
-                            ? "bg-sidebar-accent/50 border-l-2 border-primary"
-                            : "hover:bg-sidebar-accent"
-                        }`}
-                      >
-                        <Hash className="w-5 h-5 flex-shrink-0" />
-                        <span className="truncate flex-1 text-left">
-                          {channel.name}
-                        </span>
-                        {channel.unread > 0 && (
-                          <span className="bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5">
-                            {channel.unread}
+                {isLoading ? (
+                  <div className="px-4 py-6 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !selectedWorkspace ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      No workspace selected
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Select a workspace to view channels
+                    </p>
+                  </div>
+                ) : channels.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      No channels yet
+                    </p>
+                    {canCreateChannel && (
+                      <p className="text-xs text-muted-foreground">
+                        Create a channel to get started
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  channels.map((channel) => (
+                    <Tooltip key={channel.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => onSelectChannel(channel.id)}
+                          className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm relative ${
+                            selectedChannel === channel.id
+                              ? "bg-sidebar-accent/50 border-l-2 border-primary"
+                              : "hover:bg-sidebar-accent"
+                          }`}
+                        >
+                          <Hash className="w-5 h-5 flex-shrink-0" />
+                          <span className="truncate flex-1 text-left">
+                            {channel.name}
                           </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>#{channel.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
+                          {/* No unread counts for now */}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <div className="text-left">
+                          <p className="font-semibold">#{channel.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {channel.workspaceName}
+                          </p>
+                          {channel.description && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {channel.description}
+                            </p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))
+                )}
               </nav>
             )}
           </div>
 
-          {/* Direct Messages Section - Private conversations with team members */}
-          <div className="py-4 border-b border-sidebar-border">
-            <div className="px-4 pb-2 flex items-center justify-between">
-              <button
-                onClick={() => setDmsExpanded(!dmsExpanded)}
-                className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
-                aria-label="Toggle direct messages section"
-              >
-                {dmsExpanded ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronRight className="w-3 h-3" />
-                )}
-                Direct Messages
-              </button>
-              {/* Start New DM Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Start Direct Message"
-                    className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Start Direct Message</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            {/* DM List */}
-            {dmsExpanded && (
-              <nav className="max-h-48 overflow-y-auto">
-                {directMessages.map((dm) => (
-                  <Tooltip key={dm.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => onSelectChannel(dm.id)}
-                        className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm relative ${
-                          selectedChannel === dm.id
-                            ? "bg-sidebar-accent/50 border-l-2 border-primary"
-                            : "hover:bg-sidebar-accent"
-                        }`}
-                      >
-                        <Circle
-                          className={`w-2 h-2 flex-shrink-0 fill-current ${getStatusColor(
-                            dm.status
-                          )}`}
-                        />
-                        <span className="truncate flex-1 text-left">
-                          {dm.name}
-                        </span>
-                        {dm.unread > 0 && (
-                          <span className="bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5">
-                            {dm.unread}
-                          </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{dm.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </nav>
-            )}
-          </div>
+          {/* Direct Messages Section - Hidden for now as per user requirements */}
+          {/* Will be implemented in a future user story */}
         </div>
       </aside>
 
