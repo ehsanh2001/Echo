@@ -111,3 +111,37 @@ export function checkPasswordStrength(password: string, username?: string) {
     errors,
   };
 }
+
+/**
+ * Workspace creation form validation schema
+ *
+ * Validates workspace creation fields including name availability.
+ */
+export const workspaceFormSchema = z.object({
+  displayName: z
+    .string()
+    .min(1, "Display name is required")
+    .max(100, "Display name must be less than 100 characters"),
+  name: z
+    .string()
+    .min(1, "Workspace name is required")
+    .max(50, "Workspace name must be less than 50 characters")
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Workspace name can only contain lowercase letters, numbers, and hyphens"
+    )
+    .refine((val) => !val.includes(" "), {
+      message: "Workspace name cannot contain spaces. Use hyphens instead.",
+    }),
+  description: z
+    .string()
+    .max(500, "Description must be less than 500 characters")
+    .optional(),
+});
+
+/**
+ * Type-safe workspace form data
+ *
+ * Inferred from the workspaceFormSchema Zod schema.
+ */
+export type WorkspaceFormData = z.infer<typeof workspaceFormSchema>;
