@@ -7,7 +7,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useWorkspaceContext } from "@/lib/providers/workspace-provider";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useWorkspaceMemberships } from "@/lib/hooks/useWorkspaces";
 import { useState } from "react";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 
@@ -16,7 +17,8 @@ interface AppMainContentProps {
 }
 
 export function AppMainContent({ selectedChannel }: AppMainContentProps) {
-  const { workspaces } = useWorkspaceContext();
+  const { data } = useWorkspaceMemberships();
+  const workspaces = data?.data?.workspaces || [];
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
 

@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Check, X, AlertCircle } from "lucide-react";
-import { createWorkspace, checkWorkspaceName } from "@/lib/api/workspace";
+import { checkWorkspaceName } from "@/lib/api/workspace";
+import { useCreateWorkspace } from "@/lib/hooks/useWorkspaceMutations";
 import { CreateWorkspaceRequest } from "@/types/workspace";
 import { toast } from "sonner";
 
@@ -32,11 +33,13 @@ export function CreateWorkspaceModal({
   const [displayName, setDisplayName] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingName, setIsCheckingName] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
   const [nameError, setNameError] = useState<string>("");
   const [displayNameError, setDisplayNameError] = useState<string>("");
+
+  // Use React Query mutation for creating workspace
+  const createWorkspaceMutation = useCreateWorkspace();
 
   // Auto-generate name from displayName
   useEffect(() => {
@@ -141,34 +144,24 @@ export function CreateWorkspaceModal({
       return;
     }
 
-    setIsSubmitting(true);
+    const workspaceData: CreateWorkspaceRequest = {
+      name: name.trim(),
+      displayName: displayName.trim(),
+      description: description.trim() || undefined,
+    };
 
-    try {
-      const workspaceData: CreateWorkspaceRequest = {
-        name: name.trim(),
-        displayName: displayName.trim(),
-        description: description.trim() || undefined,
-      };
+    createWorkspaceMutation.mutate(workspaceData, {
+      onSuccess: (response) => {
+        // Success! Call onSuccess callback
+        onSuccess?.(response.data.id);
 
-      const response = await createWorkspace(workspaceData);
+        // Reset form
+        resetForm();
 
-      // Success! Call onSuccess callback
-      onSuccess?.(response.data.id);
-
-      // Reset form
-      resetForm();
-
-      // Close modal
-      onOpenChange(false);
-    } catch (error: any) {
-      // Backend errors shown via toast
-      const errorMessage =
-        error?.message || "Failed to create workspace. Please try again.";
-      toast.error(errorMessage);
-      console.error("Error creating workspace:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Close modal
+        onOpenChange(false);
+      },
+    });
   };
 
   // Reset form
@@ -304,17 +297,17 @@ export function CreateWorkspaceModal({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
+              disabled={createWorkspaceMutation.isPending}
               aria-label="Cancel workspace creation"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !!nameError}
+              disabled={createWorkspaceMutation.isPending || !!nameError}
               aria-label="Create new workspace"
             >
-              {isSubmitting ? (
+              {createWorkspaceMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...

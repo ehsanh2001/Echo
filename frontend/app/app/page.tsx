@@ -6,9 +6,11 @@ import { AppSidebar } from "@/components/app/app-sidebar";
 import { AppMainContent } from "@/components/app/app-main-content";
 import { AppMembersSidebar } from "@/components/app/app-members-sidebar";
 import { SuccessAlert } from "@/components/workspace/SuccessAlert";
-import { WorkspaceProvider } from "@/lib/providers/workspace-provider";
+import {
+  useWorkspaceMemberships,
+  workspaceKeys,
+} from "@/lib/hooks/useWorkspaces";
 import { useQueryClient } from "@tanstack/react-query";
-import { workspaceKeys } from "@/lib/hooks/useWorkspaces";
 import { useState, useEffect } from "react";
 import {
   loadSelectedChannel,
@@ -20,6 +22,9 @@ import {
  * Separated to allow query invalidation on workspace creation
  */
 function AppPageContent() {
+  // Initialize workspace data fetching - syncs to Zustand store automatically
+  useWorkspaceMemberships(true);
+
   const queryClient = useQueryClient();
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
@@ -150,14 +155,12 @@ function AppPageContent() {
 
 /**
  * Main App Page Component
- * Wraps the app content with authentication and workspace providers
+ * Wraps the app content with authentication guard
  */
 export default function AppPage() {
   return (
     <AuthGuard>
-      <WorkspaceProvider>
-        <AppPageContent />
-      </WorkspaceProvider>
+      <AppPageContent />
     </AuthGuard>
   );
 }

@@ -18,7 +18,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
-import { useWorkspaceContext } from "@/lib/providers/workspace-provider";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import {
+  useWorkspaceMemberships,
+  useRefetchMemberships,
+  useSelectedWorkspace,
+} from "@/lib/hooks/useWorkspaces";
 import { ChannelType, WorkspaceRole } from "@/types/workspace";
 
 interface AppSidebarProps {
@@ -40,22 +45,22 @@ export function AppSidebar({
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
-    null
+
+  // Get workspace data from React Query
+  const { data, isLoading, error } = useWorkspaceMemberships();
+  const workspaces = data?.data?.workspaces || [];
+
+  // Get UI state from Zustand
+  const selectedWorkspaceId = useWorkspaceStore(
+    (state) => state.selectedWorkspaceId
+  );
+  const setSelectedWorkspace = useWorkspaceStore(
+    (state) => state.setSelectedWorkspace
   );
 
-  // Get workspace data from context
-  const { workspaces, isLoading, error, refetch } = useWorkspaceContext();
-
-  // Auto-select first workspace if none selected and workspaces exist
-  if (!selectedWorkspaceId && workspaces.length > 0) {
-    setSelectedWorkspaceId(workspaces[0].id);
-  }
-
-  // Get the currently selected workspace
-  const selectedWorkspace = workspaces.find(
-    (workspace) => workspace.id === selectedWorkspaceId
-  );
+  // Get selected workspace (combines React Query + Zustand)
+  const selectedWorkspace = useSelectedWorkspace();
+  const refetchMemberships = useRefetchMemberships();
 
   // Get channels from the selected workspace only (only public channels for now)
   const channels =
@@ -76,7 +81,7 @@ export function AppSidebar({
   // Handle refresh with visual feedback
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetch();
+    await refetchMemberships();
     // Add small delay for better UX
     setTimeout(() => setIsRefreshing(false), 500);
   };
@@ -202,7 +207,7 @@ export function AppSidebar({
                     <Tooltip key={workspace.id}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => setSelectedWorkspaceId(workspace.id)}
+                          onClick={() => setSelectedWorkspace(workspace.id)}
                           className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm ${
                             selectedWorkspaceId === workspace.id
                               ? "bg-sidebar-accent/50 border-l-2 border-primary"

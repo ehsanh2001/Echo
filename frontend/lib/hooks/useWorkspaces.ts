@@ -1,9 +1,16 @@
 /**
  * React Query hooks for workspace-related data
+ *
+ * Architecture:
+ * - React Query: Manages server state (workspaces, channels data)
+ * - Zustand: Manages client state (selectedWorkspaceId)
+ * - Selector hooks: Combine both for convenient access
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 import { getUserMemberships } from "@/lib/api/workspace";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import type { GetUserMembershipsResponse } from "@/types/workspace";
 
 /**
@@ -36,19 +43,20 @@ export const workspaceKeys = {
  * @example
  * ```tsx
  * function WorkspaceList() {
- *   const { data, isLoading, error, refetch } = useWorkspaceMemberships();
+ *   const { data, isLoading, error } = useWorkspaceMemberships();
+ *   const workspaces = data?.data?.workspaces || [];
  *
  *   if (isLoading) return <div>Loading...</div>;
- *   if (error) return <div>Error loading workspaces</div>;
+ *   if (error) return <div>Error: {error.message}</div>;
  *
- *   return data?.data.workspaces.map(workspace => (
- *     <div key={workspace.id}>{workspace.displayName || workspace.name}</div>
- *   ));
+ *   return <div>{workspaces.length} workspaces</div>;
  * }
  * ```
  */
 export function useWorkspaceMemberships(includeChannels: boolean = true) {
-  return useQuery({
+  const { selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
+
+  const query = useQuery({
     queryKey: includeChannels
       ? workspaceKeys.membershipsWithChannels()
       : workspaceKeys.memberships(),
@@ -59,6 +67,27 @@ export function useWorkspaceMemberships(includeChannels: boolean = true) {
     refetchOnMount: true, // Refetch when component mounts
     retry: 2, // Retry failed requests twice
   });
+
+  // Auto-select first workspace if none selected and data is available
+  useEffect(() => {
+    const workspaces = query.data?.data?.workspaces;
+    if (!workspaces) return;
+
+    // If no workspace selected and workspaces exist, select first one
+    if (!selectedWorkspaceId && workspaces.length > 0) {
+      setSelectedWorkspace(workspaces[0].id);
+    }
+
+    // If selected workspace no longer exists, select first available or null
+    if (
+      selectedWorkspaceId &&
+      !workspaces.find((w) => w.id === selectedWorkspaceId)
+    ) {
+      setSelectedWorkspace(workspaces.length > 0 ? workspaces[0].id : null);
+    }
+  }, [query.data, selectedWorkspaceId, setSelectedWorkspace]);
+
+  return query;
 }
 
 /**
@@ -88,4 +117,70 @@ export function useRefetchMemberships() {
       queryKey: workspaceKeys.memberships(),
     });
   };
+}
+
+/**
+ * Selector hook to get the currently selected workspace
+ *
+ * Combines React Query data (workspaces) with Zustand state (selectedWorkspaceId)
+ * to return the currently selected workspace object.
+ *
+ * @returns The selected workspace or undefined if none selected
+ *
+ * @example
+ * ```tsx
+ * function WorkspaceHeader() {
+ *   const selectedWorkspace = useSelectedWorkspace();
+ *
+ *   if (!selectedWorkspace) return <div>No workspace selected</div>;
+ *
+ *   return <h1>{selectedWorkspace.displayName || selectedWorkspace.name}</h1>;
+ * }
+ * ```
+ */
+export function useSelectedWorkspace() {
+  const queryClient = useQueryClient();
+  const selectedWorkspaceId = useWorkspaceStore(
+    (state) => state.selectedWorkspaceId
+  );
+
+  return useMemo(() => {
+    const cachedData = queryClient.getQueryData<GetUserMembershipsResponse>(
+      workspaceKeys.membershipsWithChannels()
+    );
+
+    if (!cachedData?.data?.workspaces || !selectedWorkspaceId) {
+      return undefined;
+    }
+
+    return cachedData.data.workspaces.find((w) => w.id === selectedWorkspaceId);
+  }, [queryClient, selectedWorkspaceId]);
+}
+
+/**
+ * Selector hook to get channels from the selected workspace
+ *
+ * Combines React Query data with Zustand state to return only the channels
+ * belonging to the currently selected workspace.
+ *
+ * @returns Array of channels from selected workspace (empty array if none)
+ *
+ * @example
+ * ```tsx
+ * function ChannelList() {
+ *   const channels = useSelectedWorkspaceChannels();
+ *
+ *   return (
+ *     <div>
+ *       {channels.map(channel => (
+ *         <div key={channel.id}>{channel.name}</div>
+ *       ))}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useSelectedWorkspaceChannels() {
+  const selectedWorkspace = useSelectedWorkspace();
+  return useMemo(() => selectedWorkspace?.channels || [], [selectedWorkspace]);
 }
