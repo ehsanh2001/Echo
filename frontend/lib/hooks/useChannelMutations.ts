@@ -29,13 +29,12 @@ export function useCreateChannel() {
     mutationFn: (data: CreateChannelRequest) => createChannel(data),
 
     onSuccess: (response) => {
-      // Invalidate workspace memberships to refresh channel list
-      queryClient.invalidateQueries({
+      // Force refetch workspace memberships to refresh channel list immediately
+      queryClient.refetchQueries({
         queryKey: workspaceKeys.membershipsWithChannels(),
       });
 
-      // Show success toast
-      toast.success("Channel created successfully!");
+      // Don't show toast here - parent component will show success alert
     },
 
     onError: (error: any) => {

@@ -75,7 +75,10 @@ export function useWorkspaceMemberships(includeChannels: boolean = true) {
 
     // If no workspace selected and workspaces exist, select first one
     if (!selectedWorkspaceId && workspaces.length > 0) {
-      setSelectedWorkspace(workspaces[0].id);
+      setSelectedWorkspace(
+        workspaces[0].id,
+        workspaces[0].displayName || workspaces[0].name
+      );
     }
 
     // If selected workspace no longer exists, select first available or null
@@ -83,7 +86,13 @@ export function useWorkspaceMemberships(includeChannels: boolean = true) {
       selectedWorkspaceId &&
       !workspaces.find((w) => w.id === selectedWorkspaceId)
     ) {
-      setSelectedWorkspace(workspaces.length > 0 ? workspaces[0].id : null);
+      const firstWorkspace = workspaces[0];
+      setSelectedWorkspace(
+        workspaces.length > 0 ? firstWorkspace.id : null,
+        workspaces.length > 0
+          ? firstWorkspace.displayName || firstWorkspace.name
+          : null
+      );
     }
   }, [query.data, selectedWorkspaceId, setSelectedWorkspace]);
 
@@ -139,22 +148,20 @@ export function useRefetchMemberships() {
  * ```
  */
 export function useSelectedWorkspace() {
-  const queryClient = useQueryClient();
   const selectedWorkspaceId = useWorkspaceStore(
     (state) => state.selectedWorkspaceId
   );
 
-  return useMemo(() => {
-    const cachedData = queryClient.getQueryData<GetUserMembershipsResponse>(
-      workspaceKeys.membershipsWithChannels()
-    );
+  // Use the actual query hook to subscribe to data changes
+  const { data } = useWorkspaceMemberships();
 
-    if (!cachedData?.data?.workspaces || !selectedWorkspaceId) {
+  return useMemo(() => {
+    if (!data?.data?.workspaces || !selectedWorkspaceId) {
       return undefined;
     }
 
-    return cachedData.data.workspaces.find((w) => w.id === selectedWorkspaceId);
-  }, [queryClient, selectedWorkspaceId]);
+    return data.data.workspaces.find((w) => w.id === selectedWorkspaceId);
+  }, [data, selectedWorkspaceId]);
 }
 
 /**

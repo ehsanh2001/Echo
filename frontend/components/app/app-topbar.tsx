@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +44,14 @@ export function AppTopBar({
   const { theme, setTheme } = useTheme();
   const router = useRouter();
 
+  // Get workspace and channel display names from Zustand store
+  const selectedWorkspaceDisplayName = useWorkspaceStore(
+    (state) => state.selectedWorkspaceDisplayName
+  );
+  const selectedChannelDisplayName = useWorkspaceStore(
+    (state) => state.selectedChannelDisplayName
+  );
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
@@ -73,7 +82,17 @@ export function AppTopBar({
         {/* Channel/Workspace Title */}
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">
-            {selectedChannel ? `# ${selectedChannel}` : "My Workspace"}
+            {selectedChannel && selectedChannelDisplayName ? (
+              <>
+                <span className="text-muted-foreground">
+                  {selectedWorkspaceDisplayName || "Workspace"}
+                </span>
+                <span className="mx-2 text-muted-foreground">/</span>
+                <span># {selectedChannelDisplayName}</span>
+              </>
+            ) : (
+              selectedWorkspaceDisplayName || "My Workspace"
+            )}
           </h1>
         </div>
       </div>

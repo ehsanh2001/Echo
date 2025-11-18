@@ -174,8 +174,9 @@ export const channelFormSchema = z.object({
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")
-    .optional(),
-  type: z.enum(["public", "private"]).default("public"),
+    .optional()
+    .or(z.literal("")),
+  type: z.enum(["public", "private"]),
 });
 
 /**

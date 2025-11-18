@@ -17,8 +17,25 @@ interface WorkspaceState {
   /** ID of the currently selected workspace (client-side UI state) */
   selectedWorkspaceId: string | null;
 
+  /** Display name of the currently selected workspace (for UI display) */
+  selectedWorkspaceDisplayName: string | null;
+
+  /** ID of the currently selected channel (client-side UI state) */
+  selectedChannelId: string | null;
+
+  /** Display name of the currently selected channel (for UI display) */
+  selectedChannelDisplayName: string | null;
+
   // Actions
-  setSelectedWorkspace: (workspaceId: string | null) => void;
+  setSelectedWorkspace: (
+    workspaceId: string | null,
+    displayName?: string | null
+  ) => void;
+  setSelectedChannel: (
+    channelId: string | null,
+    displayName?: string | null
+  ) => void;
+  clearSelectedChannel: () => void;
 }
 
 /**
@@ -61,15 +78,36 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       (set) => ({
         // Initial state
         selectedWorkspaceId: null,
+        selectedWorkspaceDisplayName: null,
+        selectedChannelId: null,
+        selectedChannelDisplayName: null,
 
         // Actions
-        setSelectedWorkspace: (workspaceId) =>
-          set({ selectedWorkspaceId: workspaceId }),
+        setSelectedWorkspace: (workspaceId, displayName) =>
+          set({
+            selectedWorkspaceId: workspaceId,
+            selectedWorkspaceDisplayName: displayName || null,
+          }),
+
+        setSelectedChannel: (channelId, displayName) =>
+          set({
+            selectedChannelId: channelId,
+            selectedChannelDisplayName: displayName || null,
+          }),
+
+        clearSelectedChannel: () =>
+          set({
+            selectedChannelId: null,
+            selectedChannelDisplayName: null,
+          }),
       }),
       {
         name: "workspace-ui-state", // LocalStorage key
         partialize: (state) => ({
           selectedWorkspaceId: state.selectedWorkspaceId,
+          selectedWorkspaceDisplayName: state.selectedWorkspaceDisplayName,
+          selectedChannelId: state.selectedChannelId,
+          selectedChannelDisplayName: state.selectedChannelDisplayName,
         }),
       }
     ),

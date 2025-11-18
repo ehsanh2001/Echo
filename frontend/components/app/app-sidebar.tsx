@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
+import { CreateChannelModal } from "@/components/channel/CreateChannelModal";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   useWorkspaceMemberships,
@@ -29,8 +30,15 @@ import { ChannelType, WorkspaceRole } from "@/types/workspace";
 interface AppSidebarProps {
   collapsed: boolean;
   selectedChannel: string | null;
-  onSelectChannel: (channel: string | null) => void;
-  onWorkspaceCreated?: (workspaceId: string) => void;
+  onSelectChannel: (
+    channelId: string | null,
+    displayName?: string | null
+  ) => void;
+  onWorkspaceCreated?: (workspaceId: string) => void | Promise<void>;
+  onChannelCreated?: (
+    channelId: string,
+    channelName?: string
+  ) => void | Promise<void>;
 }
 
 export function AppSidebar({
@@ -38,12 +46,14 @@ export function AppSidebar({
   selectedChannel,
   onSelectChannel,
   onWorkspaceCreated,
+  onChannelCreated,
 }: AppSidebarProps) {
   const [workspacesExpanded, setWorkspacesExpanded] = useState(true);
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [dmsExpanded, setDmsExpanded] = useState(true);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Get workspace data from React Query
@@ -207,7 +217,12 @@ export function AppSidebar({
                     <Tooltip key={workspace.id}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => setSelectedWorkspace(workspace.id)}
+                          onClick={() =>
+                            setSelectedWorkspace(
+                              workspace.id,
+                              workspace.displayName || workspace.name
+                            )
+                          }
                           className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm ${
                             selectedWorkspaceId === workspace.id
                               ? "bg-sidebar-accent/50 border-l-2 border-primary"
@@ -266,6 +281,7 @@ export function AppSidebar({
                     type="button"
                     aria-label="Add Channel"
                     disabled={!canCreateChannel}
+                    onClick={() => setShowCreateChannelModal(true)}
                     className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
@@ -312,7 +328,12 @@ export function AppSidebar({
                     <Tooltip key={channel.id}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => onSelectChannel(channel.id)}
+                          onClick={() =>
+                            onSelectChannel(
+                              channel.id,
+                              channel.displayName || channel.name
+                            )
+                          }
                           className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm relative ${
                             selectedChannel === channel.id
                               ? "bg-sidebar-accent/50 border-l-2 border-primary"
@@ -355,11 +376,27 @@ export function AppSidebar({
       <CreateWorkspaceModal
         open={showCreateWorkspaceModal}
         onOpenChange={setShowCreateWorkspaceModal}
-        onSuccess={(workspaceId) => {
+        onSuccess={async (workspaceId) => {
           setShowCreateWorkspaceModal(false);
-          onWorkspaceCreated?.(workspaceId);
+          await onWorkspaceCreated?.(workspaceId);
         }}
       />
+
+      {/* Create Channel Modal - Opens when + button is clicked in Channels section */}
+      {selectedWorkspaceId && (
+        <CreateChannelModal
+          open={showCreateChannelModal}
+          onOpenChange={setShowCreateChannelModal}
+          workspaceId={selectedWorkspaceId}
+          onSuccess={async (channelId, channelName) => {
+            setShowCreateChannelModal(false);
+            // Wait for channel creation callback to complete (refetch data)
+            await onChannelCreated?.(channelId, channelName);
+            // Now select the channel after data is refreshed
+            onSelectChannel(channelId, channelName);
+          }}
+        />
+      )}
     </TooltipProvider>
   );
 }
