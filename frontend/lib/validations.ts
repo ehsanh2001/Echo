@@ -145,3 +145,42 @@ export const workspaceFormSchema = z.object({
  * Inferred from the workspaceFormSchema Zod schema.
  */
 export type WorkspaceFormData = z.infer<typeof workspaceFormSchema>;
+
+/**
+ * Channel creation form validation schema
+ *
+ * Validates channel creation fields including name availability.
+ * Channel names follow similar rules to workspace names but with some differences:
+ * - Can include underscores
+ * - Lowercase letters, numbers, hyphens, and underscores only
+ */
+export const channelFormSchema = z.object({
+  displayName: z
+    .string()
+    .min(1, "Display name is required")
+    .max(100, "Display name must be less than 100 characters"),
+  name: z
+    .string()
+    .min(1, "Channel name is required")
+    .max(50, "Channel name must be less than 50 characters")
+    .regex(
+      /^[a-z0-9_-]+$/,
+      "Channel name can only contain lowercase letters, numbers, hyphens, and underscores"
+    )
+    .refine((val) => !val.includes(" "), {
+      message:
+        "Channel name cannot contain spaces. Use hyphens or underscores instead.",
+    }),
+  description: z
+    .string()
+    .max(500, "Description must be less than 500 characters")
+    .optional(),
+  type: z.enum(["public", "private"]).default("public"),
+});
+
+/**
+ * Type-safe channel form data
+ *
+ * Inferred from the channelFormSchema Zod schema.
+ */
+export type ChannelFormData = z.infer<typeof channelFormSchema>;

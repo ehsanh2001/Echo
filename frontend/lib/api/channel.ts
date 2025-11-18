@@ -1,0 +1,50 @@
+/**
+ * Channel API Client
+ * Handles all channel-related API calls to the BFF service
+ */
+
+import { apiClient } from "./client";
+import type {
+  CreateChannelRequest,
+  CreateChannelResponse,
+  CheckChannelNameResponse,
+} from "@/types/workspace";
+
+/**
+ * Check if a channel name is available within a workspace
+ * @param workspaceId - The workspace ID
+ * @param name - The channel name to check
+ * @returns Promise with availability status
+ */
+export async function checkChannelName(
+  workspaceId: string,
+  name: string
+): Promise<CheckChannelNameResponse> {
+  try {
+    const response = await apiClient.get<CheckChannelNameResponse>(
+      `/api/workspaces/${workspaceId}/channels/check-name/${encodeURIComponent(name)}`
+    );
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * Create a new channel in a workspace
+ * @param data - Channel creation data
+ * @returns Promise with created channel data
+ */
+export async function createChannel(
+  data: CreateChannelRequest
+): Promise<CreateChannelResponse> {
+  try {
+    const response = await apiClient.post<CreateChannelResponse>(
+      `/api/workspaces/${data.workspaceId}/channels`,
+      data
+    );
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}

@@ -109,3 +109,46 @@ export interface WorkspaceError {
   statusCode?: number;
   details?: Record<string, any>;
 }
+
+// Channel-related types
+
+export interface CreateChannelRequest {
+  workspaceId: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  type: ChannelType;
+}
+
+export interface ChannelResponse {
+  id: string;
+  workspaceId: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  type: ChannelType;
+  isArchived: boolean;
+  isReadOnly: boolean;
+  createdBy: string | null;
+  memberCount: number;
+  lastActivity: string | null;
+  settings: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CheckChannelNameResponse {
+  success: boolean;
+  data: {
+    name: string;
+    isAvailable: boolean;
+  };
+  timestamp: string;
+}
+
+export interface CreateChannelResponse {
+  success: boolean;
+  data: ChannelResponse;
+  message: string;
+  timestamp: string;
+}
