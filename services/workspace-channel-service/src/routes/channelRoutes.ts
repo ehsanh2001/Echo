@@ -10,6 +10,24 @@ const channelRoutes = Router({ mergeParams: true }); // mergeParams to access wo
 const channelController = new ChannelController();
 
 /**
+ * Check if channel name is available in a workspace
+ * GET /api/ws-ch/workspaces/:workspaceId/channels/check-name/:name
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "name": "channel-name",
+ *     "isAvailable": true
+ *   },
+ *   "timestamp": "2025-11-18T..."
+ * }
+ */
+channelRoutes.get("/check-name/:name", jwtAuth, async (req, res) => {
+  await channelController.checkChannelNameAvailability(req, res);
+});
+
+/**
  * Create a new channel in a workspace
  * POST /api/ws-ch/workspaces/:workspaceId/channels
  *

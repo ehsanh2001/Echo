@@ -222,6 +222,54 @@ export class ChannelController {
   }
 
   /**
+   * Check if a channel name is available in a workspace
+   * GET /api/ws-ch/workspaces/:workspaceId/channels/check-name/:name
+   */
+  async checkChannelNameAvailability(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { workspaceId, name } = req.params;
+
+      console.log(
+        `Check channel name availability request for workspace ${workspaceId}, name: ${name}`
+      );
+
+      // Validate workspace ID
+      if (!workspaceId || typeof workspaceId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid workspace ID is required"
+        );
+      }
+
+      // Validate channel name
+      if (!name || typeof name !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Channel name is required"
+        );
+      }
+
+      // Check availability
+      const isAvailable = await this.channelService.isChannelNameAvailable(
+        workspaceId,
+        name
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          name,
+          isAvailable,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("checkChannelNameAvailability", error, res);
+    }
+  }
+
+  /**
    * Centralized error handler for controller methods
    */
   private handleControllerError(

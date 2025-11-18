@@ -52,4 +52,12 @@ export interface IChannelService {
     channelId: string,
     userId: string
   ): Promise<ChannelMember | null>;
+
+  /**
+   * Checks if a channel name is available in a workspace
+   * @param workspaceId - The workspace ID
+   * @param name - The channel name to check
+   * @returns Promise resolving to true if available, false if taken
+   */
+  isChannelNameAvailable(workspaceId: string, name: string): Promise<boolean>;
 }

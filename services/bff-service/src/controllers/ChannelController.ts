@@ -44,6 +44,34 @@ export class ChannelController {
   };
 
   /**
+   * GET /api/workspaces/:workspaceId/channels/check-name/:name
+   * Forward check if a channel name is available in a workspace
+   *
+   */
+  static checkChannelName = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { workspaceId, name } = req.params;
+      const authHeader = req.headers.authorization;
+
+      const response = await axios.get(
+        `${ChannelController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${workspaceId}/channels/check-name/${name}`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+        }
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      ChannelController.handleError(error, res, "Check channel name");
+    }
+  };
+
+  /**
    * Handle errors from workspace-channel service
    * Maps axios errors to appropriate HTTP responses
    */

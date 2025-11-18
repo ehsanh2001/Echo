@@ -318,4 +318,23 @@ export class ChannelService implements IChannelService {
       );
     }
   }
+
+  /**
+   * Checks if a channel name is available in a workspace
+   */
+  async isChannelNameAvailable(
+    workspaceId: string,
+    name: string
+  ): Promise<boolean> {
+    try {
+      const existingChannel =
+        await this.channelRepository.findByNameInWorkspace(workspaceId, name);
+      return existingChannel === null;
+    } catch (error) {
+      console.error("Error checking channel name availability:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to check channel name availability"
+      );
+    }
+  }
 }

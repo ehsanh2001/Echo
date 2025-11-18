@@ -13,6 +13,32 @@ import messageRoutes from "./messageRoutes";
 const channelRoutes = Router({ mergeParams: true }); // mergeParams to access workspaceId from parent
 
 /**
+ * GET /api/workspaces/:workspaceId/channels/check-name/:name
+ * Check if a channel name is available in a workspace
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "name": "channel-name",
+ *     "isAvailable": true
+ *   },
+ *   "timestamp": "2025-11-18T..."
+ * }
+ *
+ * Note: This endpoint must be defined before the "/:channelId" route
+ * to avoid route conflicts (otherwise "check-name" would be treated as a channelId).
+ */
+channelRoutes.get(
+  "/check-name/:name",
+  jwtAuth,
+  ChannelController.checkChannelName
+);
+
+/**
  * POST /api/workspaces/:workspaceId/channels
  * Create a new channel in a workspace
  *
