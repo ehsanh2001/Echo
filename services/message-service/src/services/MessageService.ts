@@ -230,12 +230,15 @@ export class MessageService implements IMessageService {
 
     // Step 4: Determine if there are more messages and extract actual page
     const hasMore = messages.length > limit;
-    const pageMessages = hasMore ? messages.slice(0, limit) : messages;
-
+    let pageMessages: MessageResponse[];
+    if (direction === PaginationDirection.BEFORE) {
+      pageMessages = hasMore ? messages.slice(1) : messages;
+    } else {
+      pageMessages = hasMore ? messages.slice(0, limit) : messages;
+    }
     // Step 5: Enrich messages with author information
-    const messagesWithAuthors = await this.enrichMessagesWithAuthors(
-      pageMessages
-    );
+    const messagesWithAuthors =
+      await this.enrichMessagesWithAuthors(pageMessages);
 
     // Step 6: Calculate pagination cursors
     const { nextCursor, prevCursor } = this.calculatePaginationCursors(
@@ -276,8 +279,8 @@ export class MessageService implements IMessageService {
       cursor !== undefined
         ? cursor
         : normalizedDirection === PaginationDirection.AFTER
-        ? 0
-        : Number.MAX_SAFE_INTEGER;
+          ? 0
+          : Number.MAX_SAFE_INTEGER;
 
     return {
       cursor: normalizedCursor,
