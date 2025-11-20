@@ -9,6 +9,7 @@ import {
   LoginResponse,
   LogoutResponse,
 } from "@/types/auth";
+import { useUserStore } from "@/lib/stores/user-store";
 
 /**
  * React Query mutation hook for user registration
@@ -85,12 +86,13 @@ export function useRegister() {
  */
 export function useLogin() {
   const queryClient = useQueryClient();
+  const setUser = useUserStore((state) => state.setUser);
 
   return useMutation<LoginResponse, Error, LoginData>({
     mutationFn: loginUser,
     onSuccess: (response) => {
       if (response.success && response.data) {
-        // Store tokens in localStorage
+        // Store tokens in localStorage (infrastructure)
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("refresh_token", response.data.refresh_token);
 
@@ -102,8 +104,10 @@ export function useLogin() {
           expirationTimestamp.toString()
         );
 
-        // Invalidate auth-related queries to trigger refetch
-        queryClient.invalidateQueries({ queryKey: ["user"] });
+        // Store user profile in Zustand (UI state)
+        setUser(response.data.user);
+
+        // Invalidate workspace queries to trigger refetch with authenticated state
         queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       }
     },
@@ -139,6 +143,7 @@ export function useLogin() {
  */
 export function useLogout() {
   const queryClient = useQueryClient();
+  const clearUser = useUserStore((state) => state.clearUser);
 
   return useMutation<LogoutResponse, Error, void>({
     mutationFn: logoutUser,
@@ -149,6 +154,9 @@ export function useLogout() {
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("token_expiration");
       }
+
+      // Clear user profile from Zustand
+      clearUser();
 
       // Clear all cached queries
       queryClient.clear();
@@ -161,12 +169,13 @@ export function useLogout() {
     onError: (error) => {
       console.error("Logout failed:", error);
 
-      // Even if logout fails on server, clear local tokens
+      // Even if logout fails on server, clear local tokens and user
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("token_expiration");
       }
+      clearUser();
 
       // Clear cache and redirect anyway
       queryClient.clear();

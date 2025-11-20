@@ -185,3 +185,32 @@ export const channelFormSchema = z.object({
  * Inferred from the channelFormSchema Zod schema.
  */
 export type ChannelFormData = z.infer<typeof channelFormSchema>;
+
+/**
+ * Message content validation schema
+ *
+ * Validates message content with configurable max length from environment.
+ * Default max length is 5000 characters.
+ */
+const MAX_MESSAGE_LENGTH =
+  Number(process.env.NEXT_PUBLIC_MAX_MESSAGE_LENGTH) || 5000;
+
+export const messageContentSchema = z.object({
+  content: z
+    .string()
+    .min(1, "Message cannot be empty")
+    .max(
+      MAX_MESSAGE_LENGTH,
+      `Message must not exceed ${MAX_MESSAGE_LENGTH} characters`
+    ),
+});
+
+/**
+ * Type-safe message content data
+ *
+ * Inferred from the messageContentSchema Zod schema.
+ */
+export type MessageContentData = z.infer<typeof messageContentSchema>;
+
+// Export the max length constant for use in components
+export { MAX_MESSAGE_LENGTH };
