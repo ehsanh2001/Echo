@@ -148,7 +148,7 @@ function AppPageContent() {
 
         {/* Main Content - Full width on mobile, flexible on desktop */}
         <div className="flex-1 w-full lg:w-auto">
-          <AppMainContent selectedChannel={selectedChannelId} />
+          <AppMainContent selectedChannelId={selectedChannelId} />
         </div>
 
         {/* Right Sidebar - Toggleable on all screen sizes */}

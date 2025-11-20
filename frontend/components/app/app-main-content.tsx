@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, UserPlus, Info, Smile, Paperclip, Send } from "lucide-react";
+import { Star, UserPlus, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -11,14 +11,21 @@ import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { useWorkspaceMemberships } from "@/lib/hooks/useWorkspaces";
 import { useState } from "react";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
+import { MessageInput } from "@/components/message/MessageInput";
 
 interface AppMainContentProps {
-  selectedChannel: string | null;
+  selectedChannelId: string | null;
 }
 
-export function AppMainContent({ selectedChannel }: AppMainContentProps) {
+export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
   const { data } = useWorkspaceMemberships();
   const workspaces = data?.data?.workspaces || [];
+  const selectedWorkspaceId = useWorkspaceStore(
+    (state) => state.selectedWorkspaceId
+  );
+  const selectedChannelDisplayName = useWorkspaceStore(
+    (state) => state.selectedChannelDisplayName
+  );
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
 
@@ -59,7 +66,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
   ];
 
   // Empty state when no channel is selected
-  if (!selectedChannel) {
+  if (!selectedChannelId) {
     // Distinguish between "no workspaces" and "no channel selected"
     const hasNoWorkspaces = workspaces.length === 0;
 
@@ -138,7 +145,7 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
             {/* Channel Name and Description */}
             <div>
               <h1 className="font-semibold text-lg text-foreground">
-                # {selectedChannel}
+                # {selectedChannelDisplayName || selectedChannelId}
               </h1>
               <p className="text-sm text-muted-foreground hidden sm:block">
                 For team-wide communication and announcements
@@ -242,58 +249,17 @@ export function AppMainContent({ selectedChannel }: AppMainContentProps) {
         </div>
 
         {/* Message Input - Compose and send new messages */}
-        <div className="p-5 border-t border-border shrink-0">
-          <div className="flex items-center gap-3 bg-muted rounded-3xl px-4 py-3">
-            {/* Emoji Picker Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
-                  aria-label="Add emoji"
-                >
-                  <Smile className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Add Emoji</p>
-              </TooltipContent>
-            </Tooltip>
-            {/* Message Input Field */}
-            <input
-              type="text"
-              placeholder="Message #general"
-              className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-            />
-            {/* Attach File Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
-                  aria-label="Attach file"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Attach File</p>
-              </TooltipContent>
-            </Tooltip>
-            {/* Send Message Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors"
-                  aria-label="Send message"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Send Message</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
+        {selectedWorkspaceId && selectedChannelId && (
+          <MessageInput
+            workspaceId={selectedWorkspaceId}
+            channelId={selectedChannelId}
+            channelName={selectedChannelDisplayName || selectedChannelId}
+            onMessageSent={(messageId) => {
+              console.log("Message sent:", messageId);
+              // Will scroll to bottom when we implement message list
+            }}
+          />
+        )}
       </main>
     </TooltipProvider>
   );
