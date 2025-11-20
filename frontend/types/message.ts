@@ -110,3 +110,37 @@ export enum MessageContentType {
   VIDEO = "video",
   AUDIO = "audio",
 }
+
+/**
+ * Pagination direction for message history
+ */
+export enum PaginationDirection {
+  BEFORE = "before", // Load older messages
+  AFTER = "after", // Load newer messages
+}
+
+/**
+ * Query parameters for fetching message history
+ */
+export interface MessageHistoryParams {
+  cursor?: number; // Optional messageNo to paginate from
+  limit?: number; // Number of messages to fetch (default from backend)
+  direction?: PaginationDirection; // Pagination direction (default: BEFORE)
+}
+
+/**
+ * Message history response with pagination cursors
+ */
+export interface MessageHistoryResponse {
+  messages: MessageWithAuthorResponse[];
+  nextCursor: number | null; // Cursor for loading newer messages
+  prevCursor: number | null; // Cursor for loading older messages
+}
+
+/**
+ * API response wrapper for message history
+ */
+export interface GetMessageHistoryResponse {
+  success: boolean;
+  data: MessageHistoryResponse;
+}

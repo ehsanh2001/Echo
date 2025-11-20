@@ -3,6 +3,7 @@
 import axios, {
   AxiosInstance,
   AxiosError,
+  AxiosRequestConfig,
   InternalAxiosRequestConfig,
 } from "axios";
 import { ApiError } from "@/types/api";
@@ -207,16 +208,22 @@ class ApiClient {
    *
    * @template T - The expected response data type
    * @param path - API endpoint path (e.g., '/api/users/me')
+   * @param config - Optional axios request config (for query params, headers, etc.)
    * @returns Promise resolving to the response data
    * @throws {ApiError} When the request fails
    *
    * @example
    * ```typescript
    * const user = await apiClient.get<UserProfile>('/api/users/123');
+   *
+   * // With query parameters
+   * const messages = await apiClient.get<MessagesResponse>('/api/messages', {
+   *   params: { cursor: 100, limit: 25 }
+   * });
    * ```
    */
-  async get<T>(path: string): Promise<T> {
-    const response = await this.axiosInstance.get<T>(path);
+  async get<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.axiosInstance.get<T>(path, config);
     return response.data;
   }
 
@@ -226,6 +233,7 @@ class ApiClient {
    * @template T - The expected response data type
    * @param path - API endpoint path (e.g., '/api/auth/register')
    * @param data - Request body data (automatically serialized to JSON by axios)
+   * @param config - Optional axios request config (for headers, params, etc.)
    * @returns Promise resolving to the response data
    * @throws {ApiError} When the request fails
    *
@@ -235,10 +243,19 @@ class ApiClient {
    *   email: 'user@example.com',
    *   password: 'password123'
    * });
+   *
+   * // With custom headers
+   * const result = await apiClient.post<Response>('/api/data', data, {
+   *   headers: { 'X-Custom-Header': 'value' }
+   * });
    * ```
    */
-  async post<T>(path: string, data: any): Promise<T> {
-    const response = await this.axiosInstance.post<T>(path, data);
+  async post<T>(
+    path: string,
+    data?: any,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const response = await this.axiosInstance.post<T>(path, data, config);
     console.log("API POST response:", response);
     return response.data;
   }
@@ -249,6 +266,7 @@ class ApiClient {
    * @template T - The expected response data type
    * @param path - API endpoint path (e.g., '/api/users/123')
    * @param data - Request body data (automatically serialized to JSON by axios)
+   * @param config - Optional axios request config (for headers, params, etc.)
    * @returns Promise resolving to the response data
    * @throws {ApiError} When the request fails
    *
@@ -257,10 +275,19 @@ class ApiClient {
    * const updated = await apiClient.put<User>('/api/users/123', {
    *   displayName: 'New Name'
    * });
+   *
+   * // With custom headers
+   * const updated = await apiClient.put<User>('/api/users/123', data, {
+   *   headers: { 'X-Custom-Header': 'value' }
+   * });
    * ```
    */
-  async put<T>(path: string, data: any): Promise<T> {
-    const response = await this.axiosInstance.put<T>(path, data);
+  async put<T>(
+    path: string,
+    data?: any,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const response = await this.axiosInstance.put<T>(path, data, config);
     return response.data;
   }
 
@@ -269,16 +296,22 @@ class ApiClient {
    *
    * @template T - The expected response data type
    * @param path - API endpoint path (e.g., '/api/users/123')
+   * @param config - Optional axios request config (for headers, params, etc.)
    * @returns Promise resolving to the response data
    * @throws {ApiError} When the request fails
    *
    * @example
    * ```typescript
    * await apiClient.delete('/api/users/123');
+   *
+   * // With query parameters
+   * await apiClient.delete('/api/items', {
+   *   params: { cascade: true }
+   * });
    * ```
    */
-  async delete<T>(path: string): Promise<T> {
-    const response = await this.axiosInstance.delete<T>(path);
+  async delete<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.axiosInstance.delete<T>(path, config);
     return response.data;
   }
 }

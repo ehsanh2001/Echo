@@ -1,7 +1,12 @@
 "use client";
 
 import { apiClient } from "./client";
-import type { SendMessageRequest, SendMessageResponse } from "@/types/message";
+import type {
+  SendMessageRequest,
+  SendMessageResponse,
+  MessageHistoryParams,
+  GetMessageHistoryResponse,
+} from "@/types/message";
 
 /**
  * Message API functions
@@ -40,6 +45,50 @@ export async function sendMessage(
     return response;
   } catch (error) {
     console.error("Error sending message:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get message history for a channel with cursor-based pagination
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelId - The channel ID
+ * @param params - Optional pagination parameters (cursor, limit, direction)
+ * @returns Promise with message history and pagination cursors
+ *
+ * @example
+ * ```typescript
+ * // Get latest 50 messages (default)
+ * const latest = await getMessageHistory(workspaceId, channelId);
+ *
+ * // Get 25 older messages before message #100
+ * const older = await getMessageHistory(workspaceId, channelId, {
+ *   cursor: 100,
+ *   limit: 25,
+ *   direction: PaginationDirection.BEFORE
+ * });
+ *
+ * // Load more using prevCursor from previous response
+ * const next = await getMessageHistory(workspaceId, channelId, {
+ *   cursor: previous.data.prevCursor,
+ *   direction: PaginationDirection.BEFORE
+ * });
+ * ```
+ */
+export async function getMessageHistory(
+  workspaceId: string,
+  channelId: string,
+  params?: MessageHistoryParams
+): Promise<GetMessageHistoryResponse> {
+  try {
+    const response = await apiClient.get<GetMessageHistoryResponse>(
+      `/api/workspaces/${workspaceId}/channels/${channelId}/messages`,
+      { params }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching message history:", error);
     throw error;
   }
 }
