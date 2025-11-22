@@ -2,25 +2,14 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendMessage } from "@/lib/api/message";
+import { messageKeys } from "@/lib/hooks/useMessageQueries";
 import type {
   SendMessageRequest,
   OptimisticMessage,
   MessageWithAuthorResponse,
 } from "@/types/message";
 import { toast } from "sonner";
-import { useUserStore } from "@/lib/stores/user-store"; /**
- * Query key factory for message-related queries
- *
- * Centralized query keys for better cache management.
- * Will be expanded when implementing message history.
- */
-export const messageKeys = {
-  all: ["messages"] as const,
-  workspace: (workspaceId: string) =>
-    [...messageKeys.all, workspaceId] as const,
-  channel: (workspaceId: string, channelId: string) =>
-    [...messageKeys.workspace(workspaceId), channelId] as const,
-};
+import { useUserStore } from "@/lib/stores/user-store";
 
 /**
  * Context type for mutation callbacks
@@ -101,11 +90,11 @@ export function useSendMessage(workspaceId: string, channelId: string) {
     },
 
     onSuccess: (response, variables, context) => {
-      // Successfully sent message
-      // When we implement message history, we'll update the cache here
-      // to replace the optimistic message with the real one
+      // Successfully sent message - invalidate cache to refetch
+      queryClient.invalidateQueries({
+        queryKey: messageKeys.channel(workspaceId, channelId),
+      });
 
-      // For now, just log success
       console.log("Message sent successfully:", response.data.id);
     },
 
@@ -124,9 +113,10 @@ export function useSendMessage(workspaceId: string, channelId: string) {
     },
 
     onSettled: (data, error, variables, context) => {
-      // This runs after success or error
-      // When we implement message history, we'll invalidate/refetch here
-      // queryClient.invalidateQueries({ queryKey: messageKeys.channel(workspaceId, channelId) });
+      // Ensure cache is always invalidated after mutation completes
+      queryClient.invalidateQueries({
+        queryKey: messageKeys.channel(workspaceId, channelId),
+      });
     },
   });
 }

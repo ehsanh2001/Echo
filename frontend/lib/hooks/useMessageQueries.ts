@@ -120,33 +120,29 @@ export function useMessageHistory(
  * Helper hook to get all messages from infinite query result
  * Flattens pages and reverses order for display (oldest to newest)
  *
- * @param queryResult - Result from useMessageHistory
+ * @param data - InfiniteData from useMessageHistory
  * @returns Flattened array of messages in chronological order
  *
  * @example
  * ```typescript
  * const query = useMessageHistory(workspaceId, channelId);
- * const messages = useMessageList(query);
+ * const messages = useMessageList(query.data);
  *
  * // messages[0] is the oldest
  * // messages[messages.length - 1] is the newest
  * ```
  */
 export function useMessageList(
-  queryResult: UseInfiniteQueryResult<
-    InfiniteData<MessageHistoryResponse, number | undefined>,
-    Error
-  >
+  data: InfiniteData<MessageHistoryResponse, number | undefined> | undefined
 ): MessageWithAuthorResponse[] {
-  if (!queryResult.data) {
+  if (!data) {
     return [];
   }
 
-  // Pages are returned with newest messages first
   // Each page has messages in ASC order (oldest to newest within page)
   // But pages themselves are in DESC order (newest page first)
   // So we need to reverse the pages, not the messages within
-  const reversedPages = [...queryResult.data.pages].reverse();
+  const reversedPages = [...data.pages].reverse();
   const messagesInOrder = reversedPages.flatMap((page) => page.messages);
 
   return messagesInOrder;
@@ -155,14 +151,9 @@ export function useMessageList(
 /**
  * Helper hook to check if there are more messages to load
  *
- * @param queryResult - Result from useMessageHistory
+ * @param hasNextPage - hasNextPage from useMessageHistory
  * @returns Boolean indicating if more messages can be loaded
  */
-export function useHasMoreMessages(
-  queryResult: UseInfiniteQueryResult<
-    InfiniteData<MessageHistoryResponse, number | undefined>,
-    Error
-  >
-): boolean {
-  return queryResult.hasNextPage ?? false;
+export function useHasMoreMessages(hasNextPage: boolean | undefined): boolean {
+  return hasNextPage ?? false;
 }

@@ -12,6 +12,7 @@ import { useWorkspaceMemberships } from "@/lib/hooks/useWorkspaces";
 import { useState } from "react";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 import { MessageInput } from "@/components/message/MessageInput";
+import { MessageList } from "@/components/message/MessageList";
 
 interface AppMainContentProps {
   selectedChannelId: string | null;
@@ -28,42 +29,6 @@ export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
   );
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
-
-  // Mock data - will be replaced with real data later
-  const messages = [
-    {
-      id: "1",
-      sender: "Alex Johnson",
-      avatar: "AJ",
-      time: "10:15 AM",
-      text: "Hey team! Just wanted to share the latest design mockups for the new dashboard. Let me know what you think!",
-      isOwn: false,
-    },
-    {
-      id: "2",
-      sender: "Sam Rivera",
-      avatar: "SR",
-      time: "10:22 AM",
-      text: "The designs look great! I especially like the new data visualization components.",
-      isOwn: false,
-    },
-    {
-      id: "3",
-      sender: "You",
-      avatar: "JD",
-      time: "10:25 AM",
-      text: "Agreed! The color scheme is much better than the previous version. When can we expect to start implementation?",
-      isOwn: true,
-    },
-    {
-      id: "4",
-      sender: "Alex Johnson",
-      avatar: "AJ",
-      time: "10:30 AM",
-      text: "I'm finishing up the final details today. We should be able to start tomorrow morning.",
-      isOwn: false,
-    },
-  ];
 
   // Empty state when no channel is selected
   if (!selectedChannelId) {
@@ -199,54 +164,13 @@ export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
           </div>
         </div>
 
-        {/* Messages Container - Scrollable message history */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-4 max-w-[80%] ${
-                message.isOwn ? "ml-auto flex-row-reverse" : ""
-              }`}
-            >
-              {/* User Avatar */}
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                  message.isOwn
-                    ? "bg-gradient-to-br from-yellow-500 to-red-500"
-                    : "bg-gradient-to-br from-primary to-primary/70"
-                } text-white`}
-              >
-                {message.avatar}
-              </div>
-              {/* Message Bubble */}
-              <div
-                className={`rounded-2xl px-4 py-3 ${
-                  message.isOwn
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {/* Sender Name and Timestamp */}
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-sm">
-                    {message.sender}
-                  </span>
-                  <span
-                    className={`text-xs ${
-                      message.isOwn
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {message.time}
-                  </span>
-                </div>
-                {/* Message Text */}
-                <p className="text-sm leading-relaxed">{message.text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Messages List - Real-time message display with infinite scroll */}
+        {selectedWorkspaceId && selectedChannelId && (
+          <MessageList
+            workspaceId={selectedWorkspaceId}
+            channelId={selectedChannelId}
+          />
+        )}
 
         {/* Message Input - Compose and send new messages */}
         {selectedWorkspaceId && selectedChannelId && (
