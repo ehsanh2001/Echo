@@ -82,9 +82,15 @@ export function MessageInput({
 
     const messageContent = content.trim();
 
+    // Generate correlation ID for optimistic updates
+    const correlationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Send message via mutation
     sendMessageMutation.mutate(
-      { content: messageContent },
+      {
+        content: messageContent,
+        clientMessageCorrelationId: correlationId,
+      },
       {
         onSuccess: (response) => {
           // Clear input on success
