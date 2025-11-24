@@ -10,6 +10,7 @@ import {
   LogoutResponse,
 } from "@/types/auth";
 import { useUserStore } from "@/lib/stores/user-store";
+import { disconnectSocket } from "@/lib/socket/socketClient";
 
 /**
  * React Query mutation hook for user registration
@@ -148,6 +149,9 @@ export function useLogout() {
   return useMutation<LogoutResponse, Error, void>({
     mutationFn: logoutUser,
     onSuccess: () => {
+      // Disconnect Socket.IO connection
+      disconnectSocket();
+
       // Clear tokens from localStorage
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token");
@@ -168,6 +172,9 @@ export function useLogout() {
     },
     onError: (error) => {
       console.error("Logout failed:", error);
+
+      // Disconnect socket even on error
+      disconnectSocket();
 
       // Even if logout fails on server, clear local tokens and user
       if (typeof window !== "undefined") {

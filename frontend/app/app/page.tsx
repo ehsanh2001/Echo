@@ -11,6 +11,7 @@ import {
   workspaceKeys,
 } from "@/lib/hooks/useWorkspaces";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useWorkspaceRooms } from "@/lib/hooks/useWorkspaceRooms";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 
@@ -20,7 +21,11 @@ import { useState, useEffect } from "react";
  */
 function AppPageContent() {
   // Initialize workspace data fetching - syncs to Zustand store automatically
-  useWorkspaceMemberships(true);
+  const workspaceMembershipsQuery = useWorkspaceMemberships(true);
+  const workspaces = workspaceMembershipsQuery.data?.data?.workspaces;
+
+  // Join all workspace and channel rooms via Socket.IO
+  useWorkspaceRooms({ workspaces });
 
   const queryClient = useQueryClient();
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
