@@ -65,17 +65,23 @@ export interface SendMessageResponse {
  * Temporary/optimistic message (shown before server confirmation)
  */
 export interface OptimisticMessage {
-  id: string; // Temporary ID like "temp-{timestamp}"
+  id: string; // Temporary ID like "optimistic-{correlationId}"
   workspaceId: string;
   channelId: string;
   userId: string;
   content: string;
   createdAt: Date;
   isPending: true; // Marker for optimistic messages
+  clientMessageCorrelationId: string; // For matching with confirmed message
   author: AuthorInfo;
   error?: boolean; // Marker for failed messages
   retryCount?: number; // Number of retry attempts
 }
+
+/**
+ * Message send status
+ */
+export type MessageSendStatus = "sending" | "sent" | "error";
 
 /**
  * Union type for both real and optimistic messages

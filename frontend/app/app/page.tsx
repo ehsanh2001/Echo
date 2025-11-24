@@ -12,6 +12,7 @@ import {
 } from "@/lib/hooks/useWorkspaces";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { useWorkspaceRooms } from "@/lib/hooks/useWorkspaceRooms";
+import { useMessageSocket } from "@/lib/hooks/useMessageSocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 
@@ -26,6 +27,9 @@ function AppPageContent() {
 
   // Join all workspace and channel rooms via Socket.IO
   useWorkspaceRooms({ workspaces });
+
+  // Listen to Socket.IO message events and update React Query cache
+  useMessageSocket();
 
   const queryClient = useQueryClient();
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);

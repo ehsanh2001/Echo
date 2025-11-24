@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Loader2, Check, CheckCheck } from "lucide-react";
 import type { MessageWithAuthorResponse } from "@/types/message";
 import { useCurrentUser } from "@/lib/stores/user-store";
 
@@ -18,6 +19,9 @@ interface MessageProps {
 export const Message = memo(function Message({ message }: MessageProps) {
   const currentUser = useCurrentUser();
   const isOwn = currentUser?.id === message.userId;
+
+  // Check if this is an optimistic message (pending confirmation)
+  const isPending = (message as any).isPending === true;
 
   // Format timestamp using date-fns
   const formattedTime = formatDistanceToNow(new Date(message.createdAt), {
@@ -71,7 +75,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
       <div
         className={`rounded-2xl px-4 py-3 ${
           isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
-        }`}
+        } ${isPending ? "opacity-70" : ""}`}
       >
         {/* Sender Name and Timestamp */}
         <div className="flex items-center gap-2 mb-1">
@@ -94,6 +98,17 @@ export const Message = memo(function Message({ message }: MessageProps) {
               }`}
             >
               (edited)
+            </span>
+          )}
+
+          {/* Message Status Indicator (only for own messages) */}
+          {isOwn && (
+            <span className="ml-auto">
+              {isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin text-primary-foreground/70" />
+              ) : (
+                <CheckCheck className="h-3 w-3 text-primary-foreground/70" />
+              )}
             </span>
           )}
         </div>

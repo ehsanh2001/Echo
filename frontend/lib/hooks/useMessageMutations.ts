@@ -1,12 +1,17 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { sendMessage } from "@/lib/api/message";
 import { messageKeys } from "@/lib/hooks/useMessageQueries";
 import type {
   SendMessageRequest,
   OptimisticMessage,
   MessageWithAuthorResponse,
+  MessageHistoryResponse,
 } from "@/types/message";
 import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/user-store";
@@ -16,7 +21,8 @@ import { useUserStore } from "@/lib/stores/user-store";
  */
 interface SendMessageContext {
   optimisticMessage: OptimisticMessage;
-  previousData?: any; // Will be typed properly when implementing message history
+  correlationId: string;
+  previousMessages?: InfiniteData<MessageHistoryResponse>;
 }
 
 /**
@@ -64,15 +70,19 @@ export function useSendMessage(workspaceId: string, channelId: string) {
     },
 
     onMutate: async (variables: SendMessageRequest) => {
+      // Use the correlation ID from the request (generated in MessageInput)
+      const correlationId = variables.clientMessageCorrelationId;
+
       // Create optimistic message
       const optimisticMessage: OptimisticMessage = {
-        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `optimistic-${correlationId}`,
         workspaceId,
         channelId,
         userId: user?.id || "unknown",
         content: variables.content,
         createdAt: new Date(),
         isPending: true,
+        clientMessageCorrelationId: correlationId,
         author: {
           id: user?.id || "unknown",
           username: user?.username || "You",
@@ -82,41 +92,78 @@ export function useSendMessage(workspaceId: string, channelId: string) {
         retryCount: 0,
       };
 
-      // Note: Actual optimistic update to cache will be implemented
-      // when we add the message list/history feature.
-      // For now, we'll just track the optimistic message in the context.
-
-      return { optimisticMessage };
-    },
-
-    onSuccess: (response, variables, context) => {
-      // Successfully sent message - invalidate cache to refetch
-      queryClient.invalidateQueries({
+      // Cancel outgoing refetches to prevent race conditions
+      await queryClient.cancelQueries({
         queryKey: messageKeys.channel(workspaceId, channelId),
       });
 
-      console.log("Message sent successfully:", response.data.id);
+      // Snapshot previous messages for rollback
+      const previousMessages = queryClient.getQueryData<
+        InfiniteData<MessageHistoryResponse>
+      >(messageKeys.channel(workspaceId, channelId));
+
+      // Optimistically update the cache
+      queryClient.setQueryData<InfiniteData<MessageHistoryResponse>>(
+        messageKeys.channel(workspaceId, channelId),
+        (old) => {
+          if (!old || !old.pages.length) return old;
+
+          const newPages = [...old.pages];
+          const lastPageIndex = newPages.length - 1;
+          const lastPage = newPages[lastPageIndex];
+
+          // Add optimistic message to the end of the last page (newest messages)
+          newPages[lastPageIndex] = {
+            ...lastPage,
+            messages: [...lastPage.messages, optimisticMessage as any],
+          };
+
+          return {
+            ...old,
+            pages: newPages,
+          };
+        }
+      );
+
+      return { optimisticMessage, correlationId, previousMessages };
+    },
+
+    onSuccess: (response, variables, context) => {
+      // Message sent successfully to backend
+      // Socket.IO will handle updating the cache when message:created event arrives
+      // No need to invalidate queries here - socket listener will replace optimistic message
+      if (process.env.NODE_ENV === "development") {
+        console.log("Message sent successfully:", response.data.id);
+      }
     },
 
     onError: (error: any, variables, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          messageKeys.channel(workspaceId, channelId),
+          context.previousMessages
+        );
+      }
+
       // Show error toast
       const errorMessage =
         error?.response?.data?.error?.message ||
         error?.message ||
-        "Failed to send message. It will be retried.";
+        "Failed to send message. Please try again.";
 
       toast.error(errorMessage);
       console.error("Error sending message:", error);
-
-      // Note: Failed messages will be stored in localStorage
-      // for retry after reconnection (future implementation)
     },
 
     onSettled: (data, error, variables, context) => {
-      // Ensure cache is always invalidated after mutation completes
-      queryClient.invalidateQueries({
-        queryKey: messageKeys.channel(workspaceId, channelId),
-      });
+      // No need to invalidate - socket will handle updates
+      // Only invalidate on error if rollback didn't happen
+      if (error && !context?.previousMessages) {
+        queryClient.invalidateQueries({
+          queryKey: messageKeys.channel(workspaceId, channelId),
+        });
+      }
     },
   });
 }
