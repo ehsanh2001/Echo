@@ -46,7 +46,8 @@ export class MessageService implements IMessageService {
     workspaceId: string,
     channelId: string,
     userId: string,
-    content: string
+    content: string,
+    clientMessageCorrelationId: string
   ): Promise<MessageWithAuthorResponse> {
     // Step 1: Validate content
     this.validateContent(content);
@@ -70,6 +71,7 @@ export class MessageService implements IMessageService {
     const messageWithAuthor: MessageWithAuthorResponse = {
       ...message,
       author: authorInfo,
+      clientMessageCorrelationId,
     };
 
     // Step 5: Publish RabbitMQ event (async, don't wait)

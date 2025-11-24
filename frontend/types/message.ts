@@ -40,6 +40,7 @@ export interface MessageResponse {
  */
 export interface MessageWithAuthorResponse extends MessageResponse {
   author: AuthorInfo;
+  clientMessageCorrelationId?: string; // Only present for newly created messages
 }
 
 /**
@@ -47,6 +48,7 @@ export interface MessageWithAuthorResponse extends MessageResponse {
  */
 export interface SendMessageRequest {
   content: string;
+  clientMessageCorrelationId: string; // Required: client-generated correlation ID
   parentMessageId?: string; // For threading (future)
   threadRootId?: string; // For threading (future)
 }

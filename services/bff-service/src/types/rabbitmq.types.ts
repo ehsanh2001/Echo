@@ -30,6 +30,7 @@ export interface MessageCreatedEvent {
       displayName: string;
       avatarUrl: string | null;
     };
+    clientMessageCorrelationId: string; // Required: client-generated correlation ID
   };
   timestamp: string;
 }

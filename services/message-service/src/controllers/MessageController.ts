@@ -30,7 +30,7 @@ export class MessageController {
       const { workspaceId, channelId } = req.params;
 
       // Extract body
-      const { content } = req.body;
+      const { content, clientMessageCorrelationId } = req.body;
 
       // Validate request (throws if invalid)
       this.validateSendMessageRequest(workspaceId, channelId, content);
@@ -40,7 +40,8 @@ export class MessageController {
         workspaceId as string,
         channelId as string,
         userId,
-        content as string
+        content as string,
+        clientMessageCorrelationId as string
       );
 
       // Return success response

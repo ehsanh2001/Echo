@@ -85,6 +85,7 @@ export interface WorkspaceChannelServiceErrorResponse {
  */
 export interface CreateMessageRequest {
   content: string;
+  clientMessageCorrelationId: string;
 }
 
 // ===== RESPONSE TYPES =====
@@ -126,6 +127,7 @@ export interface AuthorInfo {
  */
 export interface MessageWithAuthorResponse extends MessageResponse {
   author: AuthorInfo;
+  clientMessageCorrelationId?: string; // Optional: only present for newly created messages
 }
 
 /**
@@ -235,6 +237,7 @@ export interface MessageCreatedEvent {
     threadRootId: string | null;
     threadDepth: number;
     createdAt: string; // ISO-8601
+    clientMessageCorrelationId: string;
   };
   metadata: {
     timestamp: string; // ISO-8601
