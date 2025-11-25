@@ -82,13 +82,8 @@ export const config = {
         "guest"
       )}@localhost:5672`
     ),
-    // BFF consumes from multiple exchanges
-    exchanges: {
-      message: "message",
-      workspaceChannel: "workspace_channel",
-      // If BFF starts publishing, use this exchange name
-      bff: "bff",
-    },
+    // All services now use a single topic exchange
+    exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "echo.events"),
   },
 
   // Socket.IO configuration

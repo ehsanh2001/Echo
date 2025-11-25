@@ -52,7 +52,7 @@ Email notification service for the Echo Slack MVP application. Consumes workspac
 | `EMAIL_FROM_ADDRESS` | Sender email address                    | `onboarding@resend.dev`      |
 | `EMAIL_FROM_NAME`    | Sender name                             | `Echo Workspace`             |
 | `RABBITMQ_URL`       | RabbitMQ connection URL (required)      | -                            |
-| `RABBITMQ_EXCHANGE`  | Exchange name                           | `echo.events`                |
+| `RABBITMQ_EXCHANGE`  | Exchange name (set in project .env)     | `echo.events`                |
 | `RABBITMQ_QUEUE`     | Queue name                              | `notification_service_queue` |
 | `FRONTEND_BASE_URL`  | Frontend URL for email links (required) | -                            |
 | `USER_SERVICE_URL`   | User service URL                        | `http://localhost:8001`      |

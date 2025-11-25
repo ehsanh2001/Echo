@@ -9,11 +9,11 @@ import logger from "../utils/logger";
 /**
  * RabbitMQ Consumer for BFF Service
  *
- * Consumes events from message service and broadcasts them to connected
+ * Consumes events from the shared echo.events exchange and broadcasts them to connected
  * Socket.IO clients in real-time.
  *
- * Exchanges consumed:
- * - 'message' exchange: Message service events (message.created)
+ * Exchange consumed:
+ * - 'echo.events' exchange: All service events (message.created, workspace.invite.created, etc.)
  *
  * Features:
  * - Topic routing for message events
@@ -27,7 +27,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
   private readonly queueName: string;
-  private readonly messageExchange = "message";
+  private readonly exchange = config.rabbitmq.exchange;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -82,8 +82,8 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         logger.warn("RabbitMQ channel closed");
       });
 
-      // Declare message exchange (idempotent)
-      await ch.assertExchange(this.messageExchange, "topic", {
+      // Declare echo.events exchange (idempotent)
+      await ch.assertExchange(this.exchange, "topic", {
         durable: true,
       });
 
@@ -94,12 +94,8 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         autoDelete: true, // Delete queue when all consumers disconnect
       });
 
-      // Bind queue to message exchange with routing key
-      await ch.bindQueue(
-        this.queueName,
-        this.messageExchange,
-        "message.created"
-      );
+      // Bind queue to echo.events exchange with routing key
+      await ch.bindQueue(this.queueName, this.exchange, "message.created");
 
       // Start consuming
       await ch.consume(this.queueName, (msg) => this.handleMessage(msg), {
@@ -111,7 +107,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
       logger.info("✅ RabbitMQ consumer initialized", {
         queue: this.queueName,
-        exchange: this.messageExchange,
+        exchange: this.exchange,
         routingKey: "message.created",
       });
     } catch (error) {
