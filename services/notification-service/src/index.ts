@@ -1,6 +1,9 @@
+import "reflect-metadata";
 import express, { Request, Response } from "express";
 import { config } from "./config/env";
 import { logger } from "./config/logger";
+import { container } from "./container";
+import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 
 const app = express();
 
@@ -20,6 +23,7 @@ app.get("/health", (_req: Request, res: Response) => {
 // Start server
 const startServer = async () => {
   try {
+    // Start Express server
     app.listen(config.port, () => {
       logger.info(`🚀 ${config.service.name} started successfully`, {
         port: config.port,
@@ -28,6 +32,20 @@ const startServer = async () => {
         rabbitmqQueue: config.rabbitmq.queue,
       });
     });
+
+    // Resolve and initialize RabbitMQ consumer from container
+    const rabbitMQConsumer =
+      container.resolve<IRabbitMQConsumer>("IRabbitMQConsumer");
+
+    try {
+      await rabbitMQConsumer.initialize();
+      logger.info("✅ All services initialized");
+    } catch (error) {
+      logger.error("Failed to initialize RabbitMQ on startup", { error });
+      logger.warn("Service will continue - RabbitMQ will attempt reconnection");
+      // Don't exit - let the service run and RabbitMQ will reconnect automatically
+      // The reconnection is handled by event handlers on the connection
+    }
   } catch (error) {
     logger.error("Failed to start server", { error });
     process.exit(1);
@@ -38,10 +56,18 @@ const startServer = async () => {
 const shutdown = async (signal: string) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
-  // TODO: Close RabbitMQ connection
-  // TODO: Close database connections if needed
+  try {
+    // Resolve and close RabbitMQ consumer from container
+    const rabbitMQConsumer =
+      container.resolve<IRabbitMQConsumer>("IRabbitMQConsumer");
+    await rabbitMQConsumer.close();
 
-  process.exit(0);
+    logger.info("✅ Graceful shutdown complete");
+    process.exit(0);
+  } catch (error) {
+    logger.error("Error during shutdown", { error });
+    process.exit(1);
+  }
 };
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
