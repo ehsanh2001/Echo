@@ -146,6 +146,29 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Notification Service - Handles email notifications via Resend
+  notification-service:
+    build: ./services/notification-service
+    container_name: echo-notification-service
+    ports:
+      - "8005:8005"
+    env_file:
+      - .env # Load shared variables
+      - ./services/notification-service/.env # Load service-specific variables (overrides shared)
+    environment:
+      # Override specific variables for Docker environment
+      # RabbitMQ points to rabbitmq container
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
+
+      # Internal service URLs
+      - USER_SERVICE_URL=http://user-service:8001
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    restart: unless-stopped
+
   # BFF Service - Backend for Frontend with real-time WebSocket support
   bff-service:
     build: ./services/bff-service
