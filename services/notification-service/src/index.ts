@@ -4,6 +4,7 @@ import { config } from "./config/env";
 import { logger } from "./config/logger";
 import { container } from "./container";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
+import { ITemplateService } from "./interfaces/services/ITemplateService";
 
 const app = express();
 
@@ -32,6 +33,11 @@ const startServer = async () => {
         rabbitmqQueue: config.rabbitmq.queue,
       });
     });
+
+    // Initialize TemplateService (load partials and helpers)
+    const templateService =
+      container.resolve<ITemplateService>("ITemplateService");
+    await templateService.initialize();
 
     // Resolve and initialize RabbitMQ consumer from container
     const rabbitMQConsumer =
