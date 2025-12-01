@@ -52,17 +52,30 @@ describe("MessageService - Unit Tests", () => {
     const channelId = "channel-123";
     const userId = "user-123";
     const content = "Hello, world!";
+    const correlationId = "correlation-123";
 
     describe("validation", () => {
       it("should reject empty content", async () => {
         await expect(
-          messageService.sendMessage(workspaceId, channelId, userId, "")
+          messageService.sendMessage(
+            workspaceId,
+            channelId,
+            userId,
+            "",
+            correlationId
+          )
         ).rejects.toThrow("Message content cannot be empty");
       });
 
       it("should reject whitespace-only content", async () => {
         await expect(
-          messageService.sendMessage(workspaceId, channelId, userId, "   ")
+          messageService.sendMessage(
+            workspaceId,
+            channelId,
+            userId,
+            "   ",
+            correlationId
+          )
         ).rejects.toThrow("Message content cannot be empty");
       });
 
@@ -73,7 +86,8 @@ describe("MessageService - Unit Tests", () => {
             workspaceId,
             channelId,
             userId,
-            longContent
+            longContent,
+            correlationId
           )
         ).rejects.toThrow("Message content exceeds maximum length");
       });
@@ -86,7 +100,13 @@ describe("MessageService - Unit Tests", () => {
         );
 
         await expect(
-          messageService.sendMessage(workspaceId, channelId, userId, content)
+          messageService.sendMessage(
+            workspaceId,
+            channelId,
+            userId,
+            content,
+            correlationId
+          )
         ).rejects.toThrow("User is not a member of this channel");
       });
 
@@ -127,7 +147,8 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          content
+          content,
+          correlationId
         );
 
         expect(result).toBeDefined();
@@ -177,7 +198,8 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          content
+          content,
+          correlationId
         );
 
         expect(result.author).toEqual({
@@ -192,7 +214,13 @@ describe("MessageService - Unit Tests", () => {
         mockUserServiceClient.getUserProfile.mockResolvedValue(null);
 
         await expect(
-          messageService.sendMessage(workspaceId, channelId, userId, content)
+          messageService.sendMessage(
+            workspaceId,
+            channelId,
+            userId,
+            content,
+            correlationId
+          )
         ).rejects.toThrow();
       });
     });
@@ -237,7 +265,8 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          content
+          content,
+          correlationId
         );
 
         expect(mockMessageRepository.create).toHaveBeenCalledWith({
@@ -290,7 +319,8 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          content
+          content,
+          correlationId
         );
 
         // Give time for async publish to be called
@@ -316,7 +346,8 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          content
+          content,
+          correlationId
         );
 
         expect(result).toBeDefined();
@@ -628,8 +659,8 @@ describe("MessageService - Unit Tests", () => {
           }
         );
 
-        expect(result.prevCursor).toBe(1); // First message (older)
-        expect(result.nextCursor).toBe(2); // Last visible message after trim (newer)
+        expect(result.prevCursor).toBe(2); // First message after trim (older)
+        expect(result.nextCursor).toBe(3); // Last visible message (newer)
       });
 
       it("should calculate cursors correctly for AFTER direction with more messages", async () => {
