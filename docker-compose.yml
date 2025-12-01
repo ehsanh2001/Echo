@@ -51,6 +51,29 @@ services:
       retries: 3
       start_period: 30s
 
+  # MailHog - Email testing tool with SMTP server and web UI
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: echo-mailhog
+    ports:
+      - "1025:1025" # SMTP server port
+      - "8025:8025" # Web UI and HTTP API port
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8025",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   # User Service - Handles authentication, user profiles
   user-service:
     build: ./services/user-service
@@ -162,11 +185,18 @@ services:
 
       # Internal service URLs
       - USER_SERVICE_URL=http://user-service:8001
+
+      # SMTP Configuration (MailHog)
+      - USE_SMTP=${USE_SMTP:-false}
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
     depends_on:
       rabbitmq:
         condition: service_healthy
       user-service:
         condition: service_started
+      mailhog:
+        condition: service_healthy
     restart: unless-stopped
 
   # BFF Service - Backend for Frontend with real-time WebSocket support

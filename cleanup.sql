@@ -8,7 +8,7 @@
 -- ============================================================================
 
 -- Connect to users_db and clean all tables
-\c users_db
+\c users_db_test
 
 -- Disable foreign key checks temporarily (PostgreSQL doesn't have this, we'll use CASCADE)
 -- Clean users table
@@ -19,7 +19,7 @@ TRUNCATE TABLE users RESTART IDENTITY CASCADE;
 -- ============================================================================
 
 -- Connect to workspace_channels_db and clean all tables
-\c workspace_channels_db
+\c workspace_channels_db_test
 
 -- Clean tables in correct order (children first, then parents)
 -- Note: Using CASCADE will handle foreign key constraints automatically
@@ -40,7 +40,7 @@ TRUNCATE TABLE workspaces RESTART IDENTITY CASCADE;
 -- ============================================================================
 
 -- Connect to message_db and clean all tables
-\c message_db
+\c message_db_test
 
 -- Clean tables in correct order (children first, then parents)
 

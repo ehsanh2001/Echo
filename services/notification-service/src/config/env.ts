@@ -71,9 +71,18 @@ export const config = {
     queue: getOptionalEnv("RABBITMQ_QUEUE", "notification_service_queue"),
   },
 
-  // Resend Email Provider Configuration
+  // Email Provider Configuration
   email: {
-    resendApiKey: getRequiredEnv("RESEND_API_KEY"),
+    // Resend (production)
+    resendApiKey: getOptionalEnv("RESEND_API_KEY", ""),
+    // SMTP (testing with MailHog)
+    useSmtp: getOptionalEnv("USE_SMTP", "false") === "true",
+    smtpHost: getOptionalEnv("SMTP_HOST", "localhost"),
+    smtpPort: parseInt(getOptionalEnv("SMTP_PORT", "1025")),
+    smtpSecure: getOptionalEnv("SMTP_SECURE", "false") === "true",
+    smtpUser: getOptionalEnv("SMTP_USER", ""),
+    smtpPassword: getOptionalEnv("SMTP_PASSWORD", ""),
+    // Common settings
     fromAddress: getOptionalEnv("EMAIL_FROM_ADDRESS", "onboarding@resend.dev"),
     fromName: getOptionalEnv("EMAIL_FROM_NAME", "Echo Workspace"),
   },

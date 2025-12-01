@@ -21,7 +21,17 @@ Basic workflow testing HTTP APIs across services:
 - Workspace and channel creation
 - Message sending
 
-### 2. BFF WebSocket Workflow Test (`bff-websocket-workflow.test.ts`)
+### 2. Invite Workflow Test (`invite-workflow.test.ts`)
+
+Complete workspace invite workflow with email verification:
+
+- User1 creates workspace and sends invite to User2's email
+- User2 receives invite email (verified via MailHog)
+- User2 registers and accepts invite
+- User2 verified as workspace member with correct role
+- User2 sends messages to all workspace channels
+
+### 3. BFF WebSocket Workflow Test (`bff-websocket-workflow.test.ts`)
 
 Complete real-time messaging workflow:
 
@@ -41,13 +51,14 @@ cd /path/to/echo
 docker-compose up -d
 ```
 
-### 2. Database Setup
+**Important:** For the invite workflow test, ensure MailHog is running and the notification-service is configured to use SMTP:
 
-Ensure all databases are created and migrated:
-
-- `users_db` (port 5432)
-- `workspaces_channels_db` (port 5432)
-- `messages_db` (port 5432)
+```bash
+# In your .env file, set:
+USE_SMTP=true
+SMTP_HOST=mailhog  # or localhost if running outside Docker
+SMTP_PORT=1025
+```
 
 ### 3. Service Health Check
 
@@ -65,14 +76,55 @@ curl http://localhost:8003/health
 
 # BFF Service
 curl http://localhost:8004/health
+
+# MailHog (for invite workflow test)
+curl http://localhost:8025
 ```
 
-## Installation
+### 4. MailHog Setup
+
+MailHog is used for testing email notifications in the invite workflow test.
+
+**Access MailHog Web UI:**
+
+```
+http://localhost:8025
+```
+
+**MailHog ports:**
+
+- SMTP: `1025`
+- HTTP API: `8025`
+
+**Docker command to run MailHog standalone:**
+
+```bash
+docker run -d -p 1025:1025 -p 8025:8025 --name mailhog mailhog/mailhog
+```
+
+MailHog is automatically started when you run `docker-compose up` and is available as a service in the Echo stack.
+
+# Workspace-Channel Service
+
+curl http://localhost:8002/health
+
+### Run specific test suite
+
+````bash
+# Basic message workflow
+npm test message-workflow
+
+# Workspace invite workflow (requires MailHog)
+npm test invite-workflow
+
+# BFF WebSocket workflow
+npm test bff-websocket-workflow
+```Installation
 
 ```bash
 cd system-tests/api-e2e
 npm install
-```
+````
 
 ## Running Tests
 
@@ -141,6 +193,66 @@ Step 5: Send Message
   ✓ Message assigned sequential number
 ```
 
+### Invite Workflow (`invite-workflow.test.ts`)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│     Complete Workspace Invite Workflow (with Email)     │
+└─────────────────────────────────────────────────────────┘
+
+Step 1: User1 Registers
+  POST /api/users/auth/register
+  ✓ Creates user1 (inviter) account
+
+Step 2: User1 Logs In
+  POST /api/users/auth/login
+  ✓ Authenticates user1
+
+Step 3: User1 Creates Workspace
+  POST /api/ws-ch/workspaces
+  ✓ Creates workspace
+
+Step 4: User1 Sends Invite
+  POST /api/ws-ch/workspaces/:workspaceId/invites
+  ✓ Creates invite for user2's email
+  ✓ Invite includes token, role, expiration
+  ✓ Triggers email notification event
+
+Step 5: User2 Receives Email
+  MailHog API: GET /api/v2/messages
+  ✓ Email delivered to MailHog inbox
+  ✓ Subject contains "invited" and "workspace"
+  ✓ Email body contains invite token
+  ✓ Token extracted from email HTML
+
+Step 6: User2 Registers
+  POST /api/users/auth/register
+  ✓ Creates user2 account (invited user)
+  ✓ Uses same email as invite
+
+Step 7: User2 Logs In
+  POST /api/users/auth/login
+  ✓ Authenticates user2
+
+Step 8: User2 Accepts Invite
+  POST /api/ws-ch/workspaces/invites/accept
+  ✓ Accepts invite using token from email
+  ✓ User2 added to workspace
+  ✓ User2 added to workspace channels
+  ✓ Returns workspace and channel details
+
+Step 9: Verify Membership
+  GET /api/ws-ch/workspaces/:workspaceId
+  ✓ User2 confirmed as workspace member
+  ✓ User2 has "member" role
+
+Step 10: User2 Sends Messages
+  POST /api/messages/workspaces/:workspaceId/channels/:channelId/messages
+  ✓ User2 sends message to each channel
+  ✓ Messages created successfully
+  ✓ Verifies user2 has access to all channels
+```
+
 ### BFF WebSocket Workflow (`bff-websocket-workflow.test.ts`)
 
 ```
@@ -199,14 +311,34 @@ Tests use timestamped data to avoid conflicts:
 
 ```typescript
 User:
-  email: e2e.test@example.com
-  username: e2e_test_user
+  email: e2e.test.{timestamp}@example.com
+  username: e2e_test_{timestamp}
 
 Workspace:
   name: e2e-test-workspace
 
 Channel:
   name: e2e-test-channel
+```
+
+### Invite Workflow
+
+```typescript
+User1 (Inviter):
+  email: e2e.inviter.{timestamp}@example.com
+  username: e2e_inviter_{timestamp}
+
+User2 (Invited):
+  email: e2e.invited.{timestamp}@example.com
+  username: e2e_invited_{timestamp}
+
+Workspace:
+  name: e2e-invite-ws-{timestamp}
+
+Invite:
+  role: member
+  expiresInDays: 7
+  customMessage: "Welcome to our E2E test workspace!"
 ```
 
 ### BFF WebSocket Workflow
@@ -246,6 +378,18 @@ Tests read service URLs from the project root `.env` file:
 USER_SERVICE_URL=http://localhost:8001
 WORKSPACE_CHANNEL_SERVICE_URL=http://localhost:8002
 MESSAGE_SERVICE_URL=http://localhost:8003
+MAILHOG_API_URL=http://localhost:8025
+```
+
+**For Invite Workflow Test:**
+
+The notification-service must be configured to use SMTP (MailHog) instead of Resend:
+
+```env
+# In notification-service .env or root .env
+USE_SMTP=true
+SMTP_HOST=localhost  # or 'mailhog' if running in Docker
+SMTP_PORT=1025
 ```
 
 ## Assertions
@@ -258,8 +402,22 @@ Each step validates:
 - ✅ Data types and formats (UUIDs, JWT tokens)
 - ✅ Business logic (user becomes owner, member count, etc.)
 - ✅ Cross-service consistency (IDs match across services)
+- ✅ **Invite workflow:** Email delivery, token extraction, workspace membership
 
 ## Troubleshooting
+
+### MailHog not receiving emails
+
+```bash
+# Check notification-service is using SMTP
+docker-compose logs notification-service | grep SMTP
+
+# Check MailHog is running
+curl http://localhost:8025
+
+# Verify USE_SMTP=true in environment
+docker-compose exec notification-service env | grep USE_SMTP
+```
 
 ### Services not responding
 

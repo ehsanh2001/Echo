@@ -211,8 +211,8 @@ export class WorkspaceController {
 
       // 4. Authorization: Check if user is owner or admin of the workspace
       const membership = await this.workspaceRepository.getMembership(
-        workspaceId,
-        userId
+        userId,
+        workspaceId
       );
 
       if (!membership) {

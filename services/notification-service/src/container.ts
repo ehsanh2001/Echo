@@ -6,10 +6,12 @@ import { IInviteEventHandler } from "./interfaces/handlers/IInviteEventHandler";
 import { InviteEventHandler } from "./handlers/InviteEventHandler";
 import { IEmailService } from "./interfaces/services/IEmailService";
 import { EmailService } from "./services/EmailService";
+import { SmtpEmailService } from "./services/SmtpEmailService";
 import { ITemplateService } from "./interfaces/services/ITemplateService";
 import { TemplateService } from "./services/TemplateService";
 import { IUserServiceClient } from "./interfaces/services/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
+import { config } from "./config/env";
 
 /**
  * Dependency Injection Container Configuration
@@ -19,8 +21,14 @@ import { UserServiceClient } from "./services/UserServiceClient";
 
 // ===== SERVICES =====
 
-// Register EmailService as IEmailService implementation
-container.registerSingleton<IEmailService>("IEmailService", EmailService);
+// Register EmailService or SmtpEmailService based on configuration
+if (config.email.useSmtp) {
+  container.registerSingleton<IEmailService>("IEmailService", SmtpEmailService);
+  console.log("📧 Using SMTP Email Service (MailHog)");
+} else {
+  container.registerSingleton<IEmailService>("IEmailService", EmailService);
+  console.log("📧 Using Resend Email Service");
+}
 
 // Register TemplateService as ITemplateService implementation
 container.registerSingleton<ITemplateService>(
