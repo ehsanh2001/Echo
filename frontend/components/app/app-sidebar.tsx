@@ -9,6 +9,9 @@ import {
   ChevronRight,
   RefreshCw,
   Loader2,
+  MoreVertical,
+  UserPlus,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -17,8 +20,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 import { CreateChannelModal } from "@/components/channel/CreateChannelModal";
+import { InviteMembersModal } from "@/components/workspace/InviteMembersModal";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   useWorkspaceMemberships,
@@ -54,6 +65,11 @@ export function AppSidebar({
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+  const [showInviteMembersModal, setShowInviteMembersModal] = useState(false);
+  const [selectedWorkspaceForInvite, setSelectedWorkspaceForInvite] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Get workspace data from React Query
@@ -213,44 +229,91 @@ export function AppSidebar({
                     </button>
                   </div>
                 ) : (
-                  workspaces.map((workspace) => (
-                    <Tooltip key={workspace.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() =>
-                            setSelectedWorkspace(
-                              workspace.id,
-                              workspace.displayName || workspace.name
-                            )
-                          }
-                          className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm ${
-                            selectedWorkspaceId === workspace.id
-                              ? "bg-sidebar-accent/50 border-l-2 border-primary"
-                              : "hover:bg-sidebar-accent"
-                          }`}
-                        >
-                          <Building2 className="w-5 h-5 flex-shrink-0" />
-                          <span className="truncate flex-1 text-left">
-                            {workspace.displayName || workspace.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {workspace.memberCount}
-                          </span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <div className="text-left">
-                          <p className="font-semibold">
-                            {workspace.displayName || workspace.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {workspace.memberCount} members •{" "}
-                            {workspace.userRole}
-                          </p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))
+                  workspaces.map((workspace) => {
+                    const canInvite =
+                      workspace.userRole === WorkspaceRole.OWNER ||
+                      workspace.userRole === WorkspaceRole.ADMIN;
+
+                    return (
+                      <Tooltip key={workspace.id}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`group w-full flex items-center gap-1 text-sm ${
+                              selectedWorkspaceId === workspace.id
+                                ? "bg-sidebar-accent/50 border-l-2 border-primary"
+                                : "hover:bg-sidebar-accent"
+                            }`}
+                          >
+                            <button
+                              onClick={() =>
+                                setSelectedWorkspace(
+                                  workspace.id,
+                                  workspace.displayName || workspace.name
+                                )
+                              }
+                              className="flex-1 px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm"
+                            >
+                              <Building2 className="w-5 h-5 flex-shrink-0" />
+                              <span className="truncate flex-1 text-left">
+                                {workspace.displayName || workspace.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {workspace.memberCount}
+                              </span>
+                            </button>
+
+                            {/* Workspace Settings Menu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="p-1 mr-2 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded transition-all"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                {canInvite && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedWorkspaceForInvite({
+                                          id: workspace.id,
+                                          name:
+                                            workspace.displayName ||
+                                            workspace.name,
+                                        });
+                                        setShowInviteMembersModal(true);
+                                      }}
+                                    >
+                                      <UserPlus className="mr-2 h-4 w-4" />
+                                      Invite Members
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+                                <DropdownMenuItem disabled>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Workspace Settings
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <div className="text-left">
+                            <p className="font-semibold">
+                              {workspace.displayName || workspace.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {workspace.memberCount} members •{" "}
+                              {workspace.userRole}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })
                 )}
               </nav>
             )}
@@ -395,6 +458,16 @@ export function AppSidebar({
             // Now select the channel after data is refreshed
             onSelectChannel(channelId, channelName);
           }}
+        />
+      )}
+
+      {/* Invite Members Modal - Opens when Invite Members is clicked from workspace menu */}
+      {selectedWorkspaceForInvite && (
+        <InviteMembersModal
+          open={showInviteMembersModal}
+          onOpenChange={setShowInviteMembersModal}
+          workspaceId={selectedWorkspaceForInvite.id}
+          workspaceName={selectedWorkspaceForInvite.name}
         />
       )}
     </TooltipProvider>
