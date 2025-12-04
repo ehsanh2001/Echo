@@ -4,7 +4,12 @@
  */
 
 import { apiClient } from "./client";
-import { CreateInviteRequest, CreateInviteResponse } from "@/types/invite";
+import {
+  CreateInviteRequest,
+  CreateInviteResponse,
+  AcceptInviteRequest,
+  AcceptInviteResponse,
+} from "@/types/invite";
 
 /**
  * Create a workspace invite
@@ -19,6 +24,25 @@ export async function createWorkspaceInvite(
   try {
     const response = await apiClient.post<CreateInviteResponse>(
       `/api/workspaces/${workspaceId}/invites`,
+      data
+    );
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * Accept a workspace invite
+ * @param data - Accept invite data containing token
+ * @returns Promise with workspace and channels data
+ */
+export async function acceptWorkspaceInvite(
+  data: AcceptInviteRequest
+): Promise<AcceptInviteResponse> {
+  try {
+    const response = await apiClient.post<AcceptInviteResponse>(
+      `/api/workspaces/invites/accept`,
       data
     );
     return response;

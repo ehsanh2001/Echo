@@ -65,9 +65,17 @@ function LoginFormContent() {
       });
 
       if (result.success) {
-        // Redirect to intended page or default to /app
-        const destination = redirectTo || "/app";
-        router.push(destination);
+        // Check if there's a pending invite token
+        const pendingToken = localStorage.getItem("pending_invite_token");
+
+        if (pendingToken) {
+          // Redirect back to invite page to accept
+          router.push(`/invite/${pendingToken}`);
+        } else {
+          // Redirect to intended page or default to /app
+          const destination = redirectTo || "/app";
+          router.push(destination);
+        }
       }
     } catch (error: any) {
       console.error("Login error:", error);

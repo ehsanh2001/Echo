@@ -42,3 +42,33 @@ export interface InviteResult {
   success: boolean;
   error?: string;
 }
+
+export interface AcceptInviteRequest {
+  token: string;
+}
+
+export interface AcceptInviteResponse {
+  success: boolean;
+  data: {
+    workspace: {
+      id: string;
+      name: string;
+      displayName: string;
+      description: string;
+      ownerId: string;
+      isArchived: boolean;
+      createdAt: string;
+      updatedAt: string;
+    };
+    channels: Array<{
+      id: string;
+      name: string;
+      displayName: string;
+      description: string;
+      type: "public";
+      isArchived: boolean;
+    }>;
+  };
+  message: string;
+  timestamp: string;
+}

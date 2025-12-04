@@ -6,6 +6,7 @@ import { registerSchema, type RegisterFormData } from "@/lib/validations";
 import { useRegister } from "@/lib/hooks/useAuth";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,9 @@ export function RegisterForm() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
 
+  // Router for navigation
+  const router = useRouter();
+
   // React Query mutation for registration
   const registerMutation = useRegister();
 
@@ -94,9 +98,25 @@ export function RegisterForm() {
       });
 
       if (result.success) {
-        setRegisteredEmail(data.email);
-        setShowSuccess(true);
-        form.reset();
+        // Check if there's a pending invite token
+        const pendingToken = localStorage.getItem("pending_invite_token");
+
+        if (pendingToken) {
+          // Auto-login and redirect to invite page
+          // Since registration returns tokens, we can store them and redirect
+          setRegisteredEmail(data.email);
+          setShowSuccess(true);
+          form.reset();
+
+          // Redirect to invite page after a short delay
+          setTimeout(() => {
+            router.push(`/invite/${pendingToken}`);
+          }, 1500);
+        } else {
+          setRegisteredEmail(data.email);
+          setShowSuccess(true);
+          form.reset();
+        }
       }
     } catch (error: any) {
       console.error("Registration error:", error);

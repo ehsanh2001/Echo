@@ -36,6 +36,7 @@ interface WorkspaceState {
     displayName?: string | null
   ) => void;
   clearSelectedChannel: () => void;
+  clearWorkspaceState: () => void;
 }
 
 /**
@@ -97,6 +98,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         clearSelectedChannel: () =>
           set({
+            selectedChannelId: null,
+            selectedChannelDisplayName: null,
+          }),
+
+        clearWorkspaceState: () =>
+          set({
+            selectedWorkspaceId: null,
+            selectedWorkspaceDisplayName: null,
             selectedChannelId: null,
             selectedChannelDisplayName: null,
           }),

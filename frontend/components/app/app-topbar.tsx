@@ -26,6 +26,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { useUserStore } from "@/lib/stores/user-store";
+
 interface AppTopBarProps {
   selectedChannel: string | null;
   showLeftSidebar: boolean;
@@ -51,10 +53,18 @@ export function AppTopBar({
   const selectedChannelDisplayName = useWorkspaceStore(
     (state) => state.selectedChannelDisplayName
   );
+  // Get clear actions from user and workspace stores for logout
+  const clearUser = useUserStore((state) => state.clearUser);
+  const clearWorkspaceState = useWorkspaceStore(
+    (state) => state.clearWorkspaceState
+  );
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("token_expiration");
+    clearUser();
+    clearWorkspaceState();
     router.push("/login");
   };
 

@@ -6,6 +6,8 @@ import { AppSidebar } from "@/components/app/app-sidebar";
 import { AppMainContent } from "@/components/app/app-main-content";
 import { AppMembersSidebar } from "@/components/app/app-members-sidebar";
 import { SuccessAlert } from "@/components/workspace/SuccessAlert";
+import { WelcomeModal } from "@/components/invite/WelcomeModal";
+import { ErrorModal } from "@/components/invite/ErrorModal";
 import {
   useWorkspaceMemberships,
   workspaceKeys,
@@ -36,6 +38,15 @@ function AppPageContent() {
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Invite modals state
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [welcomeData, setWelcomeData] = useState<{
+    workspaceName: string;
+    channelCount: number;
+  } | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
   // Get channel selection from Zustand store
   const selectedChannelId = useWorkspaceStore(
     (state) => state.selectedChannelId
@@ -59,6 +70,34 @@ function AppPageContent() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Check for invite success/error on mount
+  useEffect(() => {
+    const inviteSuccess = localStorage.getItem("invite_success");
+    const inviteError = localStorage.getItem("invite_error");
+
+    if (inviteSuccess) {
+      try {
+        const data = JSON.parse(inviteSuccess);
+        setWelcomeData(data);
+        setShowWelcomeModal(true);
+        localStorage.removeItem("invite_success");
+      } catch (error) {
+        console.error("Failed to parse invite success data:", error);
+      }
+    }
+
+    if (inviteError) {
+      try {
+        const data = JSON.parse(inviteError);
+        setErrorMessage(data.message);
+        setShowErrorModal(true);
+        localStorage.removeItem("invite_error");
+      } catch (error) {
+        console.error("Failed to parse invite error data:", error);
+      }
+    }
   }, []);
 
   // Handle channel selection
@@ -115,6 +154,23 @@ function AppPageContent() {
           />
         </div>
       )}
+
+      {/* Welcome Modal */}
+      {welcomeData && (
+        <WelcomeModal
+          open={showWelcomeModal}
+          onClose={() => setShowWelcomeModal(false)}
+          workspaceName={welcomeData.workspaceName}
+          channelCount={welcomeData.channelCount}
+        />
+      )}
+
+      {/* Error Modal */}
+      <ErrorModal
+        open={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+      />
 
       {/* Top Navigation Bar */}
       <AppTopBar

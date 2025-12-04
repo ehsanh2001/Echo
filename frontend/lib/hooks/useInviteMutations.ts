@@ -3,10 +3,16 @@
  * Handles creating workspace invites with optimistic updates
  */
 
-import { useMutation } from "@tanstack/react-query";
-import { createWorkspaceInvite } from "@/lib/api/invite";
-import { CreateInviteRequest, CreateInviteResponse } from "@/types/invite";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createWorkspaceInvite, acceptWorkspaceInvite } from "@/lib/api/invite";
+import {
+  CreateInviteRequest,
+  CreateInviteResponse,
+  AcceptInviteRequest,
+  AcceptInviteResponse,
+} from "@/types/invite";
 import { toast } from "sonner";
+import { workspaceKeys } from "./useWorkspaces";
 
 interface CreateInviteMutationVariables {
   workspaceId: string;
@@ -46,6 +52,36 @@ export function useCreateWorkspaceInvite() {
 
       toast.error("Invite Failed", {
         description: errorMessage,
+      });
+    },
+  });
+}
+
+/**
+ * Hook for accepting workspace invites
+ * Invalidates workspace memberships cache after successful acceptance
+ *
+ * @example
+ * ```tsx
+ * const acceptInvite = useAcceptWorkspaceInvite();
+ *
+ * acceptInvite.mutate({
+ *   token: "invite-token-from-url"
+ * });
+ * ```
+ */
+export function useAcceptWorkspaceInvite() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AcceptInviteResponse, Error, AcceptInviteRequest>({
+    mutationFn: (data) => acceptWorkspaceInvite(data),
+    onSuccess: () => {
+      // Invalidate workspace memberships to refetch with new workspace
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.memberships(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.membershipsWithChannels(),
       });
     },
   });
