@@ -155,7 +155,8 @@ export class WorkspaceController {
 
       const result = await this.workspaceService.acceptInvite(
         token,
-        req.user.userId
+        req.user.userId,
+        req.user.email
       );
 
       res.status(200).json({

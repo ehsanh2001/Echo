@@ -1,5 +1,5 @@
 import { injectable, inject } from "tsyringe";
-import { Workspace } from "@prisma/client";
+import { Workspace, Invite } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
@@ -96,9 +96,8 @@ export class WorkspaceService implements IWorkspaceService {
     try {
       const sanitizedName = this.sanitizeWorkspaceName(name);
 
-      const existingWorkspace = await this.workspaceRepository.findByName(
-        sanitizedName
-      );
+      const existingWorkspace =
+        await this.workspaceRepository.findByName(sanitizedName);
       return existingWorkspace === null;
     } catch (error) {
       console.error("Error checking workspace name availability:", error);
@@ -311,9 +310,8 @@ export class WorkspaceService implements IWorkspaceService {
     }
 
     // 4. Count active members
-    const memberCount = await this.workspaceRepository.countActiveMembers(
-      workspaceId
-    );
+    const memberCount =
+      await this.workspaceRepository.countActiveMembers(workspaceId);
 
     // 5. Build response with user's role
     const baseResponse = this.mapWorkspaceToResponse(workspace);
@@ -331,15 +329,37 @@ export class WorkspaceService implements IWorkspaceService {
    */
   async acceptInvite(
     token: string,
-    userId: string
+    userId: string,
+    userEmail: string
   ): Promise<AcceptInviteResponse> {
     try {
       console.log(`Processing invite acceptance for user: ${userId}`);
 
       //  Find invite by token
-      const invite = await this.inviteRepository.findByToken(token);
+      const invite: Invite | null =
+        await this.inviteRepository.findByToken(token);
       if (!invite) {
         throw WorkspaceChannelServiceError.notFound("Invite", token);
+      }
+
+      //  Validate that the invite is for the current user
+      if (!invite.email) {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Invalid invite: email is missing"
+        );
+      }
+
+      // if invite is already accepted
+      if (invite.acceptedAt) {
+        throw WorkspaceChannelServiceError.conflict(
+          "This invite has already been accepted"
+        );
+      }
+
+      if (invite.email.toLowerCase() !== userEmail.toLowerCase()) {
+        throw WorkspaceChannelServiceError.forbidden(
+          "This invite was sent to a different email address"
+        );
       }
 
       //  Validate invite and workspace

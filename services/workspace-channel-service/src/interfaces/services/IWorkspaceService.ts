@@ -41,8 +41,9 @@ export interface IWorkspaceService {
   ): Promise<WorkspaceDetailsResponse>;
 
   /**
-   * Accept a workspace invite
+   * Accept workspace invite
    * - Validates invite token
+   * - Validates invite email matches user email
    * - Checks invite is not expired
    * - Checks workspace is not archived
    * - Adds user to workspace
@@ -50,7 +51,11 @@ export interface IWorkspaceService {
    * - Marks invite as accepted
    * All operations are atomic (in a transaction)
    */
-  acceptInvite(token: string, userId: string): Promise<AcceptInviteResponse>;
+  acceptInvite(
+    token: string,
+    userId: string,
+    userEmail: string
+  ): Promise<AcceptInviteResponse>;
 
   /**
    * Get all workspaces and optionally channels that a user is a member of
