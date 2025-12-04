@@ -10,6 +10,7 @@ import {
   LogoutResponse,
 } from "@/types/auth";
 import { useUserStore } from "@/lib/stores/user-store";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { disconnectSocket } from "@/lib/socket/socketClient";
 
 /**
@@ -145,6 +146,9 @@ export function useLogin() {
 export function useLogout() {
   const queryClient = useQueryClient();
   const clearUser = useUserStore((state) => state.clearUser);
+  const clearWorkspaceState = useWorkspaceStore(
+    (state) => state.clearWorkspaceState
+  );
 
   return useMutation<LogoutResponse, Error, void>({
     mutationFn: logoutUser,
@@ -152,15 +156,23 @@ export function useLogout() {
       // Disconnect Socket.IO connection
       disconnectSocket();
 
-      // Clear tokens from localStorage
+      // Clear all tokens and data from localStorage
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("token_expiration");
+
+        // Clear any invite-related data
+        localStorage.removeItem("pending_invite_token");
+        localStorage.removeItem("invite_success");
+        localStorage.removeItem("invite_error");
       }
 
       // Clear user profile from Zustand
       clearUser();
+
+      // Clear workspace state from Zustand
+      clearWorkspaceState();
 
       // Clear all cached queries
       queryClient.clear();
@@ -181,8 +193,14 @@ export function useLogout() {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("token_expiration");
+
+        // Clear any invite-related data
+        localStorage.removeItem("pending_invite_token");
+        localStorage.removeItem("invite_success");
+        localStorage.removeItem("invite_error");
       }
       clearUser();
+      clearWorkspaceState();
 
       // Clear cache and redirect anyway
       queryClient.clear();

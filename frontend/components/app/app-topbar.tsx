@@ -12,6 +12,7 @@ import {
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useLogout } from "@/lib/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-import { useUserStore } from "@/lib/stores/user-store";
 
 interface AppTopBarProps {
   selectedChannel: string | null;
@@ -45,6 +44,7 @@ export function AppTopBar({
 }: AppTopBarProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const logoutMutation = useLogout();
 
   // Get workspace and channel display names from Zustand store
   const selectedWorkspaceDisplayName = useWorkspaceStore(
@@ -53,19 +53,9 @@ export function AppTopBar({
   const selectedChannelDisplayName = useWorkspaceStore(
     (state) => state.selectedChannelDisplayName
   );
-  // Get clear actions from user and workspace stores for logout
-  const clearUser = useUserStore((state) => state.clearUser);
-  const clearWorkspaceState = useWorkspaceStore(
-    (state) => state.clearWorkspaceState
-  );
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("token_expiration");
-    clearUser();
-    clearWorkspaceState();
-    router.push("/login");
+    logoutMutation.mutate();
   };
 
   return (

@@ -56,6 +56,10 @@ export const workspaceKeys = {
 export function useWorkspaceMemberships(includeChannels: boolean = true) {
   const { selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
 
+  // Check if user is authenticated to prevent auto-select after logout
+  const isAuthenticated =
+    typeof window !== "undefined" && !!localStorage.getItem("access_token");
+
   const query = useQuery({
     queryKey: includeChannels
       ? workspaceKeys.membershipsWithChannels()
@@ -70,6 +74,9 @@ export function useWorkspaceMemberships(includeChannels: boolean = true) {
 
   // Auto-select first workspace if none selected and data is available
   useEffect(() => {
+    // Don't auto-select if user is not authenticated (e.g., after logout)
+    if (!isAuthenticated) return;
+
     const workspaces = query.data?.data?.workspaces;
     if (!workspaces) return;
 
@@ -94,7 +101,7 @@ export function useWorkspaceMemberships(includeChannels: boolean = true) {
           : null
       );
     }
-  }, [query.data, selectedWorkspaceId, setSelectedWorkspace]);
+  }, [query.data, selectedWorkspaceId, setSelectedWorkspace, isAuthenticated]);
 
   return query;
 }

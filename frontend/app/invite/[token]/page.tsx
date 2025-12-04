@@ -60,8 +60,9 @@ export default function InvitePage({ params }: InvitePageProps) {
               channelCount: response.data.channels.length,
             })
           );
-          // Clean up token
+          // Clean up token and error
           localStorage.removeItem("pending_invite_token");
+          localStorage.removeItem("invite_error");
           // Navigate to app
           router.push("/app");
         },
@@ -78,8 +79,9 @@ export default function InvitePage({ params }: InvitePageProps) {
               message: errorMessage,
             })
           );
-          // Clean up token
+          // Clean up token and success
           localStorage.removeItem("pending_invite_token");
+          localStorage.removeItem("invite_success");
           // Navigate to app
           router.push("/app");
         },
