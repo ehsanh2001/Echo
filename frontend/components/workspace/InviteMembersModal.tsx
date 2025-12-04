@@ -192,15 +192,14 @@ export function InviteMembersModal({
       toast.success("Invites Sent", {
         description: `${successCount} invite(s) sent successfully`,
       });
-      // Close modal after success
-      setTimeout(() => {
-        handleClose();
-      }, 2000);
     } else {
       toast.error("Some Invites Failed", {
         description: `${successCount} sent, ${failCount} failed`,
       });
     }
+
+    // Close modal immediately after all invites are processed
+    handleClose();
   };
 
   // Cancel sending

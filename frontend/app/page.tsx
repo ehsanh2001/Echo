@@ -1,5 +1,9 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * Home page / Landing page component
@@ -10,10 +14,20 @@ import Link from "next/link";
  * - Positioned "Get Started" CTA buttons (desktop and mobile versions)
  * - All buttons use #99B8F8 gradient color scheme
  * - All navigation links point to /register page
+ * - Redirects authenticated users to /app
  *
  * @returns Landing page layout
  */
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if user is authenticated
+    const accessToken = localStorage.getItem("access_token");
+    if (accessToken) {
+      router.push("/app");
+    }
+  }, [router]);
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image for Desktop */}

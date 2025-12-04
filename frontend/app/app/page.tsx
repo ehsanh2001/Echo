@@ -5,7 +5,6 @@ import { AppTopBar } from "@/components/app/app-topbar";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { AppMainContent } from "@/components/app/app-main-content";
 import { AppMembersSidebar } from "@/components/app/app-members-sidebar";
-import { SuccessAlert } from "@/components/workspace/SuccessAlert";
 import { WelcomeModal } from "@/components/invite/WelcomeModal";
 import { ErrorModal } from "@/components/invite/ErrorModal";
 import {
@@ -36,7 +35,6 @@ function AppPageContent() {
   const queryClient = useQueryClient();
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Invite modals state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -119,11 +117,11 @@ function AppPageContent() {
       queryKey: workspaceKeys.membershipsWithChannels(),
     });
 
-    setSuccessMessage("Workspace created successfully!");
-    // Auto-hide success message after 5 seconds
-    setTimeout(() => {
-      setSuccessMessage(null);
-    }, 5000);
+    // setSuccessMessage("Workspace created successfully!");
+    // // Auto-hide success message after 5 seconds
+    // setTimeout(() => {
+    //   setSuccessMessage(null);
+    // }, 5000);
   };
 
   // Handle successful channel creation
@@ -135,26 +133,10 @@ function AppPageContent() {
     await queryClient.refetchQueries({
       queryKey: workspaceKeys.membershipsWithChannels(),
     });
-
-    setSuccessMessage("Channel created successfully!");
-    // Auto-hide success message after 5 seconds
-    setTimeout(() => {
-      setSuccessMessage(null);
-    }, 5000);
   };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
-      {/* Success Alert */}
-      {successMessage && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
-          <SuccessAlert
-            message={successMessage}
-            onClose={() => setSuccessMessage(null)}
-          />
-        </div>
-      )}
-
       {/* Welcome Modal */}
       {welcomeData && (
         <WelcomeModal

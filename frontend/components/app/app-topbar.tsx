@@ -12,6 +12,7 @@ import {
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useCurrentUser } from "@/lib/stores/user-store";
 import { useLogout } from "@/lib/hooks/useAuth";
 import {
   DropdownMenu,
@@ -45,6 +46,7 @@ export function AppTopBar({
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const logoutMutation = useLogout();
+  const currentUser = useCurrentUser();
 
   // Get workspace and channel display names from Zustand store
   const selectedWorkspaceDisplayName = useWorkspaceStore(
@@ -52,6 +54,23 @@ export function AppTopBar({
   );
   const selectedChannelDisplayName = useWorkspaceStore(
     (state) => state.selectedChannelDisplayName
+  );
+
+  // Get avatar initials from display name or username
+  const getInitials = (displayName?: string, username?: string): string => {
+    const name = displayName || username || "User";
+    const parts = name.trim().split(/\s+/);
+
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const avatarInitials = getInitials(
+    currentUser?.displayName,
+    currentUser?.username
   );
 
   const handleLogout = () => {
@@ -142,16 +161,33 @@ export function AppTopBar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 p-2 hover:bg-accent rounded-md transition-colors">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold">
-                JD
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-gradient-to-br from-primary to-primary/70 text-white"
+                title={
+                  currentUser?.displayName || currentUser?.username || "User"
+                }
+              >
+                {currentUser?.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={
+                      currentUser.displayName || currentUser.username || "User"
+                    }
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  avatarInitials
+                )}
               </div>
               <ChevronDown className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <div className="px-2 py-1.5 text-sm font-semibold">John Doe</div>
+            <div className="px-2 py-1.5 text-sm font-semibold">
+              {currentUser?.displayName || currentUser?.username || "User"}
+            </div>
             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              john.doe@example.com
+              {currentUser?.email || ""}
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem>

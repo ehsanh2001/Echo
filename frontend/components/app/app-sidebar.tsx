@@ -268,6 +268,7 @@ export function AppSidebar({
                                 <button
                                   className="p-1 mr-2 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded transition-all"
                                   onClick={(e) => e.stopPropagation()}
+                                  aria-label="Workspace options"
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </button>
