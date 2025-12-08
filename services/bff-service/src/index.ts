@@ -6,6 +6,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
+import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
 import { config } from "./config/env";
 import "./container"; // Auto-configure dependency injection
 import { container } from "./container";
@@ -30,6 +31,12 @@ const io = new SocketIOServer(httpServer, {
   pingInterval: config.socketIO.pingInterval,
 });
 
+// Correlation middleware - MUST BE FIRST
+app.use(correlationMiddleware("bff-service"));
+
+// HTTP request logging with correlation context
+app.use(createHttpLogger(logger));
+
 // Security middleware
 app.use(helmet());
 app.use(
@@ -52,12 +59,6 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
-
-// Request logging
-app.use((req, res, next) => {
-  logger.http(`${req.method} ${req.path}`);
-  next();
-});
 
 // Health check endpoint
 app.get("/health", async (req, res) => {
@@ -271,7 +272,6 @@ process.on("unhandledRejection", (reason, promise) => {
     stack: reason instanceof Error ? reason.stack : undefined,
     promise,
   });
-  console.error("Unhandled Rejection Details:", reason);
   gracefulShutdown("unhandledRejection");
 });
 

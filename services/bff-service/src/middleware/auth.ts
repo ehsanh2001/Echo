@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { Socket } from "socket.io";
+import { updateContext } from "@echo/correlation";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 
@@ -125,6 +126,9 @@ const createJwtAuthMiddleware = (tokenType: "access" | "refresh") => {
         email: payload.email,
         roles: payload.roles,
       };
+
+      // Update correlation context with user ID
+      updateContext({ userId: payload.userId });
 
       next();
     } catch (error: any) {

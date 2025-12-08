@@ -24,6 +24,8 @@ function getRequiredEnv(key: string): string {
 function getOptionalEnv(key: string, defaultValue: string): string {
   const value = process.env[key];
   if (!value) {
+    // Note: Logger not available here as this runs at module load time
+    // Using console for environment variable defaults is acceptable
     console.log(
       `Environment variable ${key} not set, using default: ${defaultValue}`
     );
