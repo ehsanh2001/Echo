@@ -1,6 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import { randomBytes } from "crypto";
 import { WorkspaceRole } from "@prisma/client";
+import { getCorrelationId } from "@echo/correlation";
 import { IInviteService } from "../interfaces/services/IInviteService";
 import { IInviteRepository } from "../interfaces/repositories/IInviteRepository";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
@@ -296,7 +297,10 @@ export class InviteService implements IInviteService {
       customMessage: invite.metadata?.customMessage,
     };
 
-    // Create outbox event
-    await this.outboxService.createInviteEvent(eventData);
+    // Capture correlation context for distributed tracing
+    const correlationId = getCorrelationId();
+
+    // Create outbox event with correlation context
+    await this.outboxService.createInviteEvent(eventData, correlationId);
   }
 }

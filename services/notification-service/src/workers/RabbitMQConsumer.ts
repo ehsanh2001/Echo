@@ -145,19 +145,21 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       // Parse event payload
       const event: NotificationEvent = JSON.parse(msg.content.toString());
 
-      // Extract correlationId from event metadata or generate new one
+      // Extract correlationId and userId from event metadata
       const correlationId = event.metadata?.correlationId || uuidv4();
+      const userId = event.metadata?.userId;
 
-      // Run message processing in correlation context
+      // Run message processing in correlation context with userId
       await requestContext.run(
-        { correlationId, timestamp: new Date() },
+        { correlationId, userId, timestamp: new Date() },
         async () => {
-          logger.info("📥 Received RabbitMQ event", {
+          logger.info("Received RabbitMQ event", {
             eventId: event.eventId,
             eventType: event.eventType,
             routingKey: msg.fields.routingKey,
             timestamp: event.timestamp,
             correlationId,
+            userId,
           });
 
           // Route event to appropriate handler
@@ -168,14 +170,14 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
             this.channel.ack(msg);
           }
 
-          logger.debug("✅ Message acknowledged", {
+          logger.debug("Message acknowledged", {
             eventId: event.eventId,
             eventType: event.eventType,
           });
         }
       );
     } catch (error) {
-      logger.error("❌ Error processing RabbitMQ message", {
+      logger.error("Error processing RabbitMQ message", {
         error,
         routingKey: msg.fields.routingKey,
         errorMessage: error instanceof Error ? error.message : String(error),

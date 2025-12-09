@@ -1,5 +1,6 @@
 import { injectable } from "tsyringe";
 import amqp from "amqplib";
+import { getCorrelationId, getUserId } from "@echo/correlation";
 import logger from "../utils/logger";
 import {
   IRabbitMQService,
@@ -97,11 +98,29 @@ export class RabbitMQService implements IRabbitMQService {
         throw new Error("RabbitMQ not initialized - call initialize() first");
       }
 
+      // Capture correlation context from AsyncLocalStorage
+      const correlationId = getCorrelationId();
+      const userId = getUserId();
+
+      // Enrich event with correlation metadata (only add if defined)
+      const enrichedMetadata = { ...event.metadata };
+      if (correlationId) {
+        enrichedMetadata.correlationId = correlationId;
+      }
+      if (userId) {
+        enrichedMetadata.userId = userId;
+      }
+
+      const enrichedEvent: MessageCreatedEvent = {
+        ...event,
+        metadata: enrichedMetadata,
+      };
+
       // Use the event type as routing key
-      const routingKey = event.type; // e.g. "message.created"
+      const routingKey = enrichedEvent.type; // e.g. "message.created"
 
       // Convert event to buffer
-      const messageBuffer = Buffer.from(JSON.stringify(event));
+      const messageBuffer = Buffer.from(JSON.stringify(enrichedEvent));
 
       // Publish message with persistent delivery mode
       const published = this.channel.publish(
@@ -121,13 +140,17 @@ export class RabbitMQService implements IRabbitMQService {
         );
       }
 
-      logger.info(`📤 Published message event - Routing key: ${routingKey}`);
+      logger.info("Published message event", {
+        routingKey,
+        correlationId,
+        userId,
+      });
     } catch (error) {
-      logger.error(`❌ Failed to publish message event:`, error);
+      logger.error("Failed to publish message event", { error });
 
       // Don't throw - message creation should succeed even if event publish fails
       logger.warn(
-        "⚠️  Message event publishing failed, but message was created successfully"
+        "Message event publishing failed, but message was created successfully"
       );
     }
   }

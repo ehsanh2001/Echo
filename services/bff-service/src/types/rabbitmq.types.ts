@@ -33,6 +33,13 @@ export interface MessageCreatedEvent {
     clientMessageCorrelationId: string; // Required: client-generated correlation ID
   };
   timestamp: string;
+  metadata: {
+    timestamp: string;
+    service: string;
+    version: string;
+    correlationId?: string;
+    userId?: string;
+  };
 }
 
 /**

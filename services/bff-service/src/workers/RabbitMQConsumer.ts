@@ -1,6 +1,8 @@
 import { injectable } from "tsyringe";
 import amqp from "amqplib";
 import { Server as SocketIOServer } from "socket.io";
+import { v4 as uuidv4 } from "uuid";
+import { requestContext } from "@echo/correlation";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import { RabbitMQEvent } from "../types/rabbitmq.types";
 import { config } from "../config/env";
@@ -129,16 +131,31 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       // Parse event
       const event: RabbitMQEvent = JSON.parse(msg.content.toString());
 
-      logger.info("📥 Received RabbitMQ event", {
-        type: event.type,
-        routingKey: msg.fields.routingKey,
-      });
+      // Extract correlationId and userId from event metadata
+      const metadata = (event as any).metadata;
+      const correlationId = metadata?.correlationId || uuidv4();
+      const userId = metadata?.userId;
 
-      // Route event to appropriate handler
-      await this.routeEvent(event);
+      // Run message processing in correlation context
+      await requestContext.run(
+        { correlationId, userId, timestamp: new Date() },
+        async () => {
+          logger.info("Received RabbitMQ event", {
+            type: event.type,
+            routingKey: msg.fields.routingKey,
+            correlationId,
+            userId,
+          });
 
-      // Acknowledge message
-      this.channel.ack(msg);
+          // Route event to appropriate handler
+          await this.routeEvent(event);
+
+          // Acknowledge message
+          if (this.channel) {
+            this.channel.ack(msg);
+          }
+        }
+      );
     } catch (error) {
       logger.error("Error processing RabbitMQ message", {
         error,
@@ -180,7 +197,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
     this.io.to(roomName).emit("message:created", event.payload);
 
-    logger.info("📤 Broadcasted message.created", {
+    logger.info("Broadcasted message.created", {
       workspaceId,
       channelId,
       messageId: event.payload.id,

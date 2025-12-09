@@ -199,6 +199,11 @@ export class MessageService implements IMessageService {
       type: "message.created",
       payload: messageWithAuthor,
       timestamp: new Date().toISOString(),
+      metadata: {
+        timestamp: new Date().toISOString(),
+        service: "message-service",
+        version: "1.0",
+      },
     };
 
     await this.rabbitMQService.publishMessageEvent(event);

@@ -255,6 +255,7 @@ export interface BaseEventPayload<TEventType extends string, TData> {
     source: "workspace-channel-service";
     correlationId?: string;
     causationId?: string;
+    userId?: string;
   };
 }
 
@@ -291,11 +292,10 @@ export interface WorkspaceInviteEventData {
 }
 
 // Workspace invite created event payload (complete structure)
-export interface WorkspaceInviteCreatedEventPayload
-  extends BaseEventPayload<
-    "workspace.invite.created",
-    WorkspaceInviteEventData
-  > {
+export interface WorkspaceInviteCreatedEventPayload extends BaseEventPayload<
+  "workspace.invite.created",
+  WorkspaceInviteEventData
+> {
   aggregateType: "workspace";
 }
 
@@ -313,8 +313,10 @@ export interface ChannelCreatedEventData {
 }
 
 // Channel created event payload
-export interface ChannelCreatedEventPayload
-  extends BaseEventPayload<"channel.created", ChannelCreatedEventData> {
+export interface ChannelCreatedEventPayload extends BaseEventPayload<
+  "channel.created",
+  ChannelCreatedEventData
+> {
   aggregateType: "channel";
 }
 
@@ -329,11 +331,10 @@ export interface ChannelMemberAddedEventData {
 }
 
 // Channel member added event payload
-export interface ChannelMemberAddedEventPayload
-  extends BaseEventPayload<
-    "channel.member.added",
-    ChannelMemberAddedEventData
-  > {
+export interface ChannelMemberAddedEventPayload extends BaseEventPayload<
+  "channel.member.added",
+  ChannelMemberAddedEventData
+> {
   aggregateType: "channel";
 }
 

@@ -29,6 +29,7 @@ export interface BaseEventPayload<TEventType extends string, TData> {
     source: string;
     correlationId?: string;
     causationId?: string;
+    userId?: string;
   };
 }
 
@@ -55,11 +56,10 @@ export interface WorkspaceInviteEventData {
  * Published when a new workspace invitation is created
  * Routing key: workspace.invite.created
  */
-export interface WorkspaceInviteCreatedEvent
-  extends BaseEventPayload<
-    "workspace.invite.created",
-    WorkspaceInviteEventData
-  > {
+export interface WorkspaceInviteCreatedEvent extends BaseEventPayload<
+  "workspace.invite.created",
+  WorkspaceInviteEventData
+> {
   aggregateType: "workspace";
 }
 

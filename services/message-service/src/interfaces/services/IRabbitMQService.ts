@@ -7,6 +7,13 @@ export interface MessageCreatedEvent {
   type: "message.created";
   payload: MessageWithAuthorResponse;
   timestamp: string;
+  metadata: {
+    timestamp: string;
+    service: string;
+    version: string;
+    correlationId?: string;
+    userId?: string;
+  };
 }
 
 /**

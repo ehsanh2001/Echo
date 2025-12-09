@@ -243,6 +243,8 @@ export interface MessageCreatedEvent {
     timestamp: string; // ISO-8601
     service: string;
     version: string;
+    correlationId?: string;
+    userId?: string;
   };
 }
 
