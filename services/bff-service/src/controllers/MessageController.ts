@@ -3,6 +3,7 @@ import axios from "axios";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { httpClient } from "../utils/httpClient";
 
 /**
  * Message Controller for BFF Service
@@ -26,12 +27,11 @@ export class MessageController {
       const { workspaceId, channelId } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${MessageController.MESSAGE_SERVICE_URL}/api/messages/workspaces/${workspaceId}/channels/${channelId}/messages`,
         req.body,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader,
           },
         }
@@ -56,7 +56,7 @@ export class MessageController {
       const authHeader = req.headers.authorization;
 
       // Forward query parameters (cursor, limit, direction)
-      const response = await axios.get(
+      const response = await httpClient.get(
         `${MessageController.MESSAGE_SERVICE_URL}/api/messages/workspaces/${workspaceId}/channels/${channelId}/messages`,
         {
           headers: {

@@ -255,7 +255,7 @@ export class WorkspaceController {
       );
 
       logger.debug("Workspace invite created successfully", {
-        inviteId: invite.id,
+        inviteId: invite.inviteId,
         workspaceId,
         inviteeEmail: inviteData.email,
       });

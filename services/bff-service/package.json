@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@echo/correlation": "file:../shared/correlation",
+    "@echo/http-client": "file:../shared/http-client",
     "@echo/logger": "file:../shared/logger",
     "@socket.io/redis-adapter": "^8.3.0",
     "amqplib": "^0.10.9",

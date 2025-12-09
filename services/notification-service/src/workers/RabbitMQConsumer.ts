@@ -145,8 +145,8 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       // Parse event payload
       const event: NotificationEvent = JSON.parse(msg.content.toString());
 
-      // Extract correlationId from event or generate new one
-      const correlationId = event.correlationId || uuidv4();
+      // Extract correlationId from event metadata or generate new one
+      const correlationId = event.metadata?.correlationId || uuidv4();
 
       // Run message processing in correlation context
       await requestContext.run(

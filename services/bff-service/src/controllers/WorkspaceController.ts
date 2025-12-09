@@ -3,6 +3,7 @@ import axios from "axios";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { httpClient } from "../utils/httpClient";
 
 /**
  * Workspace Controller for BFF Service
@@ -25,12 +26,11 @@ export class WorkspaceController {
     try {
       const authHeader = req.headers.authorization;
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces`,
         req.body,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader,
           },
         }
@@ -54,7 +54,7 @@ export class WorkspaceController {
       const { id } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.get(
+      const response = await httpClient.get(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${id}`,
         {
           headers: {
@@ -81,7 +81,7 @@ export class WorkspaceController {
       const { name } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.get(
+      const response = await httpClient.get(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/check-name/${name}`,
         {
           headers: {
@@ -108,12 +108,11 @@ export class WorkspaceController {
       const { id } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${id}/invites`,
         req.body,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader,
           },
         }
@@ -136,12 +135,11 @@ export class WorkspaceController {
     try {
       const authHeader = req.headers.authorization;
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/invites/accept`,
         req.body,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader,
           },
         }
@@ -209,7 +207,7 @@ export class WorkspaceController {
       const authHeader = req.headers.authorization;
       const { includeChannels } = req.query;
 
-      const response = await axios.get(
+      const response = await httpClient.get(
         `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/me/memberships`,
         {
           headers: {

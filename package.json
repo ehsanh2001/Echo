@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "install:all": "npm install && npm run install:services && npm run install:frontend",
-    "install:services": "npm install --workspace=services/api-gateway && npm install --workspace=services/user-service && npm install --workspace=services/message-service",
+    "install:services": "npm install --workspace=services/bff-service && npm install --workspace=services/user-service && npm install --workspace=services/message-service && npm install --workspace=services/notification-service",
     "install:frontend": "npm install --workspace=frontend",
     "dev:all": "concurrently \"npm run dev:gateway\" \"npm run dev:user\" \"npm run dev:message\" \"npm run dev:ai\" \"npm run dev:frontend\"",
     "dev:gateway": "npm run dev --workspace=services/api-gateway",
@@ -18,7 +18,7 @@
     "dev:ai": "cd services/ai-service && python -m uvicorn main:app --reload --port 8004",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build:all": "npm run build:services && npm run build:frontend",
-    "build:services": "npm run build --workspace=services/api-gateway && npm run build --workspace=services/user-service && npm run build --workspace=services/message-service",
+    "build:services": "npm run build --workspace=services/bff-service && npm run build --workspace=services/user-service && npm run build --workspace=services/message-service && npm run build --workspace=services/notification-service",
     "build:frontend": "npm run build --workspace=frontend",
     "test:all": "npm run test --workspace=services/api-gateway && npm run test --workspace=services/user-service && npm run test --workspace=services/message-service && npm run test --workspace=frontend",
     "lint:all": "npm run lint --workspace=services/api-gateway && npm run lint --workspace=services/user-service && npm run lint --workspace=services/message-service && npm run lint --workspace=frontend",

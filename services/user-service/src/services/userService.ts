@@ -82,20 +82,15 @@ export class UserService implements IUserService {
    * @returns Promise resolving to user profile
    * @throws UserServiceError if user not found
    */
-  async getPublicProfileByEmail(email: string): Promise<UserProfile> {
+  async getPublicProfile(userId: string): Promise<UserProfile> {
     try {
-      logger.info("Looking up user by email", { email });
-      const user = await this.userRepository.findByEmail(email);
+      logger.info("Looking up user by ID", { userId });
+      const user = await this.userRepository.findById(userId);
 
       if (!user) {
         throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
       }
 
-      logger.debug("User found by email", {
-        userId: user.id,
-        username: user.username,
-      });
-      return this.formatUserProfile(user);
       logger.debug("Public profile retrieved", {
         targetUserId: userId,
         username: user.username,

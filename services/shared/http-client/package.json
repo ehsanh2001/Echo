@@ -1,0 +1,28 @@
+{
+  "name": "@echo/http-client",
+  "version": "1.0.0",
+  "description": "Shared HTTP client for Echo services with automatic correlation ID propagation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "echo",
+    "http",
+    "axios",
+    "correlation",
+    "observability"
+  ],
+  "author": "Echo Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "@echo/correlation": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.3"
+  }
+}

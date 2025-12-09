@@ -3,6 +3,7 @@ import axios, { AxiosError } from "axios";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { httpClient } from "../utils/httpClient";
 
 /**
  * Authentication Controller for BFF Service
@@ -41,14 +42,9 @@ export class AuthController {
    */
   static register = async (req: Request, res: Response): Promise<void> => {
     try {
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${AuthController.USER_SERVICE_URL}/api/users/auth/register`,
-        req.body,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        req.body
       );
 
       res.status(response.status).json(response.data);
@@ -87,14 +83,9 @@ export class AuthController {
    */
   static login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${AuthController.USER_SERVICE_URL}/api/users/auth/login`,
-        req.body,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        req.body
       );
 
       res.status(response.status).json(response.data);
@@ -135,12 +126,11 @@ export class AuthController {
         return;
       }
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${AuthController.USER_SERVICE_URL}/api/users/auth/refresh`,
         {}, // Empty body
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader, // Forward the refresh token
           },
         }
@@ -179,12 +169,11 @@ export class AuthController {
         return;
       }
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${AuthController.USER_SERVICE_URL}/api/users/auth/logout`,
         {}, // Empty body
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader, // Forward the access token
           },
         }

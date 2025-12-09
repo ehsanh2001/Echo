@@ -3,6 +3,7 @@ import axios from "axios";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { httpClient } from "../utils/httpClient";
 
 /**
  * Channel Controller for BFF Service
@@ -26,12 +27,11 @@ export class ChannelController {
       const { workspaceId } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.post(
+      const response = await httpClient.post(
         `${ChannelController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${workspaceId}/channels`,
         req.body,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: authHeader,
           },
         }
@@ -56,7 +56,7 @@ export class ChannelController {
       const { workspaceId, name } = req.params;
       const authHeader = req.headers.authorization;
 
-      const response = await axios.get(
+      const response = await httpClient.get(
         `${ChannelController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${workspaceId}/channels/check-name/${name}`,
         {
           headers: {

@@ -12,7 +12,6 @@ import { TemplateService } from "./services/TemplateService";
 import { IUserServiceClient } from "./interfaces/services/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
 import { config } from "./config/env";
-import logger from "./utils/logger";
 
 /**
  * Dependency Injection Container Configuration
