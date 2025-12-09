@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { container } from "tsyringe";
+import logger from "../utils/logger";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { IInviteService } from "../interfaces/services/IInviteService";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
@@ -41,7 +42,9 @@ export class WorkspaceController {
     res: Response
   ): Promise<void> {
     try {
-      console.log(`📝 Create workspace request from user: ${req.user.userId}`);
+      logger.info("Create workspace request initiated", {
+        userId: req.user.userId,
+      });
 
       const requestData = this.validateCreateWorkspaceRequest(req.body);
 
@@ -49,6 +52,11 @@ export class WorkspaceController {
         req.user.userId,
         requestData
       );
+
+      logger.debug("Workspace created successfully", {
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+      });
 
       res.status(201).json({
         success: true,
@@ -111,9 +119,10 @@ export class WorkspaceController {
         );
       }
 
-      console.log(
-        `📋 Get workspace details request from user: ${req.user.userId} for workspace: ${workspaceId}`
-      );
+      logger.info("Get workspace details request initiated", {
+        userId: req.user.userId,
+        workspaceId,
+      });
 
       const workspaceDetails = await this.workspaceService.getWorkspaceDetails(
         req.user.userId,
@@ -147,17 +156,21 @@ export class WorkspaceController {
         );
       }
 
-      console.log(
-        `Accept invite request from user: ${
-          req.user.userId
-        } with token: ${token.substring(0, 10)}...`
-      );
+      logger.info("Accept invite request initiated", {
+        userId: req.user.userId,
+        tokenPrefix: token.substring(0, 10),
+      });
 
       const result = await this.workspaceService.acceptInvite(
         token,
         req.user.userId,
         req.user.email
       );
+
+      logger.debug("Invite accepted successfully", {
+        workspaceId: result.workspace.id,
+        userId: req.user.userId,
+      });
 
       res.status(200).json({
         success: true,
@@ -206,9 +219,11 @@ export class WorkspaceController {
         });
       }
 
-      console.log(
-        `📬 Create workspace invite request from user: ${userId} for workspace: ${workspaceId}`
-      );
+      logger.info("Create workspace invite request initiated", {
+        userId,
+        workspaceId,
+        inviteeEmail: inviteData.email,
+      });
 
       // 4. Authorization: Check if user is owner or admin of the workspace
       const membership = await this.workspaceRepository.getMembership(
@@ -238,6 +253,12 @@ export class WorkspaceController {
         userId,
         inviteData
       );
+
+      logger.debug("Workspace invite created successfully", {
+        inviteId: invite.id,
+        workspaceId,
+        inviteeEmail: inviteData.email,
+      });
 
       // 6. Send success response
       res.status(201).json({
@@ -317,7 +338,9 @@ export class WorkspaceController {
     res: Response
   ): Promise<void> {
     try {
-      console.log(`📝 Get memberships request from user: ${req.user.userId}`);
+      logger.info("Get user memberships request initiated", {
+        userId: req.user.userId,
+      });
 
       // Parse includeChannels query parameter (defaults to false)
       const includeChannels =
@@ -347,7 +370,7 @@ export class WorkspaceController {
     error: unknown,
     res: Response
   ): void {
-    console.error(`❌ Error in WorkspaceController.${method}:`, error);
+    logger.error(`Error in WorkspaceController.${method}`, { error });
 
     if (error instanceof WorkspaceChannelServiceError) {
       res.status(error.statusCode).json({

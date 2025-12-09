@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { updateContext } from "@echo/correlation";
+import logger from "../utils/logger";
 import { config } from "../config/env";
 import { JwtPayload } from "../types";
 import { MessageServiceError } from "../utils/errors";
@@ -103,12 +105,15 @@ export function jwtAuth(req: Request, res: Response, next: NextFunction): void {
     // Attach user info to request
     (req as AuthenticatedRequest).user = decoded as JwtPayload;
 
-    console.log(`✅ Authenticated user: ${decoded.userId} (${decoded.email})`);
+    // Update correlation context with user ID
+    updateContext({ userId: decoded.userId });
+
+    logger.info(`✅ Authenticated user: ${decoded.userId} (${decoded.email})`);
 
     next();
   } catch (error) {
     if (error instanceof MessageServiceError) {
-      console.error(`❌ Authentication failed: ${error.message}`);
+      logger.error(`❌ Authentication failed: ${error.message}`);
       res.status(error.statusCode).json({
         success: false,
         error: {
@@ -120,7 +125,7 @@ export function jwtAuth(req: Request, res: Response, next: NextFunction): void {
         timestamp: new Date().toISOString(),
       });
     } else {
-      console.error("❌ Unexpected authentication error:", error);
+      logger.error("❌ Unexpected authentication error:", error);
       res.status(500).json({
         success: false,
         error: {

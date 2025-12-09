@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
 import { PrismaClient } from "@prisma/client";
+import logger from "./utils/logger";
 import { IMessageRepository } from "./interfaces/repositories/IMessageRepository";
 import { MessageRepository } from "./repositories/MessageRepository";
 import { ICacheService } from "./interfaces/services/ICacheService";
@@ -45,7 +46,7 @@ container.registerSingleton<IMessageService>("IMessageService", MessageService);
 // Register RabbitMQService as IRabbitMQService implementation and initialize
 const rabbitMQService = new RabbitMQService();
 rabbitMQService.initialize().catch((error) => {
-  console.error("❌ Failed to initialize RabbitMQ during startup:", error);
+  logger.error("❌ Failed to initialize RabbitMQ during startup:", error);
   // Don't throw - allow service to start even if RabbitMQ is unavailable
 });
 container.registerInstance<IRabbitMQService>(

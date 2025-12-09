@@ -1,4 +1,5 @@
 import { injectable, inject } from "tsyringe";
+import logger from "../utils/logger";
 import { IMessageService } from "../interfaces/services/IMessageService";
 import {
   IRabbitMQService,
@@ -49,6 +50,8 @@ export class MessageService implements IMessageService {
     content: string,
     clientMessageCorrelationId: string
   ): Promise<MessageWithAuthorResponse> {
+    logger.info("Sending message", { workspaceId, channelId, contentLength: content.length });
+    
     // Step 1: Validate content
     this.validateContent(content);
 
@@ -74,9 +77,17 @@ export class MessageService implements IMessageService {
       clientMessageCorrelationId,
     };
 
+    logger.info("Message created successfully", { 
+      messageId: message.id, 
+      channelId, 
+      workspaceId,
+      authorId: userId,
+      authorUsername: authorInfo.username
+    });
+
     // Step 5: Publish RabbitMQ event (async, don't wait)
     this.publishMessageEvent(messageWithAuthor).catch((error) => {
-      console.error("Failed to publish message event:", error);
+      logger.error("Failed to publish message event", { error, messageId: message.id });
       // Don't throw - message creation succeeded
     });
 
@@ -215,6 +226,14 @@ export class MessageService implements IMessageService {
     userId: string,
     params: MessageHistoryQueryParams
   ): Promise<MessageHistoryResponse> {
+    logger.info(\"Fetching message history\", { 
+      workspaceId, 
+      channelId, 
+      cursor: params.cursor, 
+      limit: params.limit,
+      direction: params.direction 
+    });
+    
     // Step 1: Verify channel membership
     await this.verifyChannelMembership(workspaceId, channelId, userId);
 
@@ -308,7 +327,7 @@ export class MessageService implements IMessageService {
     const userProfiles = await Promise.all(
       userIds.map((userId) =>
         this.getAuthorInfo(userId).catch((error) => {
-          console.error(
+          logger.error(
             `Failed to fetch author info for user ${userId}:`,
             error
           );

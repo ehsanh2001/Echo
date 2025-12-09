@@ -12,6 +12,7 @@ import { TemplateService } from "./services/TemplateService";
 import { IUserServiceClient } from "./interfaces/services/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
 import { config } from "./config/env";
+import logger from "./utils/logger";
 
 /**
  * Dependency Injection Container Configuration
@@ -24,9 +25,11 @@ import { config } from "./config/env";
 // Register EmailService or SmtpEmailService based on configuration
 if (config.email.useSmtp) {
   container.registerSingleton<IEmailService>("IEmailService", SmtpEmailService);
+  // Module-load-time logging - cannot use contextual logger here
   console.log("📧 Using SMTP Email Service (MailHog)");
 } else {
   container.registerSingleton<IEmailService>("IEmailService", EmailService);
+  // Module-load-time logging - cannot use contextual logger here
   console.log("📧 Using Resend Email Service");
 }
 

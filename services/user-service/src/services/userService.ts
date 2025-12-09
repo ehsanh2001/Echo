@@ -6,6 +6,7 @@ import { IUserRepository } from "../interfaces/repositories/IUserRepository";
 import { User, UserProfile, CreateUserData } from "../types/user.types";
 import { RegisterRequest } from "../types/user.types";
 import { UserServiceError } from "../types/error.types";
+import logger from "../utils/logger";
 
 /**
  * User service implementation using dependency injection
@@ -56,13 +57,13 @@ export class UserService implements IUserService {
       // Create user via repository
       const user = await this.userRepository.create(userData);
 
-      console.log(`User registered: ${data.email} (${user.id})`);
+      logger.info("User registered", { userId: user.id, email: data.email });
       return this.formatUserProfile(user);
     } catch (error) {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Registration error:", error);
+      logger.error("Registration error", { error });
       throw new UserServiceError(
         "Failed to register user",
         "REGISTRATION_FAILED",
@@ -81,20 +82,30 @@ export class UserService implements IUserService {
    * @returns Promise resolving to user profile
    * @throws UserServiceError if user not found
    */
-  async getPublicProfile(userId: string): Promise<UserProfile> {
+  async getPublicProfileByEmail(email: string): Promise<UserProfile> {
     try {
-      const user = await this.userRepository.findById(userId);
+      logger.info("Looking up user by email", { email });
+      const user = await this.userRepository.findByEmail(email);
 
       if (!user) {
         throw new UserServiceError("User not found", "USER_NOT_FOUND", 404);
       }
 
+      logger.debug("User found by email", {
+        userId: user.id,
+        username: user.username,
+      });
+      return this.formatUserProfile(user);
+      logger.debug("Public profile retrieved", {
+        targetUserId: userId,
+        username: user.username,
+      });
       return this.formatUserProfile(user);
     } catch (error) {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Error getting public profile:", error);
+      logger.error("Error getting public profile", { error });
       throw new UserServiceError(
         "Failed to retrieve user profile",
         "PROFILE_RETRIEVAL_FAILED",
@@ -135,7 +146,7 @@ export class UserService implements IUserService {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Error getting public profile by email:", error);
+      logger.error("Error getting public profile by email", { error });
       throw new UserServiceError(
         "Failed to retrieve user profile",
         "PROFILE_RETRIEVAL_FAILED",
@@ -204,7 +215,7 @@ export class UserService implements IUserService {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Error checking user existence:", error);
+      logger.error("Error checking user existence", { error });
       throw new UserServiceError(
         "Failed to validate user data",
         "VALIDATION_FAILED",
@@ -223,7 +234,7 @@ export class UserService implements IUserService {
     try {
       return await bcrypt.hash(password, 12);
     } catch (error) {
-      console.error("Error hashing password:", error);
+      logger.error("Error hashing password", { error });
       throw new UserServiceError(
         "Failed to process password",
         "PASSWORD_HASH_FAILED",

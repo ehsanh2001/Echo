@@ -9,9 +9,11 @@ import path from "path";
 const projectEnvPath = path.resolve(__dirname, "../../../../.env");
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
 
+// Note: Logger not available here - runs at module load time
 console.log("Loading project .env from:", projectEnvPath);
 dotenv.config({ path: projectEnvPath });
 
+// Note: Logger not available here - runs at module load time
 console.log("Loading service .env from:", serviceEnvPath);
 dotenv.config({ path: serviceEnvPath, override: true });
 
@@ -40,6 +42,8 @@ const getRequiredEnv = (key: string): string => {
 const getOptionalEnv = (key: string, defaultValue: string): string => {
   const value = process.env[key];
   if (!value) {
+    // Note: Logger not available here as this runs at module load time
+    // Using console for environment variable defaults is acceptable
     console.log(
       `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`
     );

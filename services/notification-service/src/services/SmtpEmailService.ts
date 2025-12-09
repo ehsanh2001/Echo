@@ -3,7 +3,7 @@ import * as nodemailer from "nodemailer";
 import { IEmailService } from "../interfaces/services/IEmailService";
 import { SendEmailRequest, SendEmailResult } from "../types/email";
 import { config } from "../config/env";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * SMTP Email Service (for testing with MailHog)

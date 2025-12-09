@@ -3,7 +3,7 @@ import axios, { AxiosInstance } from "axios";
 import { IUserServiceClient } from "../interfaces/services/IUserServiceClient";
 import { UserProfile, UserServiceResponse } from "../types/email";
 import { config } from "../config/env";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * User service client

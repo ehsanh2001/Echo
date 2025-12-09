@@ -40,6 +40,7 @@ const getRequiredEnv = (key: string): string => {
 const getOptionalEnv = (key: string, defaultValue: string): string => {
   const value = process.env[key];
   if (!value) {
+    // Module-load-time logging - cannot use contextual logger here
     console.log(
       `Environment variable ${key} not set, using default: ${defaultValue}`
     );

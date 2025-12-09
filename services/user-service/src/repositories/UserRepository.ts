@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { injectable } from "tsyringe";
 import { prisma } from "../config/prisma";
+import logger from "../utils/logger";
 import { User, CreateUserData } from "../types/user.types";
 import { IUserRepository } from "../interfaces/repositories/IUserRepository";
 
@@ -28,11 +29,15 @@ export class UserRepository implements IUserRepository {
    */
   async create(userData: CreateUserData): Promise<User> {
     try {
+      logger.debug("Creating user in database", {
+        email: userData.email,
+        username: userData.username,
+      });
       return await prisma.user.create({
         data: userData,
       });
     } catch (error) {
-      console.error("Error creating user:", error);
+      logger.error("Error creating user", { error });
       throw new Error(
         `Failed to create user: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -56,6 +61,7 @@ export class UserRepository implements IUserRepository {
     username: string
   ): Promise<User | null> {
     try {
+      logger.debug("Finding user by email or username", { email, username });
       return await prisma.user.findFirst({
         where: {
           OR: [{ email: email }, { username: username }],
@@ -64,7 +70,7 @@ export class UserRepository implements IUserRepository {
         },
       });
     } catch (error) {
-      console.error("Error finding user by email or username:", error);
+      logger.error("Error finding user by email or username", { error });
       throw new Error(
         `Failed to find user: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -84,6 +90,7 @@ export class UserRepository implements IUserRepository {
    */
   async findActiveById(userId: string): Promise<User | null> {
     try {
+      logger.debug("Finding active user by ID", { userId });
       return await prisma.user.findFirst({
         where: {
           id: userId,
@@ -92,7 +99,7 @@ export class UserRepository implements IUserRepository {
         },
       });
     } catch (error) {
-      console.error("Error finding active user by ID:", error);
+      logger.error("Error finding active user by ID", { error });
       throw new Error(
         `Failed to find active user: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -112,13 +119,14 @@ export class UserRepository implements IUserRepository {
    */
   async findById(userId: string): Promise<User | null> {
     try {
+      logger.debug("Finding user by ID", { userId });
       return await prisma.user.findUnique({
         where: {
           id: userId,
         },
       });
     } catch (error) {
-      console.error("Error finding user by ID:", error);
+      logger.error("Error finding user by ID", { error });
       throw new Error(
         `Failed to find user: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -138,6 +146,7 @@ export class UserRepository implements IUserRepository {
    */
   async updateLastSeen(userId: string): Promise<void> {
     try {
+      logger.debug("Updating lastSeen timestamp", { userId });
       await prisma.user.update({
         where: { id: userId },
         data: { lastSeen: new Date() },
@@ -145,10 +154,10 @@ export class UserRepository implements IUserRepository {
     } catch (error) {
       // Log the error but don't fail the login process if user doesn't exist
       // This can happen during test cleanup or if user was deleted between validation and update
-      console.warn(
-        `Failed to update lastSeen for user ${userId}:`,
-        error instanceof Error ? error.message : error
-      );
+      logger.warn("Failed to update lastSeen", {
+        userId,
+        error: error instanceof Error ? error.message : error,
+      });
     }
   }
 
@@ -163,6 +172,7 @@ export class UserRepository implements IUserRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
+      logger.debug("Finding user by email", { email });
       return await prisma.user.findFirst({
         where: {
           email: {
@@ -174,7 +184,7 @@ export class UserRepository implements IUserRepository {
         },
       });
     } catch (error) {
-      console.error("Error finding user by email:", error);
+      logger.error("Error finding user by email", { error });
       throw new Error(
         `Failed to find user by email: ${
           error instanceof Error ? error.message : "Unknown error"

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { container } from "../container";
+import logger from "../utils/logger";
 import { IUserService } from "../interfaces/services/IUserService";
 import { IAuthService } from "../interfaces/services/IAuthService";
 import { LoginRequest } from "../types/auth.types";
@@ -76,9 +77,8 @@ export class UserController {
       }
 
       const refreshToken = authHeader.substring(7); // Remove 'Bearer ' prefix
-      const result = await UserController.authService.refreshToken(
-        refreshToken
-      );
+      const result =
+        await UserController.authService.refreshToken(refreshToken);
 
       res.json({
         success: true,
@@ -172,9 +172,8 @@ export class UserController {
         return;
       }
 
-      const profile = await UserController.userService.getPublicProfileByEmail(
-        email
-      );
+      const profile =
+        await UserController.userService.getPublicProfileByEmail(email);
 
       res.status(200).json({
         success: true,
@@ -206,7 +205,7 @@ export class UserController {
       return;
     }
 
-    console.error(`${operation} error:`, error);
+    logger.error(`${operation} error`, { error });
     res.status(500).json({
       success: false,
       message: "Internal server error",

@@ -5,7 +5,7 @@ import { ITemplateService } from "../interfaces/services/ITemplateService";
 import { IUserServiceClient } from "../interfaces/services/IUserServiceClient";
 import { WorkspaceInviteCreatedEvent } from "../types/events";
 import { WorkspaceInviteEmailData } from "../types/email";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * Invite Event Handler

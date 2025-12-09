@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { injectable, inject } from "tsyringe";
 import { validate as isUUID } from "uuid";
+import logger from "../utils/logger";
 import { IMessageService } from "../interfaces/services/IMessageService";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
 import { MessageServiceError } from "../utils/errors";
@@ -34,6 +35,12 @@ export class MessageController {
 
       // Validate request (throws if invalid)
       this.validateSendMessageRequest(workspaceId, channelId, content);
+
+      logger.info(`Sending message to channel`, {
+        workspaceId,
+        channelId,
+        userId,
+      });
 
       // Call service layer
       const messageWithAuthor = await this.messageService.sendMessage(
@@ -248,7 +255,7 @@ export class MessageController {
    * Handle errors and send appropriate HTTP responses
    */
   private handleError(error: unknown, res: Response): void {
-    console.error("Controller error:", error);
+    logger.error("Controller error:", error);
 
     // Handle MessageServiceError
     if (error instanceof MessageServiceError) {

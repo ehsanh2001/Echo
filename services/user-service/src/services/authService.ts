@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { injectable, inject } from "tsyringe";
 import { config } from "../config/env";
+import logger from "../utils/logger";
 import { User, UserProfile } from "../types/user.types";
 import {
   LoginRequest,
@@ -57,6 +58,7 @@ export class AuthService implements IAuthService {
   async loginUser(data: LoginRequest): Promise<LoginResponse> {
     try {
       const user = await this.findAndValidateUser(data);
+      logger.debug("Verifying password for login", { userId: user.id });
       await this.verifyPassword(data.password, user.passwordHash!);
 
       const { access_token, refresh_token, expires_in } =
@@ -64,7 +66,7 @@ export class AuthService implements IAuthService {
 
       await this.updateLastSeen(user.id);
 
-      console.log(`User logged in: ${user.email} (${user.id})`);
+      logger.info("User logged in", { userId: user.id, email: user.email });
 
       return {
         access_token,
@@ -76,7 +78,7 @@ export class AuthService implements IAuthService {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Login error:", error);
+      logger.error("Login error", { error });
       throw new UserServiceError("Login failed", "LOGIN_FAILED", 500);
     }
   }
@@ -109,12 +111,14 @@ export class AuthService implements IAuthService {
       ) as JwtPayload;
       const { userId } = payload;
 
+      logger.info("Refreshing access token", { userId });
       await this.validateRefreshToken(userId, refreshToken);
 
       const user = await this.findActiveUser(userId);
       const { access_token, refresh_token, expires_in } =
         await this.generateAndStoreTokens(user);
 
+      logger.debug("Token refresh successful", { userId });
       return {
         access_token,
         refresh_token,
@@ -124,7 +128,7 @@ export class AuthService implements IAuthService {
       if (error instanceof UserServiceError) {
         throw error;
       }
-      console.error("Token refresh error:", error);
+      logger.error("Token refresh error", { error });
       throw new UserServiceError("Token refresh failed", "REFRESH_FAILED", 500);
     }
   }
@@ -152,9 +156,9 @@ export class AuthService implements IAuthService {
       // Remove refresh token from Redis
       await redisService.removeRefreshToken(userId);
 
-      console.log(`User logged out: ${userId}`);
+      logger.info("User logged out", { userId });
     } catch (error) {
-      console.error("Logout error:", error);
+      logger.error("Logout error", { error });
       throw new UserServiceError("Logout failed", "LOGOUT_FAILED", 500);
     }
   }

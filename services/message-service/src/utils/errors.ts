@@ -1,3 +1,5 @@
+import logger from "./logger";
+
 /**
  * Custom error class for message-service operations
  * Follows the same pattern as workspace-channel-service for consistency
@@ -123,8 +125,7 @@ export class MessageServiceError extends Error {
     logContext: string,
     internalDetails: Record<string, any>
   ) {
-    // TODO: Replace console.error with proper logger (Winston, Pino, etc.)
-    console.error(`Database error in ${logContext}:`, internalDetails);
+    logger.error(`Database error in ${logContext}`, internalDetails);
 
     return new MessageServiceError(publicMessage, "DATABASE_ERROR", 500);
   }
@@ -141,8 +142,7 @@ export class MessageServiceError extends Error {
     logContext: string,
     internalDetails: Record<string, any>
   ) {
-    // TODO: Replace console.error with proper logger (Winston, Pino, etc.)
-    console.error(`Validation error in ${logContext}:`, internalDetails);
+    logger.warn(`Validation error in ${logContext}`, internalDetails);
 
     return new MessageServiceError(publicMessage, "VALIDATION_ERROR", 400);
   }

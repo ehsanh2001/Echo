@@ -43,6 +43,7 @@ const getRequiredEnv = (key: string): string => {
 const getOptionalEnv = (key: string, defaultValue: string): string => {
   const value = process.env[key];
   if (!value) {
+    // Note: console.log is acceptable here - runs at module load time before logger is initialized
     console.log(
       `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`
     );
@@ -229,6 +230,7 @@ export function validateConfig() {
     );
   }
 
+  // Note: console.log is acceptable here - runs at module load time before logger is initialized
   // Log successful configuration
   console.log(
     `Config loaded - Environment: ${config.nodeEnv}, Port: ${config.port}`

@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import axios, { AxiosInstance, AxiosError } from "axios";
+import logger from "../utils/logger";
 import { IWorkspaceChannelServiceClient } from "../interfaces/external/IWorkspaceChannelServiceClient";
 import { ICacheService } from "../interfaces/services/ICacheService";
 import {
@@ -15,9 +16,7 @@ import { MessageServiceError } from "../utils/errors";
  * Handles channel membership checks with caching via CacheService
  */
 @injectable()
-export class WorkspaceChannelServiceClient
-  implements IWorkspaceChannelServiceClient
-{
+export class WorkspaceChannelServiceClient implements IWorkspaceChannelServiceClient {
   private readonly httpClient: AxiosInstance;
   private readonly cache: ICacheService;
   private readonly baseUrl: string;
@@ -38,7 +37,7 @@ export class WorkspaceChannelServiceClient
       },
     });
 
-    console.log(
+    logger.info(
       `WorkspaceChannelServiceClient initialized with base URL: ${this.baseUrl}`
     );
   }
@@ -63,13 +62,13 @@ export class WorkspaceChannelServiceClient
       const cachedMember = await this.cache.get<ChannelMember>(cacheKey);
 
       if (cachedMember) {
-        console.log(
+        logger.info(
           `Cache hit for channel member: ${workspaceId}/${channelId}/${userId}`
         );
         return cachedMember;
       }
 
-      console.log(
+      logger.info(
         `Cache miss for channel member: ${workspaceId}/${channelId}/${userId}, fetching from service`
       );
 
@@ -87,7 +86,7 @@ export class WorkspaceChannelServiceClient
 
       return member;
     } catch (error) {
-      console.error(
+      logger.error(
         `Error getting channel member for ${workspaceId}/${channelId}/${userId}:`,
         error
       );
@@ -122,7 +121,7 @@ export class WorkspaceChannelServiceClient
     ) {
       try {
         if (attempt > 0) {
-          console.log(
+          logger.info(
             `Retrying channel member fetch for ${workspaceId}/${channelId}/${userId}, attempt ${
               attempt + 1
             }`
@@ -160,7 +159,7 @@ export class WorkspaceChannelServiceClient
 
           // 4xx status codes: User not found or client error - don't retry
           if (status && status >= 400 && status < 500) {
-            console.log(
+            logger.info(
               `Channel member not found or client error (${status}): ${workspaceId}/${channelId}/${userId}`
             );
             return null;
@@ -168,7 +167,7 @@ export class WorkspaceChannelServiceClient
 
           // 5xx status codes: Server error - retry
           if (status && status >= 500) {
-            console.error(
+            logger.error(
               `Workspace-channel service server error (${status}) - attempt ${
                 attempt + 1
               }:`,
@@ -184,7 +183,7 @@ export class WorkspaceChannelServiceClient
           }
 
           // Other HTTP errors (network, timeout, etc.) - retry
-          console.error(
+          logger.error(
             `Workspace-channel service request failed (attempt ${
               attempt + 1
             }):`,
@@ -197,7 +196,7 @@ export class WorkspaceChannelServiceClient
             }
           );
         } else {
-          console.error(`Non-HTTP error fetching channel member:`, error);
+          logger.error(`Non-HTTP error fetching channel member:`, error);
         }
       }
     }

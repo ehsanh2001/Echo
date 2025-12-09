@@ -3,14 +3,22 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config/env";
+import logger from "./utils/logger";
 import "./container"; // Auto-configure dependency injection
 import { container } from "./container";
 import { IOutboxPublisher } from "./interfaces/workers/IOutboxPublisher";
 
 const prisma = new PrismaClient();
 const app = express();
+
+// Correlation middleware - MUST BE FIRST
+app.use(correlationMiddleware("workspace-channel-service"));
+
+// HTTP request logging with correlation context
+app.use(createHttpLogger(logger));
 
 // Security middleware
 app.use(helmet());

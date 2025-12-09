@@ -1,5 +1,6 @@
 import { injectable } from "tsyringe";
 import { createClient, RedisClientType } from "redis";
+import logger from "../utils/logger";
 import { ICacheService } from "../interfaces/services/ICacheService";
 import { config } from "../config/env";
 
@@ -23,15 +24,17 @@ export class CacheService implements ICacheService {
 
     // Set up event listeners
     this.redis.on("error", (err) => {
-      console.error("Redis connection error:", err);
+      logger.error("Redis connection error:", err);
     });
 
     this.redis.on("connect", () => {
-      console.log("Redis connected successfully");
+      logger.info("Redis connected successfully");
     });
 
     // Connect to Redis
-    this.redis.connect().catch(console.error);
+    this.redis
+      .connect()
+      .catch((err) => logger.error("Redis connect error:", err));
   }
 
   /**
@@ -49,7 +52,7 @@ export class CacheService implements ICacheService {
       const parsed = JSON.parse(cachedValue);
       return parsed as T;
     } catch (error) {
-      console.error(`Cache get error for key ${key}:`, error);
+      logger.error(`Cache get error for key ${key}:`, error);
       return null;
     }
   }
@@ -62,7 +65,7 @@ export class CacheService implements ICacheService {
       const serializedValue = JSON.stringify(value);
       await this.redis.setEx(key, ttlSeconds, serializedValue);
     } catch (error) {
-      console.error(`Cache set error for key ${key}:`, error);
+      logger.error(`Cache set error for key ${key}:`, error);
       // Don't throw - cache failures should not break the application
     }
   }
@@ -75,7 +78,7 @@ export class CacheService implements ICacheService {
       const result = await this.redis.del(key);
       return result > 0;
     } catch (error) {
-      console.error(`Cache delete error for key ${key}:`, error);
+      logger.error(`Cache delete error for key ${key}:`, error);
       return false;
     }
   }
@@ -88,7 +91,7 @@ export class CacheService implements ICacheService {
       const result = await this.redis.exists(key);
       return result > 0;
     } catch (error) {
-      console.error(`Cache exists error for key ${key}:`, error);
+      logger.error(`Cache exists error for key ${key}:`, error);
       return false;
     }
   }
@@ -113,12 +116,12 @@ export class CacheService implements ICacheService {
           const parsed = JSON.parse(value);
           return parsed as T;
         } catch (error) {
-          console.error(`Error deserializing cached value:`, error);
+          logger.error(`Error deserializing cached value:`, error);
           return null;
         }
       });
     } catch (error) {
-      console.error(
+      logger.error(
         `Cache getMultiple error for keys ${keys.join(", ")}:`,
         error
       );
@@ -148,7 +151,7 @@ export class CacheService implements ICacheService {
 
       await pipeline.exec();
     } catch (error) {
-      console.error(`Cache setMultiple error:`, error);
+      logger.error(`Cache setMultiple error:`, error);
       // Don't throw - cache failures should not break the application
     }
   }

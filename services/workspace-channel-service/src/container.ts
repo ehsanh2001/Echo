@@ -78,6 +78,7 @@ container.registerSingleton<IOutboxPublisher>(
   OutboxPublisher
 );
 
-console.log("✅ Dependency injection container configured");
+// Note: Module load-time setup - logger not yet initialized, so we skip logging here
+// Container configuration is validated through TypeScript type checking
 
 export { container };

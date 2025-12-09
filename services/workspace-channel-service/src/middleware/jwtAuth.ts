@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { updateContext } from "@echo/correlation";
 import { config } from "../config/env";
+import logger from "../utils/logger";
 import { JwtPayload } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 
@@ -116,7 +118,7 @@ function handleAuthError(error: unknown, res: Response): void {
       timestamp: new Date().toISOString(),
     });
   } else {
-    console.error("Unexpected error in JWT middleware:", error);
+    logger.error("Unexpected error in JWT middleware", { error });
     res.status(500).json({
       error: "INTERNAL_SERVER_ERROR",
       message: "Authentication failed due to server error",
@@ -144,9 +146,13 @@ export function jwtAuth(req: Request, res: Response, next: NextFunction): void {
     // Attach user to request
     (req as AuthenticatedRequest).user = userPayload;
 
-    console.log(
-      `🔐 Authenticated user: ${userPayload.email} (${userPayload.userId})`
-    );
+    // Update correlation context with userId for all subsequent logs
+    updateContext({ userId: userPayload.userId });
+
+    logger.debug("User authenticated successfully", {
+      email: userPayload.email,
+      userId: userPayload.userId,
+    });
 
     next();
   } catch (error) {

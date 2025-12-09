@@ -2,11 +2,19 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
 import { config } from "./config/env";
+import logger from "./utils/logger";
 import userRoutes from "./routes/userRoutes";
 import { prisma } from "./config/prisma";
 
 const app = express();
+
+// Correlation middleware - MUST BE FIRST
+app.use(correlationMiddleware("user-service"));
+
+// HTTP request logging with correlation context
+app.use(createHttpLogger(logger));
 
 app.use(helmet());
 app.use(cors());
@@ -45,7 +53,12 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    console.error("Unhandled error:", err);
+    logger.error("Unhandled error", {
+      error: err.message,
+      stack: err.stack,
+      path: req.path,
+      method: req.method,
+    });
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -56,25 +69,25 @@ app.use(
 async function startServer() {
   try {
     await prisma.$connect();
-    console.log("✅ Database connection established successfully");
+    logger.info("Database connection established successfully");
 
     app.listen(config.port, () => {
-      console.log(`User Service running on port ${config.port}`);
+      logger.info(`User Service running on port ${config.port}`);
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    logger.error("Failed to start server", { error });
     process.exit(1);
   }
 }
 
 process.on("SIGTERM", async () => {
-  console.log("SIGTERM received, shutting down gracefully");
+  logger.info("SIGTERM received, shutting down gracefully");
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
-  console.log("SIGINT received, shutting down gracefully");
+  logger.info("SIGINT received, shutting down gracefully");
   await prisma.$disconnect();
   process.exit(0);
 });

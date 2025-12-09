@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
+import { updateContext } from "@echo/correlation";
 import { JWTService } from "../utils/jwt";
 import { JwtPayload, TokenType } from "../types/jwt.types";
 import { UserServiceError } from "../types/error.types";
+import logger from "../utils/logger";
 
 /**
  * Extended Express Request interface to include authenticated user information
@@ -158,7 +160,10 @@ const getJwtError = (
   }
 
   // Handle other errors
-  console.error("JWT validation error:", error);
+  logger.error("JWT validation error", {
+    error: error.message,
+    stack: error.stack,
+  });
   return {
     status: 401,
     message: "Authentication failed",
@@ -217,6 +222,10 @@ export const jwtAuth = (
 
   // Transform Request to AuthenticatedRequest by adding user property
   (req as AuthenticatedRequest).user = validationResult.user;
+
+  // Update correlation context with user ID
+  updateContext({ userId: validationResult.user!.userId });
+
   next();
 };
 
@@ -251,6 +260,10 @@ export const jwtRefreshAuth = (
 
   // Transform Request to AuthenticatedRequest by adding user property
   (req as AuthenticatedRequest).user = validationResult.user;
+
+  // Update correlation context with user ID
+  updateContext({ userId: validationResult.user!.userId });
+
   next();
 };
 

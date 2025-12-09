@@ -1,7 +1,8 @@
 import "reflect-metadata";
 import express, { Request, Response } from "express";
+import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
 import { config } from "./config/env";
-import { logger } from "./config/logger";
+import logger from "./utils/logger";
 import { container } from "./container";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { ITemplateService } from "./interfaces/services/ITemplateService";
@@ -9,6 +10,8 @@ import { ITemplateService } from "./interfaces/services/ITemplateService";
 const app = express();
 
 // Middleware
+app.use(correlationMiddleware("notification-service")); // FIRST middleware - sets up correlation context
+app.use(createHttpLogger(logger)); // HTTP request logging
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

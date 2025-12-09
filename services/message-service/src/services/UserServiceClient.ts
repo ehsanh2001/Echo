@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import axios, { AxiosInstance, AxiosError } from "axios";
+import logger from "../utils/logger";
 import { IUserServiceClient } from "../interfaces/external/IUserServiceClient";
 import { ICacheService } from "../interfaces/services/ICacheService";
 import { UserProfile, UserServiceResponse } from "../types";
@@ -32,7 +33,7 @@ export class UserServiceClient implements IUserServiceClient {
       },
     });
 
-    console.log(`UserServiceClient initialized with baseUrl: ${this.baseUrl}`);
+    logger.info(`UserServiceClient initialized with baseUrl: ${this.baseUrl}`);
   }
 
   /**
@@ -45,11 +46,11 @@ export class UserServiceClient implements IUserServiceClient {
       const cachedProfile = await this.cache.get<UserProfile>(cacheKey);
 
       if (cachedProfile) {
-        console.log(`Cache hit for user profile: ${userId}`);
+        logger.info(`Cache hit for user profile: ${userId}`);
         return cachedProfile;
       }
 
-      console.log(
+      logger.info(
         `Cache miss for user profile: ${userId}, fetching from service`
       );
 
@@ -63,7 +64,7 @@ export class UserServiceClient implements IUserServiceClient {
 
       return profile;
     } catch (error) {
-      console.error(`Error getting user profile for ${userId}:`, error);
+      logger.error(`Error getting user profile for ${userId}:`, error);
 
       if (error instanceof MessageServiceError) {
         throw error;
@@ -93,7 +94,7 @@ export class UserServiceClient implements IUserServiceClient {
     ) {
       try {
         if (attempt > 0) {
-          console.log(
+          logger.info(
             `Retrying user profile fetch for ${userId}, attempt ${attempt + 1}`
           );
           await this.delay(config.externalServices.retryDelay);
@@ -128,7 +129,7 @@ export class UserServiceClient implements IUserServiceClient {
 
           // 4xx status codes: User not found or client error - don't retry
           if (status && status >= 400 && status < 500) {
-            console.log(
+            logger.info(
               `User not found or client error (${status}): ${userId}`
             );
             return null;
@@ -136,7 +137,7 @@ export class UserServiceClient implements IUserServiceClient {
 
           // 5xx status codes: Server error - retry
           if (status && status >= 500) {
-            console.error(
+            logger.error(
               `User service server error (${status}) - attempt ${attempt + 1}:`,
               {
                 status,
@@ -148,7 +149,7 @@ export class UserServiceClient implements IUserServiceClient {
           }
 
           // Other HTTP errors (network, timeout, etc.) - retry
-          console.error(
+          logger.error(
             `User service request failed (attempt ${attempt + 1}):`,
             {
               status,
@@ -157,7 +158,7 @@ export class UserServiceClient implements IUserServiceClient {
             }
           );
         } else {
-          console.error(`Non-HTTP error fetching user profile:`, error);
+          logger.error(`Non-HTTP error fetching user profile:`, error);
         }
       }
     }

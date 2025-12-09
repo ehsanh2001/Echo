@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { IEmailService } from "../interfaces/services/IEmailService";
 import { SendEmailRequest, SendEmailResult } from "../types/email";
 import { config } from "../config/env";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * Email service using Resend API

@@ -4,6 +4,8 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
+import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
+import logger from "./utils/logger";
 import { config } from "./config/env";
 import { container } from "./container"; // Auto-configure dependency injection
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
@@ -11,6 +13,10 @@ import { messageRoutes } from "./routes/messageRoutes";
 
 const prisma = new PrismaClient();
 const app = express();
+
+// Correlation middleware (MUST be first)
+app.use(correlationMiddleware("message-service"));
+app.use(createHttpLogger(logger));
 
 // Security middleware
 app.use(helmet());
@@ -43,7 +49,7 @@ app.get("/health", async (req, res) => {
 
     res.status(200).json(healthInfo);
   } catch (error) {
-    console.error("Health check failed:", error);
+    logger.error("Health check failed:", error);
 
     const unhealthyInfo = {
       ...healthInfo,
@@ -75,7 +81,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    console.error("Unhandled error:", error);
+    logger.error("Unhandled error:", error);
 
     res.status(500).json({
       error: "Internal Server Error",
@@ -93,40 +99,40 @@ const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
-    console.log("✅ Database connected");
+    logger.info("✅ Database connected");
 
     const server = app.listen(config.port, () => {
-      console.log(`🚀 ${config.service.name} running on port ${config.port}`);
-      console.log(`📊 Environment: ${config.nodeEnv}`);
-      console.log(`🏥 Health check: http://localhost:${config.port}/health`);
+      logger.info(`🚀 ${config.service.name} running on port ${config.port}`);
+      logger.info(`📊 Environment: ${config.nodeEnv}`);
+      logger.info(`🏥 Health check: http://localhost:${config.port}/health`);
     });
 
     // Graceful shutdown
     const gracefulShutdown = async (signal: string) => {
-      console.log(`\n${signal} received. Starting graceful shutdown...`);
+      logger.info(`\n${signal} received. Starting graceful shutdown...`);
 
       server.close(async () => {
-        console.log("✅ HTTP server closed");
+        logger.info("✅ HTTP server closed");
 
         try {
           // Get RabbitMQ service for cleanup
           const rabbitMQService =
             container.resolve<IRabbitMQService>("IRabbitMQService");
           await rabbitMQService.close();
-          console.log("✅ RabbitMQ disconnected");
+          logger.info("✅ RabbitMQ disconnected");
 
           await prisma.$disconnect();
-          console.log("✅ Database disconnected");
+          logger.info("✅ Database disconnected");
           process.exit(0);
         } catch (error) {
-          console.error("❌ Error during shutdown:", error);
+          logger.error("❌ Error during shutdown:", error);
           process.exit(1);
         }
       });
 
       // Force shutdown after 10 seconds
       setTimeout(() => {
-        console.error("⚠️  Forcing shutdown after timeout");
+        logger.error("⚠️  Forcing shutdown after timeout");
         process.exit(1);
       }, 10000);
     };
@@ -134,7 +140,7 @@ const startServer = async () => {
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    logger.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 };

@@ -1,5 +1,6 @@
 import { injectable } from "tsyringe";
 import amqp from "amqplib";
+import logger from "../utils/logger";
 import {
   IRabbitMQService,
   MessageCreatedEvent,
@@ -36,7 +37,7 @@ export class RabbitMQService implements IRabbitMQService {
     }
 
     try {
-      console.log("🔌 Connecting to RabbitMQ...");
+      logger.info("🔌 Connecting to RabbitMQ...");
 
       // Create connection
       const conn = await amqp.connect(config.rabbitmq.url);
@@ -44,13 +45,13 @@ export class RabbitMQService implements IRabbitMQService {
 
       // Handle connection errors
       conn.on("error", (error) => {
-        console.error("❌ RabbitMQ connection error:", error);
+        logger.error("❌ RabbitMQ connection error:", error);
         this.handleConnectionClose();
       });
 
       // Handle connection close
       conn.on("close", () => {
-        console.warn("⚠️  RabbitMQ connection closed");
+        logger.warn("⚠️  RabbitMQ connection closed");
         this.handleConnectionClose();
       });
 
@@ -60,12 +61,12 @@ export class RabbitMQService implements IRabbitMQService {
 
       // Handle channel errors
       ch.on("error", (error) => {
-        console.error("❌ RabbitMQ channel error:", error);
+        logger.error("❌ RabbitMQ channel error:", error);
       });
 
       // Handle channel close
       ch.on("close", () => {
-        console.warn("⚠️  RabbitMQ channel closed");
+        logger.warn("⚠️  RabbitMQ channel closed");
       });
 
       // Declare exchange (idempotent - safe to call multiple times)
@@ -73,11 +74,11 @@ export class RabbitMQService implements IRabbitMQService {
         durable: true, // Exchange survives broker restart
       });
 
-      console.log(
+      logger.info(
         `✅ RabbitMQ connected - Exchange: ${this.exchangeName} (${this.exchangeType})`
       );
     } catch (error) {
-      console.error("❌ Failed to connect to RabbitMQ:", error);
+      logger.error("❌ Failed to connect to RabbitMQ:", error);
       this.handleConnectionClose();
       throw new Error(
         `Failed to connect to RabbitMQ: ${
@@ -120,12 +121,12 @@ export class RabbitMQService implements IRabbitMQService {
         );
       }
 
-      console.log(`📤 Published message event - Routing key: ${routingKey}`);
+      logger.info(`📤 Published message event - Routing key: ${routingKey}`);
     } catch (error) {
-      console.error(`❌ Failed to publish message event:`, error);
+      logger.error(`❌ Failed to publish message event:`, error);
 
       // Don't throw - message creation should succeed even if event publish fails
-      console.warn(
+      logger.warn(
         "⚠️  Message event publishing failed, but message was created successfully"
       );
     }
@@ -136,7 +137,7 @@ export class RabbitMQService implements IRabbitMQService {
    */
   async close(): Promise<void> {
     try {
-      console.log("🔌 Disconnecting from RabbitMQ...");
+      logger.info("🔌 Disconnecting from RabbitMQ...");
 
       if (this.channel) {
         await this.channel.close();
@@ -148,9 +149,9 @@ export class RabbitMQService implements IRabbitMQService {
         this.connection = null;
       }
 
-      console.log("✅ RabbitMQ disconnected");
+      logger.info("✅ RabbitMQ disconnected");
     } catch (error) {
-      console.error("❌ Error during RabbitMQ disconnect:", error);
+      logger.error("❌ Error during RabbitMQ disconnect:", error);
       // Force cleanup even if close fails
       this.channel = null;
       this.connection = null;

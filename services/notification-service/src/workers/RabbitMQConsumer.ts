@@ -1,5 +1,7 @@
 import { injectable, inject } from "tsyringe";
 import amqp from "amqplib";
+import { v4 as uuidv4 } from "uuid";
+import { requestContext } from "@echo/correlation";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import { IInviteEventHandler } from "../interfaces/handlers/IInviteEventHandler";
 import {
@@ -7,7 +9,7 @@ import {
   WorkspaceInviteCreatedEvent,
 } from "../types/events";
 import { config } from "../config/env";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * RabbitMQ Consumer for Notification Service
@@ -143,23 +145,35 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       // Parse event payload
       const event: NotificationEvent = JSON.parse(msg.content.toString());
 
-      logger.info("📥 Received RabbitMQ event", {
-        eventId: event.eventId,
-        eventType: event.eventType,
-        routingKey: msg.fields.routingKey,
-        timestamp: event.timestamp,
-      });
+      // Extract correlationId from event or generate new one
+      const correlationId = event.correlationId || uuidv4();
 
-      // Route event to appropriate handler
-      await this.routeEvent(event);
+      // Run message processing in correlation context
+      await requestContext.run(
+        { correlationId, timestamp: new Date() },
+        async () => {
+          logger.info("📥 Received RabbitMQ event", {
+            eventId: event.eventId,
+            eventType: event.eventType,
+            routingKey: msg.fields.routingKey,
+            timestamp: event.timestamp,
+            correlationId,
+          });
 
-      // Acknowledge message after successful processing
-      this.channel.ack(msg);
+          // Route event to appropriate handler
+          await this.routeEvent(event);
 
-      logger.debug("✅ Message acknowledged", {
-        eventId: event.eventId,
-        eventType: event.eventType,
-      });
+          // Acknowledge message after successful processing
+          if (this.channel) {
+            this.channel.ack(msg);
+          }
+
+          logger.debug("✅ Message acknowledged", {
+            eventId: event.eventId,
+            eventType: event.eventType,
+          });
+        }
+      );
     } catch (error) {
       logger.error("❌ Error processing RabbitMQ message", {
         error,

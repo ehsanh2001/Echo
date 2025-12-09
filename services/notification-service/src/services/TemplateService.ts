@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import Handlebars from "handlebars";
 import { ITemplateService } from "../interfaces/services/ITemplateService";
-import { logger } from "../config/logger";
+import logger from "../utils/logger";
 
 /**
  * Template service using Handlebars

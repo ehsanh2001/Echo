@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import { PrismaClient, OutboxEvent } from "@prisma/client";
+import logger from "../utils/logger";
 import { IOutboxPublisher } from "../interfaces/workers/IOutboxPublisher";
 import {
   IOutboxRepository,
@@ -46,22 +47,23 @@ export class OutboxPublisher implements IOutboxPublisher {
    */
   async start(): Promise<void> {
     if (this.running) {
-      console.log("⚠️  Outbox publisher already running");
+      logger.warn("Outbox publisher already running");
       return;
     }
 
     this.running = true;
     this.shutdownRequested = false;
 
-    console.log("🚀 Starting Outbox Publisher Worker...");
-    console.log(`   Poll Interval: ${config.worker.pollIntervalMs}ms`);
-    console.log(`   Batch Size: ${config.worker.batchSize}`);
-    console.log(`   Max Retries: ${config.worker.maxRetries}`);
+    logger.info("Starting Outbox Publisher Worker", {
+      pollIntervalMs: config.worker.pollIntervalMs,
+      batchSize: config.worker.batchSize,
+      maxRetries: config.worker.maxRetries,
+    });
 
     // Start polling loop
     this.startPolling();
 
-    console.log("✅ Outbox Publisher Worker started");
+    logger.info("Outbox Publisher Worker started");
   }
 
   /**
@@ -69,11 +71,11 @@ export class OutboxPublisher implements IOutboxPublisher {
    */
   async stop(): Promise<void> {
     if (!this.running) {
-      console.log("⚠️  Outbox publisher not running");
+      logger.warn("Outbox publisher not running");
       return;
     }
 
-    console.log("🛑 Stopping Outbox Publisher Worker...");
+    logger.info("Stopping Outbox Publisher Worker");
     this.shutdownRequested = true;
 
     // Stop polling timer
@@ -88,9 +90,9 @@ export class OutboxPublisher implements IOutboxPublisher {
 
     while (this.processingBatch) {
       if (Date.now() - startTime > shutdownTimeout) {
-        console.warn(
-          `⚠️  Shutdown timeout (${shutdownTimeout}ms) exceeded, forcing shutdown`
-        );
+        logger.warn("Shutdown timeout exceeded, forcing shutdown", {
+          shutdownTimeoutMs: shutdownTimeout,
+        });
         break;
       }
       // Wait a bit before checking again
@@ -101,7 +103,7 @@ export class OutboxPublisher implements IOutboxPublisher {
     await this.rabbitMQService.disconnect();
 
     this.running = false;
-    console.log("✅ Outbox Publisher Worker stopped");
+    logger.info("Outbox Publisher Worker stopped");
   }
 
   /**
@@ -124,7 +126,7 @@ export class OutboxPublisher implements IOutboxPublisher {
       try {
         await this.processBatch();
       } catch (error) {
-        console.error("❌ Error in polling cycle:", error);
+        logger.error("Error in polling cycle", { error });
       }
 
       // Schedule next poll if still running
@@ -164,7 +166,9 @@ export class OutboxPublisher implements IOutboxPublisher {
             return { publishedCount: 0, failedCount: 0 };
           }
 
-          console.log(`📦 Processing batch: ${events.length} pending events`);
+          logger.info("Processing outbox event batch", {
+            eventCount: events.length,
+          });
 
           let publishedCount = 0;
           let failedCount = 0;
@@ -175,10 +179,11 @@ export class OutboxPublisher implements IOutboxPublisher {
               await this.processEvent(event, tx);
               publishedCount++;
             } catch (error) {
-              console.error(
-                `❌ Failed to process event ${event.id}:`,
-                error instanceof Error ? error.message : error
-              );
+              logger.error("Failed to process outbox event", {
+                eventId: event.id,
+                eventType: event.eventType,
+                error: error instanceof Error ? error.message : error,
+              });
               failedCount++;
               // Continue processing other events even if one fails
             }
@@ -192,12 +197,13 @@ export class OutboxPublisher implements IOutboxPublisher {
       );
 
       if (result.publishedCount > 0 || result.failedCount > 0) {
-        console.log(
-          `✅ Batch complete: ${result.publishedCount} published, ${result.failedCount} failed`
-        );
+        logger.info("Outbox batch processing complete", {
+          publishedCount: result.publishedCount,
+          failedCount: result.failedCount,
+        });
       }
     } catch (error) {
-      console.error("❌ Error processing batch:", error);
+      logger.error("Error processing outbox batch", { error });
     } finally {
       this.processingBatch = false;
     }
@@ -233,9 +239,11 @@ export class OutboxPublisher implements IOutboxPublisher {
       // Mark as published in the same transaction
       await this.outboxRepository.markPublished(tx, event.id);
 
-      console.log(
-        `✅ Published event ${event.id} (${event.eventType}) - Routing key: ${routingKey}`
-      );
+      logger.debug("Outbox event published successfully", {
+        eventId: event.id,
+        eventType: event.eventType,
+        routingKey,
+      });
     } catch (error) {
       // Mark as failed in the same transaction
       await this.outboxRepository.markFailed(tx, event.id);
