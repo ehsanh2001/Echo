@@ -36,8 +36,6 @@ export class UserServiceClient implements IUserServiceClient {
    */
   async getUserById(userId: string): Promise<UserProfile | null> {
     try {
-      logger.debug("Fetching user from user-service", { userId });
-
       const response = await this.httpClient.get<
         UserServiceResponse<UserProfile>
       >(`${this.baseURL}/api/users/${userId}`);
@@ -45,27 +43,9 @@ export class UserServiceClient implements IUserServiceClient {
       // Extract user from response wrapper
       const user = response.data.data;
 
-      logger.debug("User fetched successfully", {
-        userId,
-        displayName: user.displayName,
-      });
-
       return user;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        logger.warn("Failed to fetch user from user-service", {
-          userId,
-          status: error.response?.status,
-          message: error.message,
-        });
-      } else {
-        logger.warn("Unexpected error fetching user", {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      // Return null on error - caller should handle fallback
+      // http-client already logs errors, just return null for fallback
       return null;
     }
   }

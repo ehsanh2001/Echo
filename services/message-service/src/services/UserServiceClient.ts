@@ -64,8 +64,6 @@ export class UserServiceClient implements IUserServiceClient {
 
       return profile;
     } catch (error) {
-      logger.error(`Error getting user profile for ${userId}:`, error);
-
       if (error instanceof MessageServiceError) {
         throw error;
       }
@@ -94,9 +92,6 @@ export class UserServiceClient implements IUserServiceClient {
     ) {
       try {
         if (attempt > 0) {
-          logger.info(
-            `Retrying user profile fetch for ${userId}, attempt ${attempt + 1}`
-          );
           await this.delay(config.externalServices.retryDelay);
         }
 

@@ -86,11 +86,6 @@ export class WorkspaceChannelServiceClient implements IWorkspaceChannelServiceCl
 
       return member;
     } catch (error) {
-      logger.error(
-        `Error getting channel member for ${workspaceId}/${channelId}/${userId}:`,
-        error
-      );
-
       if (error instanceof MessageServiceError) {
         throw error;
       }
@@ -121,11 +116,6 @@ export class WorkspaceChannelServiceClient implements IWorkspaceChannelServiceCl
     ) {
       try {
         if (attempt > 0) {
-          logger.info(
-            `Retrying channel member fetch for ${workspaceId}/${channelId}/${userId}, attempt ${
-              attempt + 1
-            }`
-          );
           await this.delay(config.externalServices.retryDelay);
         }
 
