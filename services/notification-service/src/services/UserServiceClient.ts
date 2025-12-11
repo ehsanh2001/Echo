@@ -1,10 +1,8 @@
 import { injectable } from "tsyringe";
-import axios from "axios";
 import { createHttpClient } from "@echo/http-client";
 import { IUserServiceClient } from "../interfaces/services/IUserServiceClient";
 import { UserProfile, UserServiceResponse } from "../types/email";
 import { config } from "../config/env";
-import logger from "../utils/logger";
 
 /**
  * User service client

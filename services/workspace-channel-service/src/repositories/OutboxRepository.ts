@@ -1,5 +1,6 @@
 import { injectable } from "tsyringe";
 import { PrismaClient, OutboxEvent, OutboxStatus } from "@prisma/client";
+import logger from "../utils/logger";
 import {
   IOutboxRepository,
   PrismaTransaction,
@@ -241,7 +242,7 @@ export class OutboxRepository implements IOutboxRepository {
     eventData?: CreateOutboxEventData,
     eventId?: string
   ): never {
-    console.error("Error in outbox operation:", error);
+    logger.error("Error in outbox operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {

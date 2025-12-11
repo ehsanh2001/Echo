@@ -1,6 +1,7 @@
 import { injectable, inject } from "tsyringe";
 import { Workspace, Invite } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
+import logger from "../utils/logger";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
@@ -53,7 +54,7 @@ export class WorkspaceService implements IWorkspaceService {
     request: CreateWorkspaceRequest
   ): Promise<WorkspaceResponse> {
     try {
-      console.log(`📝 Creating workspace for user: ${userId}`);
+      logger.info(`📝 Creating workspace for user: ${userId}`);
 
       // Validate request data
       await this.validateWorkspaceCreationRequest(request);
@@ -70,7 +71,7 @@ export class WorkspaceService implements IWorkspaceService {
         userId
       );
 
-      console.log(
+      logger.info(
         `✅ Workspace created successfully: ${workspace.name} (${workspace.id})`
       );
 
@@ -79,7 +80,7 @@ export class WorkspaceService implements IWorkspaceService {
       if (error instanceof WorkspaceChannelServiceError) {
         throw error;
       }
-      console.error("Error creating workspace:", error);
+      logger.error("Error creating workspace:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to create workspace due to unexpected error"
       );
@@ -100,7 +101,7 @@ export class WorkspaceService implements IWorkspaceService {
         await this.workspaceRepository.findByName(sanitizedName);
       return existingWorkspace === null;
     } catch (error) {
-      console.error("Error checking workspace name availability:", error);
+      logger.error("Error checking workspace name availability:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to check name availability"
       );
@@ -156,9 +157,9 @@ export class WorkspaceService implements IWorkspaceService {
 
       // If userInfo is null, it means user-service was down but we're proceeding
       if (userInfo !== null) {
-        console.log(`✅ User verified: ${userInfo.email}`);
+        logger.info(`✅ User verified: ${userInfo.email}`);
       } else {
-        console.log(
+        logger.info(
           `⚠️ User verification skipped (service unavailable), proceeding with userId: ${userId}`
         );
       }
@@ -333,7 +334,7 @@ export class WorkspaceService implements IWorkspaceService {
     userEmail: string
   ): Promise<AcceptInviteResponse> {
     try {
-      console.log(`Processing invite acceptance for user: ${userId}`);
+      logger.info(`Processing invite acceptance for user: ${userId}`);
 
       //  Find invite by token
       const invite: Invite | null =
@@ -386,7 +387,7 @@ export class WorkspaceService implements IWorkspaceService {
         return { workspace, publicChannels };
       });
 
-      console.log(
+      logger.info(
         `✅ Invite accepted: User ${userId} joined workspace ${workspace.name} and ${result.publicChannels.length} public channels`
       );
 
@@ -408,7 +409,7 @@ export class WorkspaceService implements IWorkspaceService {
       if (error instanceof WorkspaceChannelServiceError) {
         throw error;
       }
-      console.error("Error accepting invite:", error);
+      logger.error("Error accepting invite:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to accept invite due to unexpected error"
       );
@@ -526,7 +527,7 @@ export class WorkspaceService implements IWorkspaceService {
     includeChannels: boolean = false
   ): Promise<UserMembershipsResponse> {
     try {
-      console.log(
+      logger.info(
         `📝 Getting memberships for user: ${userId}, includeChannels: ${includeChannels}`
       );
 
@@ -570,13 +571,13 @@ export class WorkspaceService implements IWorkspaceService {
         })
       );
 
-      console.log(`✅ Found ${workspaces.length} workspace memberships`);
+      logger.info(`✅ Found ${workspaces.length} workspace memberships`);
 
       return {
         workspaces,
       };
     } catch (error) {
-      console.error("Error getting user memberships:", error);
+      logger.error("Error getting user memberships:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to get user memberships"
       );

@@ -1,5 +1,6 @@
 import { injectable } from "tsyringe";
 import { PrismaClient, Invite } from "@prisma/client";
+import logger from "../utils/logger";
 import { IInviteRepository } from "../interfaces/repositories/IInviteRepository";
 import { CreateWorkspaceInviteData } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
@@ -63,7 +64,7 @@ export class InviteRepository implements IInviteRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding pending invite:", error);
+      logger.error("Error finding pending invite:", error);
       this.handleInviteError(error);
     }
   }
@@ -88,7 +89,7 @@ export class InviteRepository implements IInviteRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding all pending invites:", error);
+      logger.error("Error finding all pending invites:", error);
       this.handleInviteError(error);
     }
   }
@@ -136,7 +137,7 @@ export class InviteRepository implements IInviteRepository {
 
       return result.count;
     } catch (error: any) {
-      console.error("Error deleting expired invites:", error);
+      logger.error("Error deleting expired invites:", error);
       this.handleInviteError(error);
     }
   }
@@ -152,7 +153,7 @@ export class InviteRepository implements IInviteRepository {
         where: { inviteToken: token },
       });
     } catch (error: any) {
-      console.error("Error finding invite by token:", error);
+      logger.error("Error finding invite by token:", error);
       this.handleInviteError(error);
     }
   }
@@ -197,7 +198,7 @@ export class InviteRepository implements IInviteRepository {
     inviteData?: CreateWorkspaceInviteData,
     inviteId?: string
   ): never {
-    console.error("Error in invite operation:", error);
+    logger.error("Error in invite operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {

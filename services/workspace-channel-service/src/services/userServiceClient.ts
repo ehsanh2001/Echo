@@ -1,6 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { config } from "../config/env";
 import { UserInfo } from "../types";
+import logger from "../utils/logger";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 
 /**
@@ -21,7 +22,7 @@ export class UserServiceClient {
    */
   async checkUserExistsById(userId: string): Promise<UserInfo | null> {
     try {
-      console.log(`🔍 Checking user existence by ID: ${userId}`);
+      logger.info(`🔍 Checking user existence by ID: ${userId}`);
 
       const response = await axios.get<UserInfo>(
         `${this.baseUrl}/api/users/${userId}`,
@@ -34,7 +35,7 @@ export class UserServiceClient {
 
       // Note: user-service endpoints already filter for active users,
       // so if we get a response, the user is guaranteed to be active
-      console.log(`✅ User exists and is active: ${userInfo.email}`);
+      logger.info(`✅ User exists and is active: ${userInfo.email}`);
       return userInfo;
     } catch (error) {
       return this.handleUserServiceError(error, "checkUserExistsById", userId);
@@ -48,7 +49,7 @@ export class UserServiceClient {
    */
   async checkUserExistsByEmail(email: string): Promise<UserInfo | null> {
     try {
-      console.log(`🔍 Checking user existence by email: ${email}`);
+      logger.info(`🔍 Checking user existence by email: ${email}`);
 
       const response = await axios.get<UserInfo>(
         `${this.baseUrl}/api/users/searchbyemail/${encodeURIComponent(email)}`,
@@ -57,7 +58,7 @@ export class UserServiceClient {
         }
       );
 
-      console.log(`✅ User found by email: ${response.data.username}`);
+      logger.info(`✅ User found by email: ${response.data.username}`);
       return response.data;
     } catch (error) {
       return this.handleUserServiceError(
@@ -111,7 +112,7 @@ export class UserServiceClient {
 
       // 5xx server errors from user-service
       if (axiosError.response && axiosError.response.status >= 500) {
-        console.warn(
+        logger.warn(
           `⚠️  User-service server error (${axiosError.response.status}), considering user ${identifier} as valid`
         );
         return null;
@@ -123,7 +124,7 @@ export class UserServiceClient {
         axiosError.code === "ECONNREFUSED" ||
         axiosError.code === "ETIMEDOUT"
       ) {
-        console.warn(
+        logger.warn(
           `⚠️  User-service unavailable for ${operation}, considering user ${identifier} as valid`
         );
         return null;
@@ -131,7 +132,7 @@ export class UserServiceClient {
     }
 
     // Network or other unexpected errors - resilient approach
-    console.warn(
+    logger.warn(
       `⚠️  Unexpected error in ${operation}, considering user ${identifier} as valid:`,
       error
     );

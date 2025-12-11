@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import { PrismaClient, Workspace, WorkspaceMember } from "@prisma/client";
+import logger from "../utils/logger";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { CreateWorkspaceData, CreateWorkspaceMemberData } from "../types";
@@ -24,7 +25,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
     error: any,
     workspaceData?: CreateWorkspaceData
   ): never {
-    console.error("Error in workspace operation:", error);
+    logger.error("Error in workspace operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {
@@ -56,7 +57,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
     error: any,
     data?: CreateWorkspaceMemberData
   ): never {
-    console.error("Error in workspace member operation:", error);
+    logger.error("Error in workspace member operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {
@@ -117,11 +118,11 @@ export class WorkspaceRepository implements IWorkspaceRepository {
           ownerId
         );
 
-        console.log(`✅ Workspace created with defaults: ${workspace.name}`);
+        logger.info(`✅ Workspace created with defaults: ${workspace.name}`);
         return workspace;
       });
     } catch (error: any) {
-      console.error(
+      logger.error(
         "Error creating workspace (transaction rolled back):",
         error
       );
@@ -150,7 +151,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         where: { name },
       });
     } catch (error: any) {
-      console.error("Error finding workspace by name:", error);
+      logger.error("Error finding workspace by name:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find workspace: ${error.message}`
       );
@@ -166,7 +167,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         where: { id },
       });
     } catch (error: any) {
-      console.error("Error finding workspace by ID:", error);
+      logger.error("Error finding workspace by ID:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find workspace: ${error.message}`
       );
@@ -190,7 +191,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding workspace membership:", error);
+      logger.error("Error finding workspace membership:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find membership: ${error.message}`
       );
@@ -209,7 +210,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error counting workspace members:", error);
+      logger.error("Error counting workspace members:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to count members: ${error.message}`
       );
@@ -254,7 +255,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
 
       return member;
     } catch (error: any) {
-      console.error("Error adding/reactivating workspace member:", error);
+      logger.error("Error adding/reactivating workspace member:", error);
       this.handleMemberError(error, {
         workspaceId,
         userId,
@@ -310,7 +311,7 @@ export class WorkspaceRepository implements IWorkspaceRepository {
 
       return results;
     } catch (error: any) {
-      console.error("Error finding workspaces by user ID:", error);
+      logger.error("Error finding workspaces by user ID:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find workspaces: ${error.message}`
       );

@@ -1,5 +1,6 @@
 import { inject, injectable } from "tsyringe";
 import { PrismaClient, Channel, ChannelMember } from "@prisma/client";
+import logger from "../utils/logger";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { CreateChannelData, CreateChannelMemberData } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
@@ -19,7 +20,7 @@ export class ChannelRepository implements IChannelRepository {
     error: any,
     channelData?: CreateChannelData
   ): never {
-    console.error("Error in channel operation:", error);
+    logger.error("Error in channel operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {
@@ -49,7 +50,7 @@ export class ChannelRepository implements IChannelRepository {
     error: any,
     data?: CreateChannelMemberData
   ): never {
-    console.error("Error in channel member operation:", error);
+    logger.error("Error in channel member operation:", error);
 
     // Handle unique constraint violations
     if (error.code === "P2002") {
@@ -147,7 +148,7 @@ export class ChannelRepository implements IChannelRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding public channels:", error);
+      logger.error("Error finding public channels:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find public channels: ${error.message}`
       );
@@ -226,7 +227,7 @@ export class ChannelRepository implements IChannelRepository {
 
       return await this.prisma.$transaction(executeInTransaction);
     } catch (error: any) {
-      console.error("Error adding/reactivating channel member:", error);
+      logger.error("Error adding/reactivating channel member:", error);
       this.handleChannelMemberError(error, {
         channelId,
         userId,
@@ -272,7 +273,7 @@ export class ChannelRepository implements IChannelRepository {
 
       return await this.prisma.$transaction(executeInTransaction);
     } catch (error: any) {
-      console.error("Error adding multiple channel members:", error);
+      logger.error("Error adding multiple channel members:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to add multiple channel members: ${error.message}`,
         { originalError: error.code }
@@ -296,7 +297,7 @@ export class ChannelRepository implements IChannelRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding channel by name:", error);
+      logger.error("Error finding channel by name:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find channel by name: ${error.message}`
       );
@@ -316,7 +317,7 @@ export class ChannelRepository implements IChannelRepository {
         },
       });
     } catch (error: any) {
-      console.error("Error finding channel member:", error);
+      logger.error("Error finding channel member:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find channel member: ${error.message}`
       );
@@ -366,7 +367,7 @@ export class ChannelRepository implements IChannelRepository {
         membership: m,
       }));
     } catch (error: any) {
-      console.error("Error finding channel memberships by user ID:", error);
+      logger.error("Error finding channel memberships by user ID:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find channel memberships: ${error.message}`
       );

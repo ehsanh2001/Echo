@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import { ChannelMember, PrismaClient } from "@prisma/client";
+import logger from "../utils/logger";
 import { IChannelService } from "../interfaces/services/IChannelService";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
@@ -77,7 +78,7 @@ export class ChannelService implements IChannelService {
       if (error instanceof WorkspaceChannelServiceError) {
         throw error;
       }
-      console.error("Error creating channel:", error);
+      logger.error("Error creating channel:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to create channel due to unexpected error"
       );
@@ -291,7 +292,7 @@ export class ChannelService implements IChannelService {
       if (error instanceof WorkspaceChannelServiceError) {
         throw error;
       }
-      console.error("Error adding member to channel:", error);
+      logger.error("Error adding member to channel:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to add member to channel"
       );
@@ -312,7 +313,7 @@ export class ChannelService implements IChannelService {
       if (error instanceof WorkspaceChannelServiceError) {
         throw error;
       }
-      console.error("Error getting channel member:", error);
+      logger.error("Error getting channel member:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to get channel member"
       );
@@ -331,7 +332,7 @@ export class ChannelService implements IChannelService {
         await this.channelRepository.findByNameInWorkspace(workspaceId, name);
       return existingChannel === null;
     } catch (error) {
-      console.error("Error checking channel name availability:", error);
+      logger.error("Error checking channel name availability:", error);
       throw WorkspaceChannelServiceError.database(
         "Failed to check channel name availability"
       );

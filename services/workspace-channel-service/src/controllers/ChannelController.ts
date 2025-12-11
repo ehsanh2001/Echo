@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { container } from "tsyringe";
+import logger from "../utils/logger";
 import { IChannelService } from "../interfaces/services/IChannelService";
 import { AuthenticatedRequest } from "../middleware/jwtAuth";
 import { CreateChannelRequest, ChannelType } from "../types";
@@ -32,7 +33,7 @@ export class ChannelController {
       const { workspaceId } = req.params;
       const userId = req.user.userId;
 
-      console.log(
+      logger.info(
         `Create channel request from user ${userId} in workspace ${workspaceId}`
       );
 
@@ -53,7 +54,7 @@ export class ChannelController {
         requestData
       );
 
-      console.log(
+      logger.info(
         `Channel created successfully: ${channel.name} (${channel.id})`
       );
 
@@ -163,7 +164,7 @@ export class ChannelController {
     try {
       const { workspaceId, channelId, userId } = req.params;
 
-      console.log(
+      logger.info(
         `Get channel member request for workspace ${workspaceId}, channel ${channelId}, user ${userId}`
       );
 
@@ -206,7 +207,7 @@ export class ChannelController {
         return;
       }
 
-      console.log(
+      logger.info(
         `Channel member found: ${channelMember.userId} in channel ${channelMember.channelId}`
       );
 
@@ -232,7 +233,7 @@ export class ChannelController {
     try {
       const { workspaceId, name } = req.params;
 
-      console.log(
+      logger.info(
         `Check channel name availability request for workspace ${workspaceId}, name: ${name}`
       );
 
@@ -277,7 +278,7 @@ export class ChannelController {
     error: unknown,
     res: Response
   ): void {
-    console.error(`Error in ChannelController.${method}:`, error);
+    logger.error(`Error in ChannelController.${method}:`, error);
 
     if (error instanceof WorkspaceChannelServiceError) {
       res.status(error.statusCode).json({

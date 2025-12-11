@@ -75,7 +75,7 @@ app.get("/health", async (req, res) => {
 
     res.status(200).json(healthInfo);
   } catch (error) {
-    console.error("Health check failed:", error);
+    logger.error("Health check failed:", error);
 
     const unhealthyInfo = {
       ...healthInfo,
@@ -103,7 +103,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    console.error("Unhandled error:", error);
+    logger.error("Unhandled error:", error);
 
     res.status(500).json({
       error: "Internal Server Error",
@@ -118,42 +118,42 @@ app.use(
 
 async function startServer() {
   try {
-    console.log("� Starting Workspace-Channel Service...");
+    logger.info("🚀 Starting Workspace-Channel Service...");
 
     // Test database connection
     await prisma.$connect();
-    console.log("✅ Database connection successful");
+    logger.info("✅ Database connection successful");
 
     // Start Outbox Publisher Worker
     const outboxPublisher =
       container.resolve<IOutboxPublisher>("IOutboxPublisher");
     await outboxPublisher.start();
-    console.log("✅ Outbox Publisher Worker started");
+    logger.info("✅ Outbox Publisher Worker started");
 
     // Start the server
     const server = app.listen(config.port, () => {
-      console.log(`🌐 Server running on port ${config.port}`);
-      console.log(`🔧 Environment: ${config.nodeEnv}`);
+      logger.info(`🌐 Server running on port ${config.port}`);
+      logger.info(`🔧 Environment: ${config.nodeEnv}`);
     });
 
     // Graceful shutdown
     const gracefulShutdown = async (signal: string) => {
-      console.log(`\n📤 Received ${signal}. Starting graceful shutdown...`);
+      logger.info(`\n📤 Received ${signal}. Starting graceful shutdown...`);
 
       server.close(async () => {
-        console.log("🔌 HTTP server closed");
+        logger.info("🔌 HTTP server closed");
 
         try {
           // Stop Outbox Publisher Worker
           await outboxPublisher.stop();
-          console.log("🛑 Outbox Publisher Worker stopped");
+          logger.info("🛑 Outbox Publisher Worker stopped");
 
           await prisma.$disconnect();
-          console.log("💾 Database connection closed");
-          console.log("👋 Graceful shutdown complete");
+          logger.info("💾 Database connection closed");
+          logger.info("👋 Graceful shutdown complete");
           process.exit(0);
         } catch (error) {
-          console.error("❌ Error during shutdown:", error);
+          logger.error("❌ Error during shutdown:", error);
           process.exit(1);
         }
       });
@@ -162,7 +162,7 @@ async function startServer() {
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
   } catch (error) {
-    console.error("💥 Failed to start server:", error);
+    logger.error("💥 Failed to start server:", error);
     await prisma.$disconnect();
     process.exit(1);
   }
