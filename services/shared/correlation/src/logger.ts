@@ -13,9 +13,9 @@
  *   logLevel: 'info'
  * });
  *
- * // Logs automatically include correlationId, userId, workspaceId, etc.
+ * // Logs automatically include instanceId, correlationId, userId, workspaceId, etc.
  * logger.info('User created', { email: 'user@example.com' });
- * // Output: { timestamp, level, message, service, correlationId, userId, email }
+ * // Output: { timestamp, level, message, service, instanceId, correlationId, userId, email }
  * ```
  */
 
@@ -47,11 +47,18 @@ import {
  * });
  *
  * logger.info('Processing request');
- * // Automatically includes: correlationId, userId, workspaceId, method, path
+ * // Automatically includes: instanceId, correlationId, userId, workspaceId, method, path
  * ```
  */
 export function createContextualLogger(config: LoggerConfig): winston.Logger {
   const baseLogger = createLogger(config);
+
+  // Get instance ID from environment (Kubernetes pod name, Docker hostname, etc.)
+  const instanceId =
+    process.env.HOSTNAME ||
+    process.env.POD_NAME ||
+    process.env.CONTAINER_ID ||
+    "unknown";
 
   // Create a proxy that intercepts log method calls
   const handler: ProxyHandler<winston.Logger> = {
@@ -62,8 +69,9 @@ export function createContextualLogger(config: LoggerConfig): winston.Logger {
         ["error", "warn", "info", "http", "debug"].includes(prop)
       ) {
         return (message: string, meta?: any) => {
-          // Get context from AsyncLocalStorage
+          // Get context from AsyncLocalStorage (dynamic per request)
           const contextMeta = {
+            instanceId, // Static: identifies this service instance
             correlationId: getCorrelationId(),
             userId: getUserId(),
             workspaceId: getWorkspaceId(),
