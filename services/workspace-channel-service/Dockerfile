@@ -6,22 +6,26 @@ FROM node:22-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+COPY package*.json ./
+COPY services/shared ./services/shared/
+
 # Copy package files for dependency installation
 # Copying separately to leverage Docker layer caching
-COPY package*.json ./
-COPY prisma ./prisma/
+COPY services/workspace-channel-service/package*.json ./services/workspace-channel-service/
+COPY services/workspace-channel-service/prisma ./services/workspace-channel-service/prisma/
 
 # Install ALL dependencies (including devDependencies for building)
-RUN npm install
+RUN cd services/workspace-channel-service && npm install
 
 # Copy source code
-COPY . .
+COPY services/workspace-channel-service/src ./services/workspace-channel-service/src/
+COPY services/workspace-channel-service/tsconfig.json ./services/workspace-channel-service/
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN cd services/workspace-channel-service && npx prisma generate
 
 # Build TypeScript to JavaScript
-RUN npm run build
+RUN cd services/workspace-channel-service && npm run build
 
 # ==================================
 # Stage 2: Production - Runtime image
@@ -31,27 +35,26 @@ FROM node:22-alpine AS production
 # Set working directory
 WORKDIR /app
 
-# Set NODE_ENV to production
-ENV NODE_ENV=production
-
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy package files
 COPY package*.json ./
+COPY services/shared ./services/shared/
+
+# Copy package files
+COPY services/workspace-channel-service/package*.json ./services/workspace-channel-service/
 
 # Copy Prisma schema for runtime client generation
-COPY prisma ./prisma/
+COPY services/workspace-channel-service/prisma ./services/workspace-channel-service/prisma/
 
 # Install ONLY production dependencies
-RUN npm install --omit=dev && \
-    npm cache clean --force
+RUN cd services/workspace-channel-service && npm install --omit=dev && npm cache clean --force
 
 # Generate Prisma Client (needed for production)
-RUN npx prisma generate
+RUN cd services/workspace-channel-service && npx prisma generate
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/services/workspace-channel-service/dist ./services/workspace-channel-service/dist
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -59,6 +62,8 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Change ownership of app files to non-root user
 RUN chown -R nodejs:nodejs /app
+
+WORKDIR /app/services/workspace-channel-service
 
 # Switch to non-root user
 USER nodejs

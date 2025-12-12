@@ -6,18 +6,22 @@ FROM node:22-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+COPY package*.json ./
+COPY services/shared ./services/shared/
+
 # Copy package files for dependency installation
 # Copying separately to leverage Docker layer caching
-COPY package*.json ./
+COPY services/bff-service/package*.json ./services/bff-service/
 
 # Install ALL dependencies (including devDependencies for building)
-RUN npm install
+RUN cd services/bff-service && npm install
 
 # Copy source code
-COPY . .
+COPY services/bff-service/src ./services/bff-service/src/
+COPY services/bff-service/tsconfig.json ./services/bff-service/
 
 # Build TypeScript to JavaScript
-RUN npm run build
+RUN cd services/bff-service && npm run build
 
 # ==================================
 # Stage 2: Production - Runtime image
@@ -27,21 +31,20 @@ FROM node:22-alpine AS production
 # Set working directory
 WORKDIR /app
 
-# Set NODE_ENV to production
-ENV NODE_ENV=production
-
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy package files
 COPY package*.json ./
+COPY services/shared ./services/shared/
+
+# Copy package files
+COPY services/bff-service/package*.json ./services/bff-service/
 
 # Install ONLY production dependencies
-RUN npm install --omit=dev && \
-    npm cache clean --force
+RUN cd services/bff-service && npm install --omit=dev && npm cache clean --force
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/services/bff-service/dist ./services/bff-service/dist
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -49,6 +52,8 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Change ownership of app files to non-root user
 RUN chown -R nodejs:nodejs /app
+
+WORKDIR /app/services/bff-service
 
 # Switch to non-root user
 USER nodejs

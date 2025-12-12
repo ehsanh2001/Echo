@@ -76,7 +76,9 @@ services:
 
   # User Service - Handles authentication, user profiles
   user-service:
-    build: ./services/user-service
+    build:
+      context: .
+      dockerfile: ./services/user-service/Dockerfile
     container_name: echo-user-service
     ports:
       - "8001:8001"
@@ -100,7 +102,9 @@ services:
 
   # Workspace-Channel Service - Handles workspaces, channels, and memberships
   workspace-channel-service:
-    build: ./services/workspace-channel-service
+    build:
+      context: .
+      dockerfile: ./services/workspace-channel-service/Dockerfile
     container_name: echo-workspace-channel-service
     ports:
       - "8002:8002"
@@ -137,7 +141,9 @@ services:
 
   # Message Service - Handles messages, threads, reactions, and mentions
   message-service:
-    build: ./services/message-service
+    build:
+      context: .
+      dockerfile: ./services/message-service/Dockerfile
     container_name: echo-message-service
     ports:
       - "8003:8003"
@@ -174,7 +180,9 @@ services:
 
   # Notification Service - Handles email notifications via Resend
   notification-service:
-    build: ./services/notification-service
+    build:
+      context: .
+      dockerfile: ./services/notification-service/Dockerfile
     container_name: echo-notification-service
     ports:
       - "8005:8005"
@@ -204,7 +212,9 @@ services:
 
   # BFF Service - Backend for Frontend with real-time WebSocket support
   bff-service:
-    build: ./services/bff-service
+    build:
+      context: .
+      dockerfile: ./services/bff-service/Dockerfile
     container_name: echo-bff-service
     ports:
       - "8004:8080"
@@ -235,8 +245,66 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Loki - Log aggregation and storage
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: echo-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - loki_data:/loki
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Promtail - Collects logs from Docker containers
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: echo-promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Grafana - Visualization and querying
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: echo-grafana
+    ports:
+      - "3001:3000" # Using 3001 since frontend is on 3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   redis_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
     driver: local

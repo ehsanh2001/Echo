@@ -6,22 +6,26 @@ FROM node:22-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy package files for dependency installation
-# Copying separately to leverage Docker layer caching
+# Copy workspace package.json and shared packages first
 COPY package*.json ./
-COPY prisma ./prisma/
+COPY services/shared ./services/shared/
+
+# Copy service-specific files
+COPY services/user-service/package*.json ./services/user-service/
+COPY services/user-service/prisma ./services/user-service/prisma/
 
 # Install ALL dependencies (including devDependencies for building)
-RUN npm install
+RUN cd services/user-service && npm install
 
 # Copy source code
-COPY . .
+COPY services/user-service/src ./services/user-service/src/
+COPY services/user-service/tsconfig.json ./services/user-service/
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN cd services/user-service && npx prisma generate
 
 # Build TypeScript to JavaScript
-RUN npm run build
+RUN cd services/user-service && npm run build
 
 # ==================================
 # Stage 2: Production - Runtime image
@@ -31,27 +35,27 @@ FROM node:22-alpine AS production
 # Set working directory
 WORKDIR /app
 
-# Set NODE_ENV to production
-ENV NODE_ENV=production
-
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy package files
+# Copy workspace and service package files
 COPY package*.json ./
-
-# Copy Prisma schema for runtime client generation
-COPY prisma ./prisma/
+COPY services/shared ./services/shared/
+COPY services/user-service/package*.json ./services/user-service/
+COPY services/user-service/prisma ./services/user-service/prisma/
 
 # Install ONLY production dependencies
-RUN npm install --omit=dev && \
+RUN cd services/user-service && npm install --omit=dev && \
     npm cache clean --force
 
 # Generate Prisma Client (needed for production)
-RUN npx prisma generate
+RUN cd services/user-service && npx prisma generate
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/services/user-service/dist ./services/user-service/dist
+
+# Set working directory to service directory
+WORKDIR /app/services/user-service
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
