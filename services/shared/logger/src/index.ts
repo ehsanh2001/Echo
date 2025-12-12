@@ -1,11 +1,11 @@
 /**
  * Echo Shared Logger
  *
- * Provides standardized Winston logging across all Echo services with:
- * - Environment-based formatting (JSON for prod, colorized for dev)
- * - Daily log file rotation
+ * Provides standardized JSON logging for containerized Echo services:
+ * - Always outputs JSON format to stdout/stderr
  * - Service name tagging
- * - Correlation ID support (will be auto-injected in Phase 2)
+ * - Automatic correlation ID injection via @echo/correlation
+ * - Optimized for Grafana/Loki log aggregation
  *
  * Usage:
  * ```typescript
@@ -13,8 +13,7 @@
  *
  * const logger = createLogger({
  *   serviceName: 'user-service',
- *   logLevel: 'info',
- *   enableFileLogging: true
+ *   logLevel: 'info'
  * });
  *
  * logger.info('User created', { userId: '123', email: 'user@example.com' });
@@ -24,18 +23,11 @@
 
 import winston from "winston";
 import { LoggerConfig, LOG_LEVELS, LogContext } from "./types";
-import {
-  createLogFormat,
-  createTransports,
-  getLogLevel,
-  initializeColors,
-} from "./config";
-
-// Initialize Winston colors
-initializeColors();
+import { createLogFormat, createTransports, getLogLevel } from "./config";
 
 /**
  * Create a Winston logger instance for a service
+ * Always outputs JSON to stdout for container log aggregation
  *
  * @param config - Logger configuration
  * @returns Winston logger instance
@@ -44,9 +36,7 @@ initializeColors();
  * ```typescript
  * const logger = createLogger({
  *   serviceName: 'user-service',
- *   logLevel: 'debug',
- *   enableFileLogging: true,
- *   logDir: './logs'
+ *   logLevel: 'debug'
  * });
  *
  * logger.info('Service started');
@@ -96,4 +86,4 @@ export function createHttpStream(logger: winston.Logger) {
 
 // Re-export types for convenience
 export type { LoggerConfig, LogContext } from "./types";
-export { LOG_LEVELS, LOG_COLORS } from "./types";
+export { LOG_LEVELS } from "./types";

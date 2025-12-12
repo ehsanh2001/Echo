@@ -31,30 +31,6 @@ export interface LoggerConfig {
    * Defaults to 'info' in production, 'debug' in development
    */
   logLevel?: string;
-
-  /**
-   * Enable file logging (creates log files in logDir)
-   * Defaults to true
-   */
-  enableFileLogging?: boolean;
-
-  /**
-   * Directory where log files will be created
-   * Defaults to './logs'
-   */
-  logDir?: string;
-
-  /**
-   * Maximum size of each log file before rotation (in bytes)
-   * Defaults to 5MB (5 * 1024 * 1024)
-   */
-  maxFileSize?: string;
-
-  /**
-   * Maximum number of log files to keep
-   * Defaults to 5
-   */
-  maxFiles?: string;
 }
 
 /**
@@ -66,15 +42,4 @@ export const LOG_LEVELS = {
   info: 2,
   http: 3,
   debug: 4,
-} as const;
-
-/**
- * Colors for console output in development
- */
-export const LOG_COLORS = {
-  error: "red",
-  warn: "yellow",
-  info: "green",
-  http: "magenta",
-  debug: "blue",
 } as const;
