@@ -253,7 +253,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
-      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - ./infra/loki/loki-config.yaml:/etc/loki/loki-config.yaml
       - loki_data:/loki
     restart: unless-stopped
     healthcheck:
@@ -272,7 +272,7 @@ services:
     container_name: echo-promtail
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - ./infra/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/promtail-config.yaml
     depends_on:
@@ -293,10 +293,70 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3001
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       loki:
         condition: service_healthy
+      tempo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Tempo - Distributed tracing backend
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: echo-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP API
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3200/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # OpenTelemetry Collector - Central hub for traces
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    container_name: echo-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./infra/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8888:8888" # Prometheus metrics (collector self-metrics)
+    environment:
+      - DEPLOYMENT_ENV=${NODE_ENV:-development}
+    depends_on:
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:13133/",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
@@ -307,4 +367,6 @@ volumes:
   loki_data:
     driver: local
   grafana_data:
+    driver: local
+  tempo_data:
     driver: local

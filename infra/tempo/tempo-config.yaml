@@ -1,0 +1,69 @@
+# Grafana Tempo Configuration
+# Distributed tracing backend for storing and querying traces
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+# Distributor receives spans from OTel Collector
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# Ingester configuration
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1000000
+  max_block_duration: 5m
+
+# Compactor configuration for storage optimization
+compactor:
+  compaction:
+    block_retention: 168h # 7 days retention
+
+# Storage configuration
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
+    block:
+      bloom_filter_false_positive: 0.05
+      v2_index_downsample_bytes: 1000
+      v2_encoding: zstd
+
+# Querier configuration
+querier:
+  search:
+    prefer_self: 10
+  frontend_worker:
+    frontend_address: 127.0.0.1:9095
+
+# Query frontend for improved query performance
+query_frontend:
+  search:
+    concurrent_jobs: 1000
+    target_bytes_per_job: 104857600
+
+# Metrics generator for deriving metrics from traces
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: echo-local
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write: []
+
+# Overrides for multi-tenant configuration (single tenant for now)
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
