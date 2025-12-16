@@ -4,7 +4,7 @@
   "description": "Echo Workspace Channel Service - Workspace and channel management",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
     "test": "cross-env NODE_ENV=test jest --maxWorkers=1 --forceExit",

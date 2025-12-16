@@ -4,7 +4,7 @@
   "description": "Echo User Service - Authentication and user management",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
     "test": "cross-env NODE_ENV=test jest",
