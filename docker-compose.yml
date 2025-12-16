@@ -36,11 +36,13 @@ services:
     ports:
       - "5672:5672" # AMQP protocol port
       - "15672:15672" # Management UI port
+      - "15692:15692" # Prometheus metrics port
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-dev-rabbitmq-password}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     env_file:
       - .env
     restart: unless-stopped
@@ -389,6 +391,38 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # Prometheus - Metrics storage and querying
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: echo-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   redis_data:
     driver: local
@@ -399,4 +433,6 @@ volumes:
   grafana_data:
     driver: local
   tempo_data:
+    driver: local
+  prometheus_data:
     driver: local

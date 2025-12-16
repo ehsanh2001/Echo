@@ -1,5 +1,6 @@
 # OpenTelemetry Collector Configuration
 # Receives traces from services and exports to Tempo
+# Exposes metrics for Prometheus scraping
 
 receivers:
   otlp:
@@ -8,6 +9,15 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+
+  # Prometheus receiver for scraping metrics from services (future use)
+  # prometheus:
+  #   config:
+  #     scrape_configs:
+  #       - job_name: 'otel-collector'
+  #         scrape_interval: 10s
+  #         static_configs:
+  #           - targets: ['localhost:8888']
 
 processors:
   # Batch traces for efficient export
@@ -41,6 +51,17 @@ exporters:
   debug:
     verbosity: detailed
 
+  # Prometheus exporter - exposes metrics for Prometheus to scrape
+  # This allows OTel Collector's internal metrics to be monitored
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: otel_collector
+    const_labels:
+      service: otel-collector
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
 extensions:
   # Health check endpoint
   health_check:
@@ -62,5 +83,7 @@ service:
   telemetry:
     logs:
       level: info
+    # Expose collector's own metrics on port 8888 (Prometheus format)
     metrics:
+      level: detailed
       address: 0.0.0.0:8888

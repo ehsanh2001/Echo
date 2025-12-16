@@ -7,6 +7,7 @@ datasources:
     access: proxy
     url: http://loki:3100
     isDefault: true
+    uid: loki
     jsonData:
       maxLines: 1000
       derivedFields:
@@ -43,3 +44,21 @@ datasources:
         hide: false
       lokiSearch:
         datasourceUid: loki
+
+  # Prometheus - Metrics storage and querying
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.48.0
+      cacheLevel: "High"
+      disableRecordingRules: false
+      incrementalQueryOverlapWindow: 10m
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
