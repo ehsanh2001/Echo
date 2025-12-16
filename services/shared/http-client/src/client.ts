@@ -1,16 +1,19 @@
 /**
  * Echo HTTP Client
  *
- * Shared HTTP client for inter-service communication with automatic
- * correlation ID propagation and standardized error handling.
+ * Shared HTTP client for inter-service communication with standardized
+ * error handling and retry logic.
  *
  * Features:
- * - Automatic X-Request-ID and X-Correlation-ID header propagation
+ * - Automatic trace context propagation via OTel (traceparent header)
  * - Authorization header forwarding
- * - Request/response logging with correlation context
+ * - Request/response logging
  * - Retry logic for transient failures
  * - Timeout configuration
  * - Standardized error handling
+ *
+ * Note: Correlation/trace headers are automatically propagated by OpenTelemetry's
+ * HTTP instrumentation. No manual header injection needed.
  *
  * Usage:
  * ```typescript
@@ -22,7 +25,7 @@
  *   debugLogging: true
  * });
  *
- * // In a request handler (with correlation context)
+ * // In a request handler (OTel automatically propagates trace context)
  * const response = await httpClient.get('http://user-service:8001/api/users/123', {
  *   headers: {
  *     Authorization: req.headers.authorization
@@ -38,7 +41,6 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from "axios";
-import { getCorrelationId } from "@echo/correlation";
 import {
   HttpClientConfig,
   HttpRequestOptions,
@@ -47,7 +49,10 @@ import {
 } from "./types";
 
 /**
- * Create a configured HTTP client instance with correlation propagation
+ * Create a configured HTTP client instance
+ *
+ * Note: OTel's HTTP instrumentation automatically adds traceparent headers
+ * for distributed tracing. This client focuses on retry logic and error handling.
  *
  * @param config - HTTP client configuration
  * @returns Configured axios instance with interceptors
@@ -69,43 +74,17 @@ export function createHttpClient(config: HttpClientConfig): AxiosInstance {
   });
 
   /**
-   * Request interceptor: Add correlation headers
+   * Request interceptor: Debug logging only
+   * Note: OTel HTTP instrumentation automatically adds traceparent headers
    */
   instance.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      // Get correlation ID from AsyncLocalStorage context or request options
-      const correlationId = (config as any).correlationId || getCorrelationId();
-
-      if (correlationId) {
-        // Add correlation headers
-        config.headers["X-Request-ID"] = correlationId;
-        config.headers["X-Correlation-ID"] = correlationId;
-
-        if (debugLogging) {
-          console.debug(
-            `[${serviceName}] HTTP Client: Forwarding correlation headers`,
-            {
-              correlationId,
-              method: config.method?.toUpperCase(),
-              url: config.url,
-              headers: {
-                "X-Request-ID": correlationId,
-                "X-Correlation-ID": correlationId,
-                Authorization: config.headers.Authorization
-                  ? "Bearer ***"
-                  : undefined,
-              },
-            }
-          );
-        }
-      } else if (debugLogging) {
-        console.debug(
-          `[${serviceName}] HTTP Client: No correlation ID available`,
-          {
-            method: config.method?.toUpperCase(),
-            url: config.url,
-          }
-        );
+      if (debugLogging) {
+        console.debug(`[${serviceName}] HTTP Client: Sending request`, {
+          method: config.method?.toUpperCase(),
+          url: config.url,
+          hasAuth: !!config.headers.Authorization,
+        });
       }
 
       return config;
@@ -113,7 +92,6 @@ export function createHttpClient(config: HttpClientConfig): AxiosInstance {
     (error: AxiosError) => {
       console.error(`[${serviceName}] HTTP Client: Request error`, {
         error: error.message,
-        correlationId: getCorrelationId(),
       });
       return Promise.reject(error);
     }
@@ -126,23 +104,16 @@ export function createHttpClient(config: HttpClientConfig): AxiosInstance {
     (response: AxiosResponse) => {
       if (debugLogging) {
         console.debug(`[${serviceName}] HTTP Client: Response received`, {
-          correlationId: getCorrelationId(),
           method: response.config.method?.toUpperCase(),
           url: response.config.url,
           status: response.status,
-          responseCorrelationId:
-            response.headers["x-request-id"] ||
-            response.headers["x-correlation-id"],
         });
       }
       return response;
     },
     async (error: AxiosError) => {
-      const correlationId = getCorrelationId();
-
       // Log error
       console.error(`[${serviceName}] HTTP Client: Response error`, {
-        correlationId,
         method: error.config?.method?.toUpperCase(),
         url: error.config?.url,
         status: error.response?.status,
@@ -171,7 +142,6 @@ export function createHttpClient(config: HttpClientConfig): AxiosInstance {
           console.debug(
             `[${serviceName}] HTTP Client: Retrying request (attempt ${retryCount + 1}/${maxRetries})`,
             {
-              correlationId,
               method: error.config?.method?.toUpperCase(),
               url: error.config?.url,
               delayMs: delay,

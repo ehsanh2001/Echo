@@ -1,8 +1,11 @@
 /**
  * Echo HTTP Client Package
  *
- * Shared HTTP client for inter-service communication with automatic
- * correlation ID propagation.
+ * Shared HTTP client for inter-service communication with standardized
+ * error handling and retry logic.
+ *
+ * Note: Trace context (traceparent headers) are automatically propagated
+ * by OpenTelemetry's HTTP instrumentation when @echo/telemetry is initialized.
  *
  * @example
  * ```typescript
@@ -14,7 +17,7 @@
  *   debugLogging: process.env.NODE_ENV === 'development'
  * });
  *
- * // Make requests - correlation headers are automatically added
+ * // Make requests - OTel automatically adds trace headers
  * const response = await httpClient.get('http://user-service/api/users/123', {
  *   headers: {
  *     Authorization: req.headers.authorization
