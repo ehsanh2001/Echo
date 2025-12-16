@@ -150,32 +150,29 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       const userId = event.metadata?.userId;
 
       // Run message processing in OTel context with userId
-      await runWithContextAsync(
-        { userId, timestamp: new Date() },
-        async () => {
-          logger.info("Received RabbitMQ event", {
-            eventId: event.eventId,
-            eventType: event.eventType,
-            routingKey: msg.fields.routingKey,
-            timestamp: event.timestamp,
-            correlationId,
-            userId,
-          });
+      await runWithContextAsync({ userId, timestamp: new Date() }, async () => {
+        logger.info("Received RabbitMQ event", {
+          eventId: event.eventId,
+          eventType: event.eventType,
+          routingKey: msg.fields.routingKey,
+          timestamp: event.timestamp,
+          correlationId,
+          userId,
+        });
 
-          // Route event to appropriate handler
-          await this.routeEvent(event);
+        // Route event to appropriate handler
+        await this.routeEvent(event);
 
-          // Acknowledge message after successful processing
-          if (this.channel) {
-            this.channel.ack(msg);
-          }
-
-          logger.debug("Message acknowledged", {
-            eventId: event.eventId,
-            eventType: event.eventType,
-          });
+        // Acknowledge message after successful processing
+        if (this.channel) {
+          this.channel.ack(msg);
         }
-      );
+
+        logger.debug("Message acknowledged", {
+          eventId: event.eventId,
+          eventType: event.eventType,
+        });
+      });
     } catch (error) {
       logger.error("Error processing RabbitMQ message", {
         error,
