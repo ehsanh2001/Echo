@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@echo/logger": "file:services/shared/logger",
+    "@echo/metrics": "file:services/shared/metrics",
     "@echo/telemetry": "file:services/shared/telemetry",
     "morgan": "^1.10.1",
     "uuid": "^13.0.0"
