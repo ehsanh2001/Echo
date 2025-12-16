@@ -298,20 +298,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # Promtail - Collects logs from Docker containers
-  promtail:
-    image: grafana/promtail:2.9.3
-    container_name: echo-promtail
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./infra/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    command: -config.file=/etc/promtail/promtail-config.yaml
-    depends_on:
-      loki:
-        condition: service_healthy
-    restart: unless-stopped
-
   # Grafana - Visualization and querying
   grafana:
     image: grafana/grafana:10.2.3
@@ -416,6 +402,41 @@ services:
           "--tries=1",
           "--spider",
           "http://localhost:9090/-/healthy",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Grafana Alloy - Faro collector for frontend observability + Docker log collection (replaces Promtail)
+  alloy:
+    image: grafana/alloy:v1.4.2
+    container_name: echo-alloy
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "/etc/alloy/config.alloy"
+    volumes:
+      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # For Docker log collection
+    ports:
+      - "12345:12345" # Alloy UI
+      - "12347:12347" # Faro receiver
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:12345/-/ready",
         ]
       interval: 10s
       timeout: 5s

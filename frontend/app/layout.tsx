@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/lib/providers/query-provider";
+import { FaroProvider } from "@/lib/providers/faro-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -37,7 +38,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <QueryProvider>{children}</QueryProvider>
+          <FaroProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </FaroProvider>
           <Toaster position="top-center" />
         </ThemeProvider>
       </body>

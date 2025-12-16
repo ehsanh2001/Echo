@@ -1,0 +1,187 @@
+// Grafana Alloy Configuration for Complete Observability
+// This configuration collects:
+// - Frontend telemetry from Grafana Faro SDK (logs, traces, metrics)
+// - Backend service logs from Docker containers
+// Exports to: Loki (logs), Tempo (traces)
+
+// =============================================================================
+// DOCKER LOG COLLECTION (replaces Promtail)
+// =============================================================================
+// Collect logs from Docker containers for backend services
+
+loki.source.docker "backend_containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.backend_services.targets
+  forward_to = [loki.process.backend_logs.receiver]
+  
+  // Relabel container logs
+  relabel_rules = loki.relabel.backend_containers.rules
+}
+
+// Docker service discovery - find Echo backend services
+discovery.docker "backend_services" {
+  host = "unix:///var/run/docker.sock"
+  
+  // Only discover echo-* containers
+  filter {
+    name   = "name"
+    values = ["echo-*"]
+  }
+  
+  refresh_interval = "5s"
+}
+
+// Relabel rules to extract service names and add labels
+loki.relabel "backend_containers" {
+  // Only keep our backend services (exclude infrastructure)
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "echo-(user-service|message-service|workspace-channel-service|bff-service|notification-service)"
+    action        = "keep"
+  }
+  
+  // Extract service name from container name
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "echo-(.*)"
+    target_label  = "service"
+    replacement   = "$1"
+  }
+  
+  // Add job label
+  rule {
+    target_label = "job"
+    replacement  = "echo-services"
+  }
+  
+  // Add source label
+  rule {
+    target_label = "source"
+    replacement  = "docker"
+  }
+}
+
+// Process backend logs - extract JSON fields
+loki.process "backend_logs" {
+  // Parse JSON log format from Winston
+  stage.json {
+    expressions = {
+      level     = "level",
+      message   = "message",
+      timestamp = "timestamp",
+      trace_id  = "trace_id",
+      span_id   = "span_id",
+      service   = "service",
+    }
+  }
+  
+  // Add extracted fields as labels for better filtering
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+  
+  // Parse timestamp if present
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+  
+  forward_to = [loki.write.default.receiver]
+}
+
+// =============================================================================
+// FARO RECEIVER (Frontend Observability)
+// =============================================================================
+// Receives telemetry data from the Grafana Faro SDK running in the browser
+
+faro.receiver "frontend" {
+  server {
+    listen_address = "0.0.0.0"
+    listen_port = 12347
+
+    // CORS configuration for browser requests
+    cors_allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+  }
+
+  // Source maps configuration (optional - for readable stack traces)
+  // sourcemaps {
+  //   download = true
+  //   download_from_origins = ["http://localhost:3000"]
+  // }
+
+  output {
+    logs   = [loki.process.faro_logs.receiver]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// =============================================================================
+// FARO LOG PROCESSING
+// =============================================================================
+// Process and format frontend logs before sending to Loki
+
+loki.process "faro_logs" {
+  // Add static labels
+  stage.static_labels {
+    values = {
+      source = "faro",
+      app    = "echo-frontend",
+    }
+  }
+
+  // Extract log level from log line if present
+  stage.json {
+    expressions = {
+      level   = "level",
+      kind    = "kind",
+      browser = "browser",
+      url     = "url",
+    }
+  }
+
+  // Add extracted values as labels
+  stage.labels {
+    values = {
+      level   = "",
+      kind    = "",
+      browser = "",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// =============================================================================
+// LOKI EXPORTER
+// =============================================================================
+// Send logs to Loki
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// =============================================================================
+// OTEL COLLECTOR FOR TRACES
+// =============================================================================
+// Send traces to Tempo via OTLP
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// =============================================================================
+// LOGGING (for debugging Alloy itself)
+// =============================================================================
+logging {
+  level  = "info"
+  format = "logfmt"
+}
