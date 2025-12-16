@@ -48,6 +48,18 @@ app.use(
   cors({
     origin: config.externalServices.frontendBaseUrl,
     credentials: true,
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Request-ID",
+      "traceparent", // W3C Trace Context
+      "tracestate", // W3C Trace Context (vendor info)
+      "baggage", // OTel Baggage propagation
+    ],
+    exposedHeaders: [
+      "X-Request-ID",
+      "X-Trace-ID", // Return trace ID to frontend
+    ],
   })
 );
 
