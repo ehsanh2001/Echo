@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { updateContext } from "@echo/correlation";
+import { updateContext } from "@echo/telemetry";
 import logger from "../utils/logger";
 import { config } from "../config/env";
 import { JwtPayload } from "../types";

@@ -18,8 +18,8 @@
     "db:setup": "./setup-db.sh"
   },
   "dependencies": {
-    "@echo/correlation": "file:../shared/correlation",
     "@echo/logger": "file:../shared/logger",
+    "@echo/telemetry": "file:../shared/telemetry",
     "@prisma/client": "^6.16.2",
     "amqplib": "^0.10.4",
     "axios": "^1.6.0",

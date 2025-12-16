@@ -1,7 +1,7 @@
 import { injectable, inject } from "tsyringe";
 import amqp from "amqplib";
 import { v4 as uuidv4 } from "uuid";
-import { requestContext } from "@echo/correlation";
+import { runWithContextAsync } from "@echo/telemetry";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import { IInviteEventHandler } from "../interfaces/handlers/IInviteEventHandler";
 import {
@@ -149,9 +149,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       const correlationId = event.metadata?.correlationId || uuidv4();
       const userId = event.metadata?.userId;
 
-      // Run message processing in correlation context with userId
-      await requestContext.run(
-        { correlationId, userId, timestamp: new Date() },
+      // Run message processing in OTel context with userId
+      await runWithContextAsync(
+        { userId, timestamp: new Date() },
         async () => {
           logger.info("Received RabbitMQ event", {
             eventId: event.eventId,

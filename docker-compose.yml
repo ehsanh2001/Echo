@@ -92,8 +92,14 @@ services:
 
       # Redis points to redis container
       - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
+
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=user-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       redis:
+        condition: service_healthy
+      otel-collector:
         condition: service_healthy
     restart: unless-stopped
     # Allow container to access host machine's PostgreSQL
@@ -127,6 +133,10 @@ services:
 
       # Frontend URL for invite links - override to ensure correct URL
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
+
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=workspace-channel-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       redis:
         condition: service_healthy
@@ -134,6 +144,8 @@ services:
         condition: service_healthy
       user-service:
         condition: service_started
+      otel-collector:
+        condition: service_healthy
     restart: unless-stopped
     # Allow container to access host machine's PostgreSQL
     extra_hosts:
@@ -164,6 +176,10 @@ services:
       # Internal service URLs
       - USER_SERVICE_URL=http://user-service:8001
       - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
+
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=message-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       redis:
         condition: service_healthy
@@ -173,6 +189,8 @@ services:
         condition: service_started
       workspace-channel-service:
         condition: service_started
+      otel-collector:
+        condition: service_healthy
     restart: unless-stopped
     # Allow container to access host machine's PostgreSQL
     extra_hosts:
@@ -201,12 +219,18 @@ services:
       - USE_SMTP=${USE_SMTP:-false}
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
+
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=notification-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       rabbitmq:
         condition: service_healthy
       user-service:
         condition: service_started
       mailhog:
+        condition: service_healthy
+      otel-collector:
         condition: service_healthy
     restart: unless-stopped
 
@@ -236,6 +260,10 @@ services:
       - USER_SERVICE_URL=http://user-service:8001
       - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
       - MESSAGE_SERVICE_URL=http://message-service:8003
+
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=bff-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       redis:
         condition: service_healthy
@@ -243,6 +271,8 @@ services:
         condition: service_healthy
       message-service:
         condition: service_started
+      otel-collector:
+        condition: service_healthy
     restart: unless-stopped
 
   # Loki - Log aggregation and storage

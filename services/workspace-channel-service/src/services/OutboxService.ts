@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
 import { OutboxEvent } from "@prisma/client";
-import { getCorrelationId, getUserId } from "@echo/correlation";
+import { getTraceId, getUserId } from "@echo/telemetry";
 import { IOutboxService } from "../interfaces/services/IOutboxService";
 import { IOutboxRepository } from "../interfaces/repositories/IOutboxRepository";
 import {
@@ -85,8 +85,8 @@ export class OutboxService implements IOutboxService {
     correlationId?: string,
     causationId?: string
   ): WorkspaceInviteCreatedEventPayload {
-    // Capture correlation context from AsyncLocalStorage if not explicitly provided
-    const effectiveCorrelationId = correlationId ?? getCorrelationId();
+    // Capture trace context from OTel if not explicitly provided
+    const effectiveCorrelationId = correlationId ?? getTraceId();
     const userId = getUserId();
 
     const metadata: {

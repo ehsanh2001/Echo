@@ -1,22 +1,27 @@
+// OpenTelemetry must be initialized FIRST before any other imports
+import "@echo/telemetry";
+
 import "reflect-metadata";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
-import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
+import { requestContextMiddleware } from "@echo/telemetry";
+import { createHttpStream } from "@echo/logger";
 import logger from "./utils/logger";
 import { config } from "./config/env";
 import { container } from "./container"; // Auto-configure dependency injection
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { messageRoutes } from "./routes/messageRoutes";
+import morgan from "morgan";
 
 const prisma = new PrismaClient();
 const app = express();
 
-// Correlation middleware (MUST be first)
-app.use(correlationMiddleware("message-service"));
-app.use(createHttpLogger(logger));
+// Request context middleware - MUST BE FIRST (sets up OTel context)
+app.use(requestContextMiddleware());
+app.use(morgan("combined", { stream: createHttpStream(logger) }));
 
 // Security middleware
 app.use(helmet());

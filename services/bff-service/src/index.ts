@@ -1,3 +1,6 @@
+// OpenTelemetry must be initialized FIRST before any other imports
+import "@echo/telemetry";
+
 import "reflect-metadata";
 import express from "express";
 import { createServer } from "http";
@@ -6,7 +9,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
+import { requestContextMiddleware } from "@echo/telemetry";
+import { createHttpStream } from "@echo/logger";
 import { config } from "./config/env";
 import "./container"; // Auto-configure dependency injection
 import { container } from "./container";
@@ -17,6 +21,7 @@ import { RabbitMQConsumer } from "./workers/RabbitMQConsumer";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { socketAuth, AuthenticatedSocket } from "./middleware/auth";
 import bffRoutes from "./routes";
+import morgan from "morgan";
 
 const app = express();
 const httpServer = createServer(app);
@@ -31,11 +36,11 @@ const io = new SocketIOServer(httpServer, {
   pingInterval: config.socketIO.pingInterval,
 });
 
-// Correlation middleware - MUST BE FIRST
-app.use(correlationMiddleware("bff-service"));
+// Request context middleware - MUST BE FIRST (sets up OTel context)
+app.use(requestContextMiddleware());
 
-// HTTP request logging with correlation context
-app.use(createHttpLogger(logger));
+// HTTP request logging
+app.use(morgan("combined", { stream: createHttpStream(logger) }));
 
 // Security middleware
 app.use(helmet());

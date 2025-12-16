@@ -1,22 +1,22 @@
 /**
  * BFF Service Logger
  *
- * Contextual logger that auto-injects correlation ID and user context
- * from AsyncLocalStorage into every log entry.
+ * Logger that outputs JSON to stdout for Grafana/Loki.
+ * OTel Winston instrumentation automatically injects trace_id and span_id.
  *
  * Usage:
  * ```typescript
  * import logger from './utils/logger';
  *
  * logger.info('Processing request', { userId: '123' });
- * // Output includes: correlationId, userId, workspaceId (automatically)
+ * // Output includes trace_id, span_id automatically via OTel
  * ```
  */
 
-import { createContextualLogger } from "@echo/correlation";
+import { createLogger } from "@echo/logger";
 
-// Create contextual logger for BFF service
-const logger = createContextualLogger({
+// Create logger for BFF service
+const logger = createLogger({
   serviceName: "bff-service",
   logLevel: process.env.LOG_LEVEL || "info",
 });

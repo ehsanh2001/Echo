@@ -25,9 +25,9 @@
   "author": "Echo Team",
   "license": "MIT",
   "dependencies": {
-    "@echo/correlation": "file:../shared/correlation",
     "@echo/http-client": "file:../shared/http-client",
     "@echo/logger": "file:../shared/logger",
+    "@echo/telemetry": "file:../shared/telemetry",
     "amqplib": "^0.10.3",
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",

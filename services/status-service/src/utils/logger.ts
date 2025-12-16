@@ -1,10 +1,10 @@
-import { createContextualLogger } from "@echo/correlation";
+import { createLogger } from "@echo/logger";
 
 /**
- * Contextual logger for status-service
- * Automatically includes correlationId, userId in all log entries
+ * Logger for status-service
+ * OTel Winston instrumentation automatically adds trace_id/span_id
  */
-const logger = createContextualLogger({
+const logger = createLogger({
   serviceName: "status-service",
   logLevel: process.env.LOG_LEVEL || "info",
   enableFileLogging: process.env.ENABLE_FILE_LOGGING === "true",

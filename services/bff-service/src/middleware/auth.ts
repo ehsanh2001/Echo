@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { Socket } from "socket.io";
-import { updateContext } from "@echo/correlation";
+import { updateContext } from "@echo/telemetry";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 

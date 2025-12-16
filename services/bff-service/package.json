@@ -15,9 +15,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@echo/correlation": "file:../shared/correlation",
     "@echo/http-client": "file:../shared/http-client",
     "@echo/logger": "file:../shared/logger",
+    "@echo/telemetry": "file:../shared/telemetry",
     "@socket.io/redis-adapter": "^8.3.0",
     "amqplib": "^0.10.9",
     "axios": "^1.12.2",

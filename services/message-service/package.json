@@ -16,8 +16,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@echo/correlation": "file:../shared/correlation",
     "@echo/logger": "file:../shared/logger",
+    "@echo/telemetry": "file:../shared/telemetry",
     "@prisma/client": "^6.16.2",
     "@types/uuid": "^11.0.0",
     "amqplib": "^0.10.9",

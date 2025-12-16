@@ -18,8 +18,8 @@
     "db:setup": "./setup-db.sh"
   },
   "dependencies": {
-    "@echo/correlation": "file:../shared/correlation",
     "@echo/logger": "file:../shared/logger",
+    "@echo/telemetry": "file:../shared/telemetry",
     "@prisma/client": "^6.16.2",
     "@types/bcryptjs": "^3.0.0",
     "bcrypt": "^5.1.1",

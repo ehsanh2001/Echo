@@ -4,7 +4,7 @@
  * Provides standardized JSON logging for containerized Echo services:
  * - Always outputs JSON format to stdout/stderr
  * - Service name tagging
- * - Automatic correlation ID injection via @echo/correlation
+ * - Automatic trace context injection via OTel Winston instrumentation
  * - Optimized for Grafana/Loki log aggregation
  *
  * Usage:

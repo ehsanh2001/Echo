@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { updateContext } from "@echo/correlation";
+import { updateContext } from "@echo/telemetry";
 import { JWTService } from "../utils/jwt";
 import { JwtPayload, TokenType } from "../types/jwt.types";
 import { UserServiceError } from "../types/error.types";

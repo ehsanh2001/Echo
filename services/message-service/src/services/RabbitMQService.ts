@@ -1,6 +1,6 @@
 import { injectable } from "tsyringe";
 import amqp from "amqplib";
-import { getCorrelationId, getUserId } from "@echo/correlation";
+import { getTraceId, getUserId } from "@echo/telemetry";
 import logger from "../utils/logger";
 import {
   IRabbitMQService,
@@ -98,8 +98,8 @@ export class RabbitMQService implements IRabbitMQService {
         throw new Error("RabbitMQ not initialized - call initialize() first");
       }
 
-      // Capture correlation context from AsyncLocalStorage
-      const correlationId = getCorrelationId();
+      // Capture trace context from OTel
+      const correlationId = getTraceId();
       const userId = getUserId();
 
       // Enrich event with correlation metadata (only add if defined)

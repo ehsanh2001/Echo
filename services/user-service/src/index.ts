@@ -1,20 +1,25 @@
+// OpenTelemetry must be initialized FIRST before any other imports
+import "@echo/telemetry";
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { correlationMiddleware, createHttpLogger } from "@echo/correlation";
+import { requestContextMiddleware } from "@echo/telemetry";
+import { createHttpStream } from "@echo/logger";
 import { config } from "./config/env";
 import logger from "./utils/logger";
 import userRoutes from "./routes/userRoutes";
 import { prisma } from "./config/prisma";
+import morgan from "morgan";
 
 const app = express();
 
-// Correlation middleware - MUST BE FIRST
-app.use(correlationMiddleware("user-service"));
+// Request context middleware - MUST BE FIRST (sets up OTel context)
+app.use(requestContextMiddleware());
 
-// HTTP request logging with correlation context
-app.use(createHttpLogger(logger));
+// HTTP request logging
+app.use(morgan("combined", { stream: createHttpStream(logger) }));
 
 app.use(helmet());
 app.use(cors());
