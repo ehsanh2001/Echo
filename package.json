@@ -40,6 +40,7 @@
   "dependencies": {
     "@echo/correlation": "file:services/shared/correlation",
     "@echo/logger": "file:services/shared/logger",
+    "@echo/telemetry": "file:services/shared/telemetry",
     "morgan": "^1.10.1",
     "uuid": "^13.0.0"
   }
