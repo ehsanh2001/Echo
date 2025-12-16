@@ -7,6 +7,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { requestContextMiddleware } from "@echo/telemetry";
 import { createHttpStream } from "@echo/logger";
+import { metricsMiddleware, metricsEndpoint } from "@echo/metrics";
 import { config } from "./config/env";
 import logger from "./utils/logger";
 import userRoutes from "./routes/userRoutes";
@@ -15,7 +16,13 @@ import morgan from "morgan";
 
 const app = express();
 
-// Request context middleware - MUST BE FIRST (sets up OTel context)
+// Metrics endpoint FIRST - before any other middleware (no auth, no rate limit)
+app.get("/metrics", metricsEndpoint());
+
+// Initialize metrics collection
+app.use(metricsMiddleware({ serviceName: "user-service" }));
+
+// Request context middleware - sets up OTel context
 app.use(requestContextMiddleware());
 
 // HTTP request logging
@@ -28,6 +35,7 @@ const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max,
   message: "Too many requests from this IP, please try again later.",
+  skip: (req) => req.path === "/metrics", // Skip rate limiting for metrics
 });
 app.use(limiter);
 

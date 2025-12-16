@@ -5,6 +5,7 @@ import "reflect-metadata";
 import express, { Request, Response } from "express";
 import { requestContextMiddleware } from "@echo/telemetry";
 import { createHttpStream } from "@echo/logger";
+import { metricsMiddleware, metricsEndpoint } from "@echo/metrics";
 import { config } from "./config/env";
 import logger from "./utils/logger";
 import { container } from "./container";
@@ -14,8 +15,14 @@ import morgan from "morgan";
 
 const app = express();
 
+// Metrics endpoint FIRST - before any other middleware (no auth, no rate limit)
+app.get("/metrics", metricsEndpoint());
+
+// Initialize metrics collection
+app.use(metricsMiddleware({ serviceName: "notification-service" }));
+
 // Middleware
-app.use(requestContextMiddleware()); // FIRST middleware - sets up OTel context
+app.use(requestContextMiddleware()); // Sets up OTel context
 app.use(morgan("combined", { stream: createHttpStream(logger) })); // HTTP request logging
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

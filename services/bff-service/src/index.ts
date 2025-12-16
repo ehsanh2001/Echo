@@ -11,6 +11,11 @@ import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { requestContextMiddleware } from "@echo/telemetry";
 import { createHttpStream } from "@echo/logger";
+import {
+  metricsMiddleware,
+  metricsEndpoint,
+  createWebSocketConnectionsGauge,
+} from "@echo/metrics";
 import { config } from "./config/env";
 import "./container"; // Auto-configure dependency injection
 import { container } from "./container";
@@ -36,7 +41,16 @@ const io = new SocketIOServer(httpServer, {
   pingInterval: config.socketIO.pingInterval,
 });
 
-// Request context middleware - MUST BE FIRST (sets up OTel context)
+// WebSocket connections gauge for metrics
+const wsConnectionsGauge = createWebSocketConnectionsGauge();
+
+// Metrics endpoint FIRST - before any other middleware (no auth, no rate limit)
+app.get("/metrics", metricsEndpoint());
+
+// Initialize metrics collection
+app.use(metricsMiddleware({ serviceName: "bff-service" }));
+
+// Request context middleware - sets up OTel context
 app.use(requestContextMiddleware());
 
 // HTTP request logging
@@ -70,6 +84,7 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === "/metrics", // Skip rate limiting for metrics
 });
 app.use(limiter);
 
@@ -134,6 +149,9 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   const userId = socket.user!.userId;
   logger.info(`Socket connected: ${socket.id}, User: ${userId}`);
 
+  // Track WebSocket connection for metrics
+  wsConnectionsGauge.inc();
+
   // Auto-join user-specific room for direct notifications
   socket.join(`user:${userId}`);
 
@@ -170,6 +188,8 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   );
 
   socket.on("disconnect", (reason) => {
+    // Track WebSocket disconnection for metrics
+    wsConnectionsGauge.dec();
     logger.info(
       `Socket disconnected: ${socket.id}, User: ${userId}, reason: ${reason}`
     );

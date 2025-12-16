@@ -17,6 +17,7 @@
   "dependencies": {
     "@echo/http-client": "file:../shared/http-client",
     "@echo/logger": "file:../shared/logger",
+    "@echo/metrics": "file:../shared/metrics",
     "@echo/telemetry": "file:../shared/telemetry",
     "@socket.io/redis-adapter": "^8.3.0",
     "amqplib": "^0.10.9",

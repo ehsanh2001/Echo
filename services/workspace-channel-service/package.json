@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@echo/logger": "file:../shared/logger",
+    "@echo/metrics": "file:../shared/metrics",
     "@echo/telemetry": "file:../shared/telemetry",
     "@prisma/client": "^6.16.2",
     "amqplib": "^0.10.4",
