@@ -12,10 +12,7 @@
 loki.source.docker "backend_containers" {
   host       = "unix:///var/run/docker.sock"
   targets    = discovery.docker.backend_services.targets
-  forward_to = [loki.process.backend_logs.receiver]
-  
-  // Relabel container logs
-  relabel_rules = loki.relabel.backend_containers.rules
+  forward_to = [loki.relabel.backend_containers.receiver]
 }
 
 // Docker service discovery - find Echo backend services
@@ -33,6 +30,8 @@ discovery.docker "backend_services" {
 
 // Relabel rules to extract service names and add labels
 loki.relabel "backend_containers" {
+  forward_to = [loki.process.backend_logs.receiver]
+  
   // Only keep our backend services (exclude infrastructure)
   rule {
     source_labels = ["__meta_docker_container_name"]

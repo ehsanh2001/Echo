@@ -236,6 +236,46 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Frontend - Next.js application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: echo-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # API Configuration
+      - NEXT_PUBLIC_API_URL=http://localhost:8004
+      - NEXT_PUBLIC_BFF_URL=http://localhost:8004
+
+      # App Configuration
+      - NEXT_PUBLIC_APP_NAME=Echo
+      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
+
+      # Observability Configuration (Grafana Faro)
+      - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://alloy:12347/collect
+      - NEXT_PUBLIC_APP_VERSION=1.0.0
+      - NEXT_PUBLIC_APP_ENVIRONMENT=${NODE_ENV:-development}
+    depends_on:
+      - bff-service
+      - alloy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   # BFF Service - Backend for Frontend with real-time WebSocket support
   bff-service:
     build:
@@ -365,16 +405,15 @@ services:
       test:
         [
           "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:13133/",
+          "/otelcol-contrib",
+          "validate",
+          "--config",
+          "/etc/otel-collector-config.yaml",
         ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
       start_period: 10s
+      retries: 3
     restart: unless-stopped
 
   # Prometheus - Metrics storage and querying

@@ -119,10 +119,6 @@ function initFaro() {
         environment: APP_ENVIRONMENT,
       },
 
-      // Disable console transport - logs only go to Alloy, NOT to browser console
-      // This keeps the browser DevTools clean
-      transports: [],
-
       instrumentations: [
         // Web Vitals, errors, and basic instrumentation
         // captureConsole is disabled - we handle console suppression ourselves
