@@ -152,3 +152,70 @@ export interface CreateChannelResponse {
   message: string;
   timestamp: string;
 }
+
+// ===== WORKSPACE MEMBERS TYPES =====
+
+/**
+ * Enriched user information from user-service (cached)
+ */
+export interface EnrichedUserInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  lastSeen: Date | null;
+}
+
+/**
+ * Workspace member with enriched user data
+ */
+export interface WorkspaceMemberWithUser {
+  userId: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+/**
+ * Channel member with enriched user data
+ */
+export interface ChannelMemberWithUser {
+  userId: string;
+  channelId: string;
+  role: ChannelRole;
+  joinedAt: string;
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+/**
+ * Channel with its members
+ */
+export interface ChannelWithMembers {
+  id: string;
+  name: string;
+  displayName: string | null;
+  type: ChannelType;
+  members: ChannelMemberWithUser[];
+}
+
+/**
+ * Response data for workspace members endpoint
+ */
+export interface WorkspaceMembersData {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceMembers: WorkspaceMemberWithUser[];
+  channels: ChannelWithMembers[];
+}
+
+/**
+ * API response for workspace members endpoint
+ */
+export interface GetWorkspaceMembersResponse {
+  success: boolean;
+  data: WorkspaceMembersData;
+  timestamp: string;
+}

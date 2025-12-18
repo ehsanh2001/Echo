@@ -26,6 +26,9 @@ interface WorkspaceState {
   /** Display name of the currently selected channel (for UI display) */
   selectedChannelDisplayName: string | null;
 
+  /** Whether to show workspace members (true) or channel members (false) in the sidebar */
+  showWorkspaceMembers: boolean;
+
   // Actions
   setSelectedWorkspace: (
     workspaceId: string | null,
@@ -37,6 +40,8 @@ interface WorkspaceState {
   ) => void;
   clearSelectedChannel: () => void;
   clearWorkspaceState: () => void;
+  setShowWorkspaceMembers: (show: boolean) => void;
+  toggleMembersView: () => void;
 }
 
 /**
@@ -82,6 +87,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         selectedWorkspaceDisplayName: null,
         selectedChannelId: null,
         selectedChannelDisplayName: null,
+        showWorkspaceMembers: false,
 
         // Actions
         setSelectedWorkspace: (workspaceId, displayName) =>
@@ -108,7 +114,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             selectedWorkspaceDisplayName: null,
             selectedChannelId: null,
             selectedChannelDisplayName: null,
+            showWorkspaceMembers: false,
           }),
+
+        setShowWorkspaceMembers: (show) => set({ showWorkspaceMembers: show }),
+
+        toggleMembersView: () =>
+          set((state) => ({
+            showWorkspaceMembers: !state.showWorkspaceMembers,
+          })),
       }),
       {
         name: "workspace-ui-state", // LocalStorage key
@@ -117,6 +131,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           selectedWorkspaceDisplayName: state.selectedWorkspaceDisplayName,
           selectedChannelId: state.selectedChannelId,
           selectedChannelDisplayName: state.selectedChannelDisplayName,
+          showWorkspaceMembers: state.showWorkspaceMembers,
         }),
       }
     ),

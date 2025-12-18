@@ -9,6 +9,7 @@ import {
   CreateWorkspaceResponse,
   CheckNameAvailabilityResponse,
   GetUserMembershipsResponse,
+  GetWorkspaceMembersResponse,
   WorkspaceError,
 } from "@/types/workspace";
 
@@ -87,6 +88,31 @@ export async function getUserMemberships(
       ? `${WORKSPACE_BASE_URL}/me/memberships?includeChannels=true`
       : `${WORKSPACE_BASE_URL}/me/memberships`;
     const response = await apiClient.get<GetUserMembershipsResponse>(url);
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * Get workspace members and channel members
+ *
+ * @param workspaceId - The workspace ID to fetch members for
+ * @returns Promise with workspace members and channel members data
+ *
+ * Response structure:
+ * - workspaceId: The workspace ID
+ * - workspaceName: The workspace name
+ * - workspaceMembers: Array of workspace members with enriched user info
+ * - channels: Array of channels the user has access to with their members
+ */
+export async function getWorkspaceMembers(
+  workspaceId: string
+): Promise<GetWorkspaceMembersResponse> {
+  try {
+    const response = await apiClient.get<GetWorkspaceMembersResponse>(
+      `${WORKSPACE_BASE_URL}/${workspaceId}/members`
+    );
     return response;
   } catch (error: any) {
     throw error;
