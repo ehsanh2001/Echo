@@ -99,6 +99,12 @@ export const config = {
     userServiceUrl: getOptionalEnv("USER_SERVICE_URL", "http://localhost:8001"),
   },
 
+  // Redis Configuration (for caching user data)
+  redis: {
+    url: getRequiredEnv("REDIS_URL"),
+    password: getRequiredEnv("REDIS_PASSWORD"),
+  },
+
   // Frontend Configuration
   frontend: {
     baseUrl: getRequiredEnv("FRONTEND_BASE_URL"),
@@ -192,6 +198,19 @@ export function validateConfig() {
         "JWT_SECRET must be at least 32 characters long in production"
       );
     }
+
+    // Production-specific Redis security validation
+    const redisUrl = config.redis.url.toLowerCase();
+
+    // Validate Redis connection uses TLS in production
+    if (!redisUrl.startsWith("rediss://")) {
+      errors.push("Redis must use secure connection (rediss://) in production");
+    }
+
+    // Validate Redis not using localhost in production
+    if (redisUrl.includes("localhost") || redisUrl.includes("127.0.0.1")) {
+      errors.push("Redis should not use localhost in production environment");
+    }
   }
 
   // Port validation
@@ -240,6 +259,7 @@ export function validateConfig() {
   );
   console.log(`Service: ${config.service.name}`);
   console.log(`User Service URL: ${config.service.userServiceUrl}`);
+  console.log(`Redis: ${config.redis.url.substring(0, 20)}...`);
 
   // Parse and display database connection details (safely, without credentials)
   const dbUrl = new URL(config.database.url);

@@ -26,6 +26,7 @@ import { OutboxService } from "./services/OutboxService";
 import { RabbitMQService } from "./services/RabbitMQService";
 import { OutboxPublisher } from "./workers/OutboxPublisher";
 import { UserServiceClient } from "./services/userServiceClient";
+import { CacheService } from "./services/CacheService";
 
 /**
  * Dependency Injection Container Configuration
@@ -56,6 +57,7 @@ container.registerSingleton<IOutboxRepository>(
 );
 
 // Register services
+container.registerSingleton<CacheService>("CacheService", CacheService);
 container.registerSingleton<UserServiceClient>(
   "UserServiceClient",
   UserServiceClient
