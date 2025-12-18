@@ -49,4 +49,16 @@ export interface IUserService {
    * @throws {UserServiceError} When database operation fails (PROFILE_RETRIEVAL_FAILED)
    */
   getPublicProfileByEmail(email: string): Promise<UserProfile>;
+
+  /**
+   * Retrieves multiple user profiles by their IDs
+   *
+   * Used for batch fetching user information for member lists and enrichment.
+   * Returns safe, public information for all found active users.
+   *
+   * @param userIds - Array of user IDs to fetch
+   * @returns Promise resolving to array of user profiles
+   * @throws {UserServiceError} When database operation fails
+   */
+  getUsersByIds(userIds: string[]): Promise<UserProfile[]>;
 }

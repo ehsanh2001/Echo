@@ -185,6 +185,53 @@ export class UserController {
   };
 
   /**
+   * POST /users/batch
+   * Batch fetch user profiles by IDs - no authentication required
+   * Used by other services to enrich user data
+   */
+  static getUsersByIds = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { userIds } = req.body;
+
+      if (!userIds || !Array.isArray(userIds)) {
+        res.status(400).json({
+          success: false,
+          message: "userIds array is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      if (userIds.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: [],
+        });
+        return;
+      }
+
+      // Limit batch size to prevent abuse
+      if (userIds.length > 100) {
+        res.status(400).json({
+          success: false,
+          message: "Maximum 100 user IDs allowed per request",
+          code: "BATCH_SIZE_EXCEEDED",
+        });
+        return;
+      }
+
+      const profiles = await UserController.userService.getUsersByIds(userIds);
+
+      res.status(200).json({
+        success: true,
+        data: profiles,
+      });
+    } catch (error) {
+      UserController.handleError(error, res, "Get users by IDs");
+    }
+  };
+
+  /**
    * Handles errors consistently across all endpoints
    *
    * @param error - The error that occurred

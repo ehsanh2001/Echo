@@ -150,6 +150,35 @@ export class UserService implements IUserService {
     }
   }
 
+  /**
+   * Retrieves multiple user profiles by their IDs
+   *
+   * Used for batch fetching user information for member lists and enrichment.
+   * Returns safe, public information for all found active users.
+   *
+   * @param userIds - Array of user IDs to fetch
+   * @returns Promise resolving to array of user profiles
+   */
+  async getUsersByIds(userIds: string[]): Promise<UserProfile[]> {
+    try {
+      if (!userIds || userIds.length === 0) {
+        return [];
+      }
+
+      logger.debug("Fetching users by IDs", { count: userIds.length });
+      const users = await this.userRepository.findByIds(userIds);
+
+      return users.map((user) => this.formatUserProfile(user));
+    } catch (error) {
+      logger.error("Error getting users by IDs", { error });
+      throw new UserServiceError(
+        "Failed to retrieve user profiles",
+        "BATCH_PROFILE_RETRIEVAL_FAILED",
+        500
+      );
+    }
+  }
+
   // =============================================================================
   // Private Helper Methods
   // =============================================================================

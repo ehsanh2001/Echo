@@ -192,4 +192,39 @@ export class UserRepository implements IUserRepository {
       );
     }
   }
+
+  /**
+   * Finds multiple users by their IDs
+   *
+   * Searches for active, non-deleted users matching the provided IDs.
+   * Used for batch fetching user information.
+   *
+   * @param userIds - Array of user IDs to fetch
+   * @returns Promise resolving to array of found users
+   */
+  async findByIds(userIds: string[]): Promise<User[]> {
+    try {
+      if (userIds.length === 0) {
+        return [];
+      }
+
+      logger.debug("Finding users by IDs", { count: userIds.length });
+      return await prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+          deletedAt: null, // Only non-deleted users
+          isActive: true, // Only active users
+        },
+      });
+    } catch (error) {
+      logger.error("Error finding users by IDs", { error });
+      throw new Error(
+        `Failed to find users by IDs: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
 }

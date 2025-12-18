@@ -587,4 +587,189 @@ describe("UserRepository", () => {
       );
     });
   });
+
+  describe("findByIds", () => {
+    it("should return multiple users by their IDs", async () => {
+      // Arrange - create test users
+      const user1Data: CreateUserData = {
+        email: "repo_test_batch1@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_batch_user1",
+        displayName: "Batch User 1",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const user2Data: CreateUserData = {
+        email: "repo_test_batch2@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_batch_user2",
+        displayName: "Batch User 2",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const user3Data: CreateUserData = {
+        email: "repo_test_batch3@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_batch_user3",
+        displayName: "Batch User 3",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const user1 = await userRepository.create(user1Data);
+      const user2 = await userRepository.create(user2Data);
+      const user3 = await userRepository.create(user3Data);
+
+      // Act
+      const users = await userRepository.findByIds([
+        user1.id,
+        user2.id,
+        user3.id,
+      ]);
+
+      // Assert
+      expect(users).toHaveLength(3);
+      const userIds = users.map((u) => u.id);
+      expect(userIds).toContain(user1.id);
+      expect(userIds).toContain(user2.id);
+      expect(userIds).toContain(user3.id);
+    });
+
+    it("should return empty array when no user IDs provided", async () => {
+      // Act
+      const users = await userRepository.findByIds([]);
+
+      // Assert
+      expect(users).toEqual([]);
+    });
+
+    it("should exclude inactive users", async () => {
+      // Arrange - create active and inactive users
+      const activeUserData: CreateUserData = {
+        email: "repo_test_active_batch@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_active_batch",
+        displayName: "Active Batch User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const inactiveUserData: CreateUserData = {
+        email: "repo_test_inactive_batch@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_inactive_batch",
+        displayName: "Inactive Batch User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: false,
+      };
+
+      const activeUser = await userRepository.create(activeUserData);
+      const inactiveUser = await userRepository.create(inactiveUserData);
+
+      // Act
+      const users = await userRepository.findByIds([
+        activeUser.id,
+        inactiveUser.id,
+      ]);
+
+      // Assert
+      expect(users).toHaveLength(1);
+      expect(users[0]!.id).toBe(activeUser.id);
+      expect(users[0]!.isActive).toBe(true);
+    });
+
+    it("should exclude deleted users", async () => {
+      // Arrange - create non-deleted and deleted users
+      const normalUserData: CreateUserData = {
+        email: "repo_test_normal_batch@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_normal_batch",
+        displayName: "Normal Batch User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const deletedUserData: CreateUserData = {
+        email: "repo_test_deleted_batch@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_deleted_batch",
+        displayName: "Deleted Batch User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: new Date(),
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const normalUser = await userRepository.create(normalUserData);
+      const deletedUser = await userRepository.create(deletedUserData);
+
+      // Act
+      const users = await userRepository.findByIds([
+        normalUser.id,
+        deletedUser.id,
+      ]);
+
+      // Assert
+      expect(users).toHaveLength(1);
+      expect(users[0]!.id).toBe(normalUser.id);
+      expect(users[0]!.deletedAt).toBeNull();
+    });
+
+    it("should handle mix of existing and non-existing IDs", async () => {
+      // Arrange
+      const userData: CreateUserData = {
+        email: "repo_test_existing_batch@example.com",
+        passwordHash: "hashedpassword123",
+        username: "repo_test_existing_batch",
+        displayName: "Existing Batch User",
+        bio: null,
+        avatarUrl: null,
+        lastSeen: null,
+        deletedAt: null,
+        roles: ["user"],
+        isActive: true,
+      };
+
+      const existingUser = await userRepository.create(userData);
+      const nonExistingId = "00000000-0000-0000-0000-000000000000";
+
+      // Act
+      const users = await userRepository.findByIds([
+        existingUser.id,
+        nonExistingId,
+      ]);
+
+      // Assert
+      expect(users).toHaveLength(1);
+      expect(users[0]!.id).toBe(existingUser.id);
+    });
+  });
 });

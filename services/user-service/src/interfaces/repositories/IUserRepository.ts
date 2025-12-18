@@ -71,4 +71,15 @@ export interface IUserRepository {
    * @returns Promise resolving to user if found, null otherwise
    */
   findByEmail(email: string): Promise<User | null>;
+
+  /**
+   * Finds multiple users by their IDs
+   *
+   * Searches for active, non-deleted users matching the provided IDs.
+   * Used for batch fetching user information.
+   *
+   * @param userIds - Array of user IDs to fetch
+   * @returns Promise resolving to array of found users
+   */
+  findByIds(userIds: string[]): Promise<User[]>;
 }
