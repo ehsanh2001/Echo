@@ -226,6 +226,42 @@ export class WorkspaceController {
   };
 
   /**
+   * GET /api/workspaces/:id/members
+   * Forward get workspace members to workspace-channel service
+   *
+   * Returns all workspace members and channel members (for channels the user has access to)
+   * with enriched user information.
+   *
+   * @returns {WorkspaceMembersResponse} Response containing:
+   * - workspaceId: string - The workspace ID
+   * - workspaceName: string - The workspace name
+   * - workspaceMembers: WorkspaceMemberWithUserInfo[] - Array of workspace members with user details
+   * - channels: ChannelWithMembers[] - Array of channels with their members (user has access to)
+   */
+  static getWorkspaceMembers = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const authHeader = req.headers.authorization;
+
+      const response = await httpClient.get(
+        `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${id}/members`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+        }
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      WorkspaceController.handleError(error, res, "Get workspace members");
+    }
+  };
+
+  /**
    * Handle errors from workspace-channel service
    * Maps axios errors to appropriate HTTP responses
    */

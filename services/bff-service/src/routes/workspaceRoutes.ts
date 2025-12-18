@@ -192,6 +192,54 @@ workspaceRoutes.get(
 workspaceRoutes.post("/:id/invites", jwtAuth, WorkspaceController.createInvite);
 
 /**
+ * GET /api/workspaces/:id/members
+ * Get workspace members and channel members
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspaceId": "uuid",
+ *     "workspaceName": "my-workspace",
+ *     "workspaceMembers": [
+ *       {
+ *         "userId": "uuid",
+ *         "role": "admin",
+ *         "joinedAt": "2025-10-27T...",
+ *         "isActive": true,
+ *         "user": {
+ *           "id": "uuid",
+ *           "username": "johndoe",
+ *           "displayName": "John Doe",
+ *           "email": "john@example.com",
+ *           "avatarUrl": "https://...",
+ *           "lastSeen": "2025-10-27T..."
+ *         }
+ *       }
+ *     ],
+ *     "channels": [
+ *       {
+ *         "id": "uuid",
+ *         "name": "general",
+ *         "displayName": "General",
+ *         "type": "public",
+ *         "members": [...]
+ *       }
+ *     ]
+ *   },
+ *   "timestamp": "2025-10-27T..."
+ * }
+ */
+workspaceRoutes.get(
+  "/:id/members",
+  jwtAuth,
+  WorkspaceController.getWorkspaceMembers
+);
+
+/**
  * GET /api/workspaces/:id
  * Get workspace details
  *
