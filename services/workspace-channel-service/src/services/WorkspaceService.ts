@@ -6,6 +6,7 @@ import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { IInviteRepository } from "../interfaces/repositories/IInviteRepository";
+import { IOutboxService } from "../interfaces/services/IOutboxService";
 import { UserServiceClient } from "./userServiceClient";
 import {
   CreateWorkspaceRequest,
@@ -38,6 +39,7 @@ export class WorkspaceService implements IWorkspaceService {
     @inject("IChannelRepository") private channelRepository: IChannelRepository,
     @inject("IInviteRepository") private inviteRepository: IInviteRepository,
     @inject("UserServiceClient") private userServiceClient: UserServiceClient,
+    @inject("IOutboxService") private outboxService: IOutboxService,
     @inject(PrismaClient) private prisma: PrismaClient
   ) {}
 
@@ -395,6 +397,15 @@ export class WorkspaceService implements IWorkspaceService {
         `✅ Invite accepted: User ${userId} joined workspace ${workspace.name} and ${result.publicChannels.length} public channels`
       );
 
+      // Publish member events (outside transaction for better isolation)
+      await this.publishMemberJoinedEvents(
+        result.workspace,
+        result.publicChannels,
+        userId,
+        invite.role,
+        invite.id
+      );
+
       // Build response
       return {
         message: "Invite accepted successfully",
@@ -515,6 +526,87 @@ export class WorkspaceService implements IWorkspaceService {
     }
 
     return publicChannels;
+  }
+
+  /**
+   * Publishes member joined events for workspace and channels
+   * @private
+   */
+  private async publishMemberJoinedEvents(
+    workspace: Workspace,
+    publicChannels: any[],
+    userId: string,
+    role: string,
+    inviteId: string
+  ): Promise<void> {
+    try {
+      // Fetch user details for the event payload
+      const userDetails = await this.fetchUserDetailsForEvent(userId);
+
+      // Publish workspace.member.joined event
+      await this.outboxService.createWorkspaceMemberJoinedEvent({
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+        userId,
+        role: role as "admin" | "member",
+        user: userDetails,
+        inviteId,
+      });
+
+      logger.info(
+        `📤 Published workspace.member.joined event for user ${userId} in workspace ${workspace.name}`
+      );
+
+      // Publish channel.member.joined events for each public channel
+      for (const channel of publicChannels) {
+        await this.outboxService.createChannelMemberJoinedEvent({
+          channelId: channel.id,
+          channelName: channel.name,
+          workspaceId: workspace.id,
+          userId,
+          role: "member",
+          user: userDetails,
+        });
+      }
+
+      logger.info(
+        `📤 Published ${publicChannels.length} channel.member.joined events for user ${userId}`
+      );
+    } catch (error) {
+      // Log error but don't fail the invite acceptance
+      // Events can be retried via outbox pattern if needed
+      logger.error("Error publishing member joined events:", error);
+    }
+  }
+
+  /**
+   * Fetches user details from user service for event payloads
+   * @private
+   */
+  private async fetchUserDetailsForEvent(
+    userId: string
+  ): Promise<EnrichedUserInfo> {
+    try {
+      const usersMap = await this.userServiceClient.getUsersByIds([userId]);
+      const user = usersMap.get(userId);
+      if (user) {
+        return user;
+      }
+    } catch (error) {
+      logger.warn(
+        `Failed to fetch user details for event, using placeholder: ${error}`
+      );
+    }
+
+    // Return placeholder if user fetch fails
+    return {
+      id: userId,
+      username: "unknown",
+      displayName: "Unknown User",
+      email: "",
+      avatarUrl: null,
+      lastSeen: null,
+    };
   }
 
   /**

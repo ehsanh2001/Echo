@@ -83,10 +83,85 @@ export interface MemberJoinedWorkspaceEvent {
 }
 
 /**
+ * User info included in member events
+ */
+export interface MemberEventUserInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  lastSeen: Date | null;
+}
+
+/**
+ * Workspace member joined event (from workspace-channel service)
+ */
+export interface WorkspaceMemberJoinedEvent {
+  type: "workspace.member.joined";
+  payload: {
+    workspaceId: string;
+    workspaceName: string;
+    userId: string;
+    role: "admin" | "member";
+    user: MemberEventUserInfo;
+    inviteId?: string;
+  };
+  timestamp: string;
+}
+
+/**
+ * Workspace member left event (from workspace-channel service)
+ */
+export interface WorkspaceMemberLeftEvent {
+  type: "workspace.member.left";
+  payload: {
+    workspaceId: string;
+    workspaceName: string;
+    userId: string;
+  };
+  timestamp: string;
+}
+
+/**
+ * Channel member joined event (from workspace-channel service)
+ */
+export interface ChannelMemberJoinedEvent {
+  type: "channel.member.joined";
+  payload: {
+    channelId: string;
+    channelName: string;
+    workspaceId: string;
+    userId: string;
+    role: "admin" | "member";
+    user: MemberEventUserInfo;
+  };
+  timestamp: string;
+}
+
+/**
+ * Channel member left event (from workspace-channel service)
+ */
+export interface ChannelMemberLeftEvent {
+  type: "channel.member.left";
+  payload: {
+    channelId: string;
+    channelName: string;
+    workspaceId: string;
+    userId: string;
+  };
+  timestamp: string;
+}
+
+/**
  * Union type of all events BFF consumes
  */
 export type RabbitMQEvent =
   | MessageCreatedEvent
   | WorkspaceCreatedEvent
   | ChannelCreatedEvent
-  | MemberJoinedWorkspaceEvent;
+  | MemberJoinedWorkspaceEvent
+  | WorkspaceMemberJoinedEvent
+  | WorkspaceMemberLeftEvent
+  | ChannelMemberJoinedEvent
+  | ChannelMemberLeftEvent;

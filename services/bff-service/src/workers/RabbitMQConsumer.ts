@@ -96,8 +96,24 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         autoDelete: true, // Delete queue when all consumers disconnect
       });
 
-      // Bind queue to echo.events exchange with routing key
+      // Bind queue to echo.events exchange with routing keys
       await ch.bindQueue(this.queueName, this.exchange, "message.created");
+      await ch.bindQueue(
+        this.queueName,
+        this.exchange,
+        "workspace.member.joined"
+      );
+      await ch.bindQueue(
+        this.queueName,
+        this.exchange,
+        "workspace.member.left"
+      );
+      await ch.bindQueue(
+        this.queueName,
+        this.exchange,
+        "channel.member.joined"
+      );
+      await ch.bindQueue(this.queueName, this.exchange, "channel.member.left");
 
       // Start consuming
       await ch.consume(this.queueName, (msg) => this.handleMessage(msg), {
@@ -175,6 +191,22 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         await this.handleMessageCreated(event);
         break;
 
+      case "workspace.member.joined":
+        await this.handleWorkspaceMemberJoined(event);
+        break;
+
+      case "workspace.member.left":
+        await this.handleWorkspaceMemberLeft(event);
+        break;
+
+      case "channel.member.joined":
+        await this.handleChannelMemberJoined(event);
+        break;
+
+      case "channel.member.left":
+        await this.handleChannelMemberLeft(event);
+        break;
+
       default:
         logger.warn("Unknown event type", { type: (event as any).type });
     }
@@ -198,6 +230,102 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       workspaceId,
       channelId,
       messageId: event.payload.id,
+      room: roomName,
+    });
+  }
+
+  /**
+   * Handle workspace.member.joined event
+   * Broadcast to all clients in the workspace room
+   */
+  private async handleWorkspaceMemberJoined(
+    event: RabbitMQEvent
+  ): Promise<void> {
+    const { workspaceId, userId, user } = (event as any).payload;
+
+    // Broadcast to workspace room
+    const roomName = `workspace:${workspaceId}`;
+
+    this.io.to(roomName).emit("workspace:member:joined", {
+      workspaceId,
+      userId,
+      user,
+    });
+
+    logger.info("Broadcasted workspace.member.joined", {
+      workspaceId,
+      userId,
+      room: roomName,
+    });
+  }
+
+  /**
+   * Handle workspace.member.left event
+   * Broadcast to all clients in the workspace room
+   */
+  private async handleWorkspaceMemberLeft(event: RabbitMQEvent): Promise<void> {
+    const { workspaceId, userId } = (event as any).payload;
+
+    // Broadcast to workspace room
+    const roomName = `workspace:${workspaceId}`;
+
+    this.io.to(roomName).emit("workspace:member:left", {
+      workspaceId,
+      userId,
+    });
+
+    logger.info("Broadcasted workspace.member.left", {
+      workspaceId,
+      userId,
+      room: roomName,
+    });
+  }
+
+  /**
+   * Handle channel.member.joined event
+   * Broadcast to all clients in the channel room
+   */
+  private async handleChannelMemberJoined(event: RabbitMQEvent): Promise<void> {
+    const { workspaceId, channelId, userId, user } = (event as any).payload;
+
+    // Broadcast to channel room
+    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
+
+    this.io.to(roomName).emit("channel:member:joined", {
+      workspaceId,
+      channelId,
+      userId,
+      user,
+    });
+
+    logger.info("Broadcasted channel.member.joined", {
+      workspaceId,
+      channelId,
+      userId,
+      room: roomName,
+    });
+  }
+
+  /**
+   * Handle channel.member.left event
+   * Broadcast to all clients in the channel room
+   */
+  private async handleChannelMemberLeft(event: RabbitMQEvent): Promise<void> {
+    const { workspaceId, channelId, userId } = (event as any).payload;
+
+    // Broadcast to channel room
+    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
+
+    this.io.to(roomName).emit("channel:member:left", {
+      workspaceId,
+      channelId,
+      userId,
+    });
+
+    logger.info("Broadcasted channel.member.left", {
+      workspaceId,
+      channelId,
+      userId,
       room: roomName,
     });
   }

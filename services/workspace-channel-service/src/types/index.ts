@@ -338,14 +338,90 @@ export interface ChannelMemberAddedEventPayload extends BaseEventPayload<
   aggregateType: "channel";
 }
 
+// ===== WORKSPACE MEMBER EVENTS =====
+
+// Member event types
+export type MemberEventType =
+  | "workspace.member.joined"
+  | "workspace.member.left"
+  | "channel.member.joined"
+  | "channel.member.left";
+
+// Workspace member joined event data
+export interface WorkspaceMemberJoinedEventData {
+  workspaceId: string;
+  workspaceName: string;
+  userId: string;
+  role: WorkspaceRole;
+  user: EnrichedUserInfo;
+  inviteId?: string;
+}
+
+// Workspace member joined event payload
+export interface WorkspaceMemberJoinedEventPayload extends BaseEventPayload<
+  "workspace.member.joined",
+  WorkspaceMemberJoinedEventData
+> {
+  aggregateType: "workspace";
+}
+
+// Workspace member left event data
+export interface WorkspaceMemberLeftEventData {
+  workspaceId: string;
+  workspaceName: string;
+  userId: string;
+}
+
+// Workspace member left event payload
+export interface WorkspaceMemberLeftEventPayload extends BaseEventPayload<
+  "workspace.member.left",
+  WorkspaceMemberLeftEventData
+> {
+  aggregateType: "workspace";
+}
+
+// Channel member joined event data
+export interface ChannelMemberJoinedEventData {
+  channelId: string;
+  channelName: string;
+  workspaceId: string;
+  userId: string;
+  role: ChannelRole;
+  user: EnrichedUserInfo;
+}
+
+// Channel member joined event payload
+export interface ChannelMemberJoinedEventPayload extends BaseEventPayload<
+  "channel.member.joined",
+  ChannelMemberJoinedEventData
+> {
+  aggregateType: "channel";
+}
+
+// Channel member left event data
+export interface ChannelMemberLeftEventData {
+  channelId: string;
+  channelName: string;
+  workspaceId: string;
+  userId: string;
+}
+
+// Channel member left event payload
+export interface ChannelMemberLeftEventPayload extends BaseEventPayload<
+  "channel.member.left",
+  ChannelMemberLeftEventData
+> {
+  aggregateType: "channel";
+}
+
 // ===== UNION TYPES FOR TYPE SAFETY =====
 
 // All event types in this service
 export type ServiceEventType =
   | "workspace.invite.created"
   | "channel.created"
-  | "channel.member.added";
-// Add more as needed
+  | "channel.member.added"
+  | MemberEventType;
 
 // All aggregate types in this service
 export type AggregateType = "workspace" | "channel" | "user" | "message";
@@ -354,8 +430,11 @@ export type AggregateType = "workspace" | "channel" | "user" | "message";
 export type EventPayload =
   | WorkspaceInviteCreatedEventPayload
   | ChannelCreatedEventPayload
-  | ChannelMemberAddedEventPayload;
-// Add more as needed
+  | ChannelMemberAddedEventPayload
+  | WorkspaceMemberJoinedEventPayload
+  | WorkspaceMemberLeftEventPayload
+  | ChannelMemberJoinedEventPayload
+  | ChannelMemberLeftEventPayload;
 
 // ===== INVITE ACCEPTANCE TYPES =====
 

@@ -1,10 +1,16 @@
 import { inject, injectable } from "tsyringe";
 import { OutboxEvent } from "@prisma/client";
 import { getTraceId, getUserId } from "@echo/telemetry";
-import { IOutboxService } from "../interfaces/services/IOutboxService";
+import {
+  IOutboxService,
+  CreateWorkspaceMemberJoinedEventData,
+  CreateChannelMemberJoinedEventData,
+} from "../interfaces/services/IOutboxService";
 import { IOutboxRepository } from "../interfaces/repositories/IOutboxRepository";
 import {
   WorkspaceInviteCreatedEventPayload,
+  WorkspaceMemberJoinedEventPayload,
+  ChannelMemberJoinedEventPayload,
   CreateOutboxEventData,
   CreateInviteEventData,
 } from "../types";
@@ -41,6 +47,67 @@ export class OutboxService implements IOutboxService {
       causationId
     );
     return await this.createWorkspaceInviteCreatedEvent(payload);
+  }
+
+  /**
+   * Create a workspace member joined event
+   *
+   * @param eventData - Workspace member joined data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  async createWorkspaceMemberJoinedEvent(
+    eventData: CreateWorkspaceMemberJoinedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent> {
+    const payload = this.createWorkspaceMemberJoinedPayload(
+      eventData,
+      correlationId,
+      causationId
+    );
+
+    const outboxData: CreateOutboxEventData = {
+      workspaceId: eventData.workspaceId,
+      aggregateType: payload.aggregateType,
+      aggregateId: eventData.workspaceId,
+      eventType: payload.eventType,
+      payload: payload,
+    };
+
+    return await this.outboxRepository.create(outboxData);
+  }
+
+  /**
+   * Create a channel member joined event
+   *
+   * @param eventData - Channel member joined data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  async createChannelMemberJoinedEvent(
+    eventData: CreateChannelMemberJoinedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent> {
+    const payload = this.createChannelMemberJoinedPayload(
+      eventData,
+      correlationId,
+      causationId
+    );
+
+    const outboxData: CreateOutboxEventData = {
+      workspaceId: eventData.workspaceId,
+      channelId: eventData.channelId,
+      aggregateType: payload.aggregateType,
+      aggregateId: eventData.channelId,
+      eventType: payload.eventType,
+      payload: payload,
+    };
+
+    return await this.outboxRepository.create(outboxData);
   }
 
   /**
@@ -117,6 +184,75 @@ export class OutboxService implements IOutboxService {
       version: "1.0",
       data: inviteData,
       metadata,
+    };
+  }
+
+  /**
+   * Create metadata object for event payloads
+   */
+  private createMetadata(correlationId?: string, causationId?: string) {
+    const effectiveCorrelationId = correlationId ?? getTraceId();
+    const userId = getUserId();
+
+    const metadata: {
+      source: "workspace-channel-service";
+      correlationId?: string;
+      causationId?: string;
+      userId?: string;
+    } = {
+      source: "workspace-channel-service",
+    };
+
+    if (effectiveCorrelationId) {
+      metadata.correlationId = effectiveCorrelationId;
+    }
+    if (causationId) {
+      metadata.causationId = causationId;
+    }
+    if (userId) {
+      metadata.userId = userId;
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Create workspace member joined event payload
+   */
+  private createWorkspaceMemberJoinedPayload(
+    eventData: CreateWorkspaceMemberJoinedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): WorkspaceMemberJoinedEventPayload {
+    return {
+      eventId: randomUUID(),
+      eventType: "workspace.member.joined",
+      aggregateType: "workspace",
+      aggregateId: eventData.workspaceId,
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: eventData,
+      metadata: this.createMetadata(correlationId, causationId),
+    };
+  }
+
+  /**
+   * Create channel member joined event payload
+   */
+  private createChannelMemberJoinedPayload(
+    eventData: CreateChannelMemberJoinedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): ChannelMemberJoinedEventPayload {
+    return {
+      eventId: randomUUID(),
+      eventType: "channel.member.joined",
+      aggregateType: "channel",
+      aggregateId: eventData.channelId,
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: eventData,
+      metadata: this.createMetadata(correlationId, causationId),
     };
   }
 }
