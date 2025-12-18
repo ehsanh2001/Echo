@@ -1,5 +1,9 @@
 import { Channel, ChannelMember } from "@prisma/client";
-import { CreateChannelData, CreateChannelMemberData } from "../../types";
+import {
+  CreateChannelData,
+  CreateChannelMemberData,
+  ChannelWithMembersData,
+} from "../../types";
 
 /**
  * Interface for channel repository operations
@@ -137,4 +141,22 @@ export interface IChannelRepository {
       membership: ChannelMember;
     }>
   >;
+
+  /**
+   * Gets channel members for channels the user belongs to within a workspace.
+   * Only includes channels the user is a member of (to respect privacy).
+   * Excludes archived channels.
+   * By default, only returns active members. Channel owners/admins can see all members.
+   * Results are grouped by channel.
+   *
+   * @param workspaceId - The workspace ID
+   * @param userId - The user ID requesting the channel members
+   * @param channelIdsWithAdminAccess - Array of channel IDs where user is owner/admin (can see inactive members)
+   * @returns {Promise<ChannelWithMembersData[]>}
+   */
+  getChannelMembersByWorkspace(
+    workspaceId: string,
+    userId: string,
+    channelIdsWithAdminAccess?: string[]
+  ): Promise<ChannelWithMembersData[]>;
 }

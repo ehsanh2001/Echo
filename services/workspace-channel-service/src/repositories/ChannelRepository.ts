@@ -2,7 +2,11 @@ import { inject, injectable } from "tsyringe";
 import { PrismaClient, Channel, ChannelMember } from "@prisma/client";
 import logger from "../utils/logger";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
-import { CreateChannelData, CreateChannelMemberData } from "../types";
+import {
+  CreateChannelData,
+  CreateChannelMemberData,
+  ChannelWithMembersData,
+} from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 
 /**
@@ -370,6 +374,108 @@ export class ChannelRepository implements IChannelRepository {
       logger.error("Error finding channel memberships by user ID:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find channel memberships: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Gets channel members for channels the user belongs to within a workspace.
+   * Only includes channels the user is a member of (to respect privacy).
+   * Excludes archived channels.
+   * By default, only returns active members. Channel owners/admins can see all members.
+   * Results are grouped by channel.
+   */
+  async getChannelMembersByWorkspace(
+    workspaceId: string,
+    userId: string,
+    channelIdsWithAdminAccess: string[] = []
+  ): Promise<ChannelWithMembersData[]> {
+    try {
+      // First, get all channels the user is a member of in this workspace
+      const userChannelMemberships = await this.prisma.channelMember.findMany({
+        where: {
+          userId,
+          channel: {
+            workspaceId,
+            isArchived: false,
+          },
+        },
+        select: {
+          channelId: true,
+        },
+      });
+
+      // Extract channel IDs
+      const userChannelIds = userChannelMemberships.map((m) => m.channelId);
+
+      // If user has no channels, return empty array
+      if (userChannelIds.length === 0) {
+        return [];
+      }
+
+      // Find all channels the user has access to
+      const channels = await this.prisma.channel.findMany({
+        where: {
+          workspaceId,
+          id: {
+            in: userChannelIds,
+          },
+          isArchived: false,
+        },
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          type: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      });
+
+      // For each channel, get members (all members if user is admin/owner, else only active)
+      const channelsWithMembers = await Promise.all(
+        channels.map(async (channel) => {
+          // Check if user has admin access to this channel
+          const hasAdminAccess = channelIdsWithAdminAccess.includes(channel.id);
+
+          const whereClause: any = {
+            channelId: channel.id,
+          };
+
+          // If user doesn't have admin access, only show active members
+          if (!hasAdminAccess) {
+            whereClause.isActive = true;
+          }
+
+          const members = await this.prisma.channelMember.findMany({
+            where: whereClause,
+            select: {
+              userId: true,
+              role: true,
+              joinedAt: true,
+              isActive: true,
+            },
+            orderBy: {
+              joinedAt: "asc",
+            },
+          });
+
+          return {
+            channelId: channel.id,
+            channelName: channel.name,
+            channelDisplayName: channel.displayName,
+            channelType: channel.type,
+            members,
+          };
+        })
+      );
+
+      return channelsWithMembers;
+    } catch (error: any) {
+      logger.error("Error getting channel members by workspace:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to get channel members: ${error.message}`
       );
     }
   }

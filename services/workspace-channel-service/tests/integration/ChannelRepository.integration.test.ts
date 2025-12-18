@@ -947,4 +947,382 @@ describe("ChannelRepository Integration Tests", () => {
       expect(result).toHaveLength(0);
     });
   });
+
+  describe("getChannelMembersByWorkspace", () => {
+    it("should return channel members for channels user belongs to", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "members-test");
+      const userId = randomUUID();
+
+      // Create two channels - use userId as creator so they're automatically added
+      const channel1 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "channel-1",
+        { type: "public", createdBy: userId }
+      );
+
+      const channel2 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "channel-2",
+        { type: "private", createdBy: userId }
+      );
+
+      // Add other members to both channels
+      const otherUser1 = randomUUID();
+      const otherUser2 = randomUUID();
+
+      await channelRepository.addOrReactivateMember(
+        channel1.id,
+        otherUser1,
+        userId,
+        "member"
+      );
+
+      await channelRepository.addOrReactivateMember(
+        channel2.id,
+        otherUser2,
+        userId,
+        "member"
+      );
+
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        userId
+      );
+
+      // Should return 2 channels with their members
+      expect(result).toHaveLength(2);
+
+      // Check channel 1 - should have userId (owner) + otherUser1 (member)
+      const channel1Result = result.find((c) => c.channelId === channel1.id);
+      expect(channel1Result).toBeDefined();
+      expect(channel1Result?.channelName).toBe(channel1.name);
+      expect(channel1Result?.channelType).toBe("public");
+      expect(channel1Result?.members).toHaveLength(2);
+
+      const channel1UserIds = channel1Result?.members.map((m) => m.userId);
+      expect(channel1UserIds).toContain(userId);
+      expect(channel1UserIds).toContain(otherUser1);
+
+      // Check channel 2
+      const channel2Result = result.find((c) => c.channelId === channel2.id);
+      expect(channel2Result).toBeDefined();
+      expect(channel2Result?.channelName).toBe(channel2.name);
+      expect(channel2Result?.channelType).toBe("private");
+      expect(channel2Result?.members).toHaveLength(2);
+
+      const channel2UserIds = channel2Result?.members.map((m) => m.userId);
+      expect(channel2UserIds).toContain(userId);
+      expect(channel2UserIds).toContain(otherUser2);
+    });
+
+    it("should return empty array when user has no channels", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "no-channels-test");
+      const userId = randomUUID();
+
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        userId
+      );
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should exclude archived channels", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "archived-test");
+      const userId = randomUUID();
+
+      // Create two channels
+      const activeChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "active-channel",
+        { type: "public" }
+      );
+
+      const archivedChannel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "archived-channel",
+        { type: "public" }
+      );
+
+      // Add user to both channels
+      await channelRepository.addOrReactivateMember(
+        activeChannel.id,
+        userId,
+        userId,
+        "member"
+      );
+      await channelRepository.addOrReactivateMember(
+        archivedChannel.id,
+        userId,
+        userId,
+        "member"
+      );
+
+      // Archive one channel
+      await db.channel.update({
+        where: { id: archivedChannel.id },
+        data: { isArchived: true },
+      });
+
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        userId
+      );
+
+      // Should only return the active channel
+      expect(result).toHaveLength(1);
+      expect(result[0]?.channelId).toBe(activeChannel.id);
+    });
+
+    it("should exclude inactive members", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(
+        db,
+        "inactive-member-test"
+      );
+      const userId = randomUUID();
+      const activeMember = randomUUID();
+      const inactiveMember = randomUUID();
+
+      // Create a channel with userId as creator (automatically added as owner)
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "test-channel",
+        { type: "public", createdBy: userId }
+      );
+
+      // Add two more members
+      await channelRepository.addOrReactivateMember(
+        channel.id,
+        activeMember,
+        userId,
+        "member"
+      );
+      const inactiveMembership = await channelRepository.addOrReactivateMember(
+        channel.id,
+        inactiveMember,
+        userId,
+        "member"
+      );
+
+      // Deactivate one member
+      await db.channelMember.update({
+        where: { id: inactiveMembership.id },
+        data: { isActive: false },
+      });
+
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        userId
+      );
+
+      // Should return channel with only active members (userId + activeMember)
+      expect(result).toHaveLength(1);
+      expect(result[0]?.members).toHaveLength(2);
+
+      const memberUserIds = result[0]?.members.map((m) => m.userId);
+      expect(memberUserIds).toContain(userId);
+      expect(memberUserIds).toContain(activeMember);
+      expect(memberUserIds).not.toContain(inactiveMember);
+    });
+
+    it("should only return channels in the specified workspace", async () => {
+      const db = prismaClientWithModels(prisma);
+      const workspace1 = await createTestWorkspace(db, "workspace-1");
+      const workspace2 = await createTestWorkspace(db, "workspace-2");
+      const userId = randomUUID();
+
+      // Create channels in both workspaces
+      const channel1 = await createTestChannel(
+        channelRepository,
+        workspace1.id,
+        "channel-1",
+        { type: "public" }
+      );
+
+      const channel2 = await createTestChannel(
+        channelRepository,
+        workspace2.id,
+        "channel-2",
+        { type: "public" }
+      );
+
+      // Add user to both channels
+      await channelRepository.addOrReactivateMember(
+        channel1.id,
+        userId,
+        userId,
+        "member"
+      );
+      await channelRepository.addOrReactivateMember(
+        channel2.id,
+        userId,
+        userId,
+        "member"
+      );
+
+      // Query for workspace1 channels only
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        workspace1.id,
+        userId
+      );
+
+      // Should only return channel1 from workspace1
+      expect(result).toHaveLength(1);
+      expect(result[0]?.channelId).toBe(channel1.id);
+    });
+
+    it("should include member roles and joinedAt dates", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "roles-test");
+      const ownerId = randomUUID();
+      const adminId = randomUUID();
+      const memberId = randomUUID();
+
+      // Create a channel with ownerId as creator (automatically added as owner)
+      const channel = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "roles-channel",
+        { type: "public", createdBy: ownerId }
+      );
+
+      // Add members with different roles (ownerId already added as owner by createTestChannel)
+      await channelRepository.addOrReactivateMember(
+        channel.id,
+        adminId,
+        ownerId,
+        "admin"
+      );
+      await channelRepository.addOrReactivateMember(
+        channel.id,
+        memberId,
+        ownerId,
+        "member"
+      );
+
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        ownerId
+      );
+
+      expect(result).toHaveLength(1);
+      const channelResult = result[0];
+      expect(channelResult?.members).toHaveLength(3);
+
+      // Check roles are correct
+      const owner = channelResult?.members.find((m) => m.userId === ownerId);
+      const admin = channelResult?.members.find((m) => m.userId === adminId);
+      const member = channelResult?.members.find((m) => m.userId === memberId);
+
+      expect(owner?.role).toBe("owner");
+      expect(admin?.role).toBe("admin");
+      expect(member?.role).toBe("member");
+
+      // Check all have joinedAt dates
+      channelResult?.members.forEach((m) => {
+        expect(m.joinedAt).toBeDefined();
+        expect(m.joinedAt).toBeInstanceOf(Date);
+        expect(m.isActive).toBe(true);
+      });
+    });
+
+    it("should include inactive members for channels where user is admin/owner", async () => {
+      const db = prismaClientWithModels(prisma);
+      const testWorkspace = await createTestWorkspace(db, "admin-access-test");
+      const userId = randomUUID();
+
+      // Create two channels - userId is owner of channel1, regular member of channel2
+      const channel1 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "admin-channel",
+        { type: "public", createdBy: userId }
+      );
+
+      const channel2Creator = randomUUID();
+      const channel2 = await createTestChannel(
+        channelRepository,
+        testWorkspace.id,
+        "member-channel",
+        { type: "public", createdBy: channel2Creator }
+      );
+
+      // Add userId as member to channel2
+      await channelRepository.addOrReactivateMember(
+        channel2.id,
+        userId,
+        channel2Creator,
+        "member"
+      );
+
+      // Add inactive members to both channels
+      const inactiveMember1 = randomUUID();
+      const inactiveMembership1 = await channelRepository.addOrReactivateMember(
+        channel1.id,
+        inactiveMember1,
+        userId,
+        "member"
+      );
+
+      const inactiveMember2 = randomUUID();
+      const inactiveMembership2 = await channelRepository.addOrReactivateMember(
+        channel2.id,
+        inactiveMember2,
+        channel2Creator,
+        "member"
+      );
+
+      // Deactivate both members
+      await db.channelMember.update({
+        where: { id: inactiveMembership1.id },
+        data: { isActive: false },
+      });
+
+      await db.channelMember.update({
+        where: { id: inactiveMembership2.id },
+        data: { isActive: false },
+      });
+
+      // Call with admin access for channel1 only
+      const result = await channelRepository.getChannelMembersByWorkspace(
+        testWorkspace.id,
+        userId,
+        [channel1.id] // userId has admin access to channel1
+      );
+
+      expect(result).toHaveLength(2);
+
+      // Channel 1 - user is owner, should see inactive member
+      const channel1Result = result.find((c) => c.channelId === channel1.id);
+      expect(channel1Result?.members).toHaveLength(2); // userId (owner) + inactive member
+      const channel1UserIds = channel1Result?.members.map((m) => m.userId);
+      expect(channel1UserIds).toContain(userId);
+      expect(channel1UserIds).toContain(inactiveMember1);
+
+      const inactiveMem1 = channel1Result?.members.find(
+        (m) => m.userId === inactiveMember1
+      );
+      expect(inactiveMem1?.isActive).toBe(false);
+
+      // Channel 2 - user is regular member, should NOT see inactive member
+      const channel2Result = result.find((c) => c.channelId === channel2.id);
+      expect(channel2Result?.members).toHaveLength(2); // channel2Creator (owner) + userId (member)
+      const channel2UserIds = channel2Result?.members.map((m) => m.userId);
+      expect(channel2UserIds).not.toContain(inactiveMember2);
+
+      // All returned members in channel2 should be active
+      channel2Result?.members.forEach((m) => {
+        expect(m.isActive).toBe(true);
+      });
+    });
+  });
 });

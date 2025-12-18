@@ -1,5 +1,9 @@
 import { Workspace, WorkspaceMember } from "@prisma/client";
-import { CreateWorkspaceData, CreateWorkspaceMemberData } from "../../types";
+import {
+  CreateWorkspaceData,
+  CreateWorkspaceMemberData,
+  WorkspaceMemberData,
+} from "../../types";
 
 /**
  * Interface for workspace repository operations
@@ -99,6 +103,28 @@ export interface IWorkspaceRepository {
       workspace: Workspace;
       memberCount: number;
       userRole: string;
+    }>
+  >;
+
+  /**
+   * Gets members of a workspace.
+   * By default, only returns active members (isActive: true).
+   * Workspace owners/admins can see all members by setting includeInactive to true.
+   * Results are sorted by joinedAt in ascending order.
+   *
+   * @param workspaceId - The workspace ID
+   * @param includeInactive - Whether to include inactive members (for admins/owners)
+   * @returns {Promise<Array<{userId: string, role: string, joinedAt: Date, isActive: boolean}>>}
+   */
+  getMembers(
+    workspaceId: string,
+    includeInactive?: boolean
+  ): Promise<
+    Array<{
+      userId: string;
+      role: string;
+      joinedAt: Date;
+      isActive: boolean;
     }>
   >;
 }

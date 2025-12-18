@@ -384,3 +384,76 @@ export interface AcceptInviteResponse {
   workspace: AcceptInviteWorkspaceInfo;
   channels: AcceptInviteChannelInfo[];
 }
+
+// ===== WORKSPACE & CHANNEL MEMBERS TYPES =====
+
+// Enriched user info (cached from user-service)
+export interface EnrichedUserInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  lastSeen: Date | null;
+}
+
+// Raw workspace member data (from repository, before user enrichment)
+export interface WorkspaceMemberData {
+  userId: string;
+  role: WorkspaceRole;
+  joinedAt: Date;
+  isActive: boolean;
+}
+
+// Raw channel member data (from repository, before user enrichment)
+export interface ChannelMemberData {
+  userId: string;
+  role: ChannelRole;
+  joinedAt: Date;
+  isActive: boolean;
+}
+
+// Channel with raw member data (from repository)
+export interface ChannelWithMembersData {
+  channelId: string;
+  channelName: string;
+  channelDisplayName: string | null;
+  channelType: ChannelType;
+  members: ChannelMemberData[];
+}
+
+// Workspace member with enriched user data (for API responses)
+export interface WorkspaceMemberWithUserInfo {
+  userId: string;
+  role: WorkspaceRole;
+  joinedAt: Date;
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+// Channel member with enriched user data (for API responses)
+export interface ChannelMemberWithUserInfo {
+  userId: string;
+  channelId: string;
+  role: ChannelRole;
+  joinedAt: Date;
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+// Channel with its members (for API responses)
+export interface ChannelWithMembers {
+  id: string;
+  name: string;
+  displayName: string | null;
+  type: ChannelType;
+  members: ChannelMemberWithUserInfo[];
+}
+
+// Response for workspace members endpoint
+export interface WorkspaceMembersResponse {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceMembers: WorkspaceMemberWithUserInfo[];
+  channels: ChannelWithMembers[];
+}

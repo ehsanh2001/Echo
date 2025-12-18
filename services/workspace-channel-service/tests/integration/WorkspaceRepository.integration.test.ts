@@ -854,11 +854,250 @@ describe("WorkspaceRepository Integration Tests", () => {
     it("should handle user with no workspaces gracefully", async () => {
       const nonExistentUserId = randomUUID();
 
-      const result = await workspaceRepository.findWorkspacesByUserId(
-        nonExistentUserId
-      );
+      const result =
+        await workspaceRepository.findWorkspacesByUserId(nonExistentUserId);
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe("getActiveMembers", () => {
+    it("should return all active members for a workspace", async () => {
+      const testId = randomUUID();
+      const ownerId = randomUUID();
+
+      // Create a test workspace
+      const workspace = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}active-members-${testId}`,
+          displayName: `Active Members Test ${testId}`,
+          ownerId: ownerId,
+        },
+        ownerId
+      );
+
+      // Add two more members
+      const member1Id = randomUUID();
+      const member2Id = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: member1Id,
+        role: "admin",
+      });
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: member2Id,
+        role: "member",
+      });
+
+      const result = await workspaceRepository.getMembers(workspace.id);
+
+      // Should return 3 members (owner + 2 added members)
+      expect(result).toHaveLength(3);
+
+      // Check if all members are present
+      const userIds = result.map((m) => m.userId);
+      expect(userIds).toContain(ownerId);
+      expect(userIds).toContain(member1Id);
+      expect(userIds).toContain(member2Id);
+
+      // Check roles
+      const ownerMember = result.find((m) => m.userId === ownerId);
+      const adminMember = result.find((m) => m.userId === member1Id);
+      const regularMember = result.find((m) => m.userId === member2Id);
+
+      expect(ownerMember?.role).toBe("owner");
+      expect(adminMember?.role).toBe("admin");
+      expect(regularMember?.role).toBe("member");
+
+      // Check that all have joinedAt dates
+      result.forEach((member) => {
+        expect(member.joinedAt).toBeDefined();
+        expect(member.joinedAt).toBeInstanceOf(Date);
+        expect(member.isActive).toBe(true);
+      });
+    });
+
+    it("should return empty array for workspace with no members", async () => {
+      const testId = randomUUID();
+      const ownerId = randomUUID();
+
+      // Create a workspace
+      const workspace = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}no-members-${testId}`,
+          displayName: `No Members Test ${testId}`,
+          ownerId: ownerId,
+        },
+        ownerId
+      );
+
+      // Delete the owner membership to simulate empty workspace
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.deleteMany({
+        where: { workspaceId: workspace.id },
+      });
+
+      const result = await workspaceRepository.getMembers(workspace.id);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should exclude inactive members", async () => {
+      const testId = randomUUID();
+      const ownerId = randomUUID();
+
+      // Create a workspace
+      const workspace = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}inactive-members-${testId}`,
+          displayName: `Inactive Members Test ${testId}`,
+          ownerId: ownerId,
+        },
+        ownerId
+      );
+
+      // Add two members
+      const activeMemberId = randomUUID();
+      const inactiveMemberId = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: activeMemberId,
+        role: "member",
+      });
+
+      const inactiveMembership = await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: inactiveMemberId,
+        role: "member",
+      });
+
+      // Deactivate one member
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: { id: inactiveMembership.id },
+        data: { isActive: false },
+      });
+
+      const result = await workspaceRepository.getMembers(workspace.id);
+
+      // Should only return 2 active members (owner + activeMember)
+      expect(result).toHaveLength(2);
+
+      const userIds = result.map((m) => m.userId);
+      expect(userIds).toContain(ownerId);
+      expect(userIds).toContain(activeMemberId);
+      expect(userIds).not.toContain(inactiveMemberId);
+
+      // Verify all returned members are active
+      result.forEach((member) => {
+        expect(member.isActive).toBe(true);
+      });
+    });
+
+    it("should return members sorted by joinedAt in ascending order", async () => {
+      const testId = randomUUID();
+      const ownerId = randomUUID();
+
+      // Create a workspace
+      const workspace = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}sorted-members-${testId}`,
+          displayName: `Sorted Members Test ${testId}`,
+          ownerId: ownerId,
+        },
+        ownerId
+      );
+
+      // Add members with slight delays to ensure different joinedAt times
+      const member1Id = randomUUID();
+      const member2Id = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: member1Id,
+        role: "member",
+      });
+
+      // Small delay to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: member2Id,
+        role: "member",
+      });
+
+      const result = await workspaceRepository.getMembers(workspace.id);
+
+      // Check that results are sorted by joinedAt in ascending order
+      for (let i = 1; i < result.length; i++) {
+        const current = result[i];
+        const previous = result[i - 1];
+        if (current && previous) {
+          expect(current.joinedAt.getTime()).toBeGreaterThanOrEqual(
+            previous.joinedAt.getTime()
+          );
+        }
+      }
+    });
+
+    it("should include inactive members when includeInactive is true", async () => {
+      const testId = randomUUID();
+      const ownerId = randomUUID();
+
+      // Create a workspace
+      const workspace = await workspaceRepository.create(
+        {
+          name: `${TEST_PREFIX}include-inactive-${testId}`,
+          displayName: `Include Inactive Test ${testId}`,
+          ownerId: ownerId,
+        },
+        ownerId
+      );
+
+      // Add active and inactive members
+      const activeMemberId = randomUUID();
+      const inactiveMemberId = randomUUID();
+
+      await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: activeMemberId,
+        role: "member",
+      });
+
+      const inactiveMembership = await workspaceRepository.addMember({
+        workspaceId: workspace.id,
+        userId: inactiveMemberId,
+        role: "member",
+      });
+
+      // Deactivate one member
+      const db = prismaClientWithModels(prisma);
+      await db.workspaceMember.update({
+        where: { id: inactiveMembership.id },
+        data: { isActive: false },
+      });
+
+      // Call with includeInactive = true
+      const result = await workspaceRepository.getMembers(workspace.id, true);
+
+      // Should return all 3 members (owner + active + inactive)
+      expect(result).toHaveLength(3);
+
+      const userIds = result.map((m) => m.userId);
+      expect(userIds).toContain(ownerId);
+      expect(userIds).toContain(activeMemberId);
+      expect(userIds).toContain(inactiveMemberId);
+
+      // Verify isActive flags are correct
+      const activeMember = result.find((m) => m.userId === activeMemberId);
+      const inactiveMember = result.find((m) => m.userId === inactiveMemberId);
+      expect(activeMember?.isActive).toBe(true);
+      expect(inactiveMember?.isActive).toBe(false);
     });
   });
 });

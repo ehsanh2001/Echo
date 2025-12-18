@@ -3,7 +3,11 @@ import { PrismaClient, Workspace, WorkspaceMember } from "@prisma/client";
 import logger from "../utils/logger";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
-import { CreateWorkspaceData, CreateWorkspaceMemberData } from "../types";
+import {
+  CreateWorkspaceData,
+  CreateWorkspaceMemberData,
+  WorkspaceMemberData,
+} from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 
 /**
@@ -314,6 +318,48 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       logger.error("Error finding workspaces by user ID:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to find workspaces: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Gets members of a workspace.
+   * By default, only returns active members (isActive: true).
+   * Workspace owners/admins can see all members by setting includeInactive to true.
+   * Results are sorted by joinedAt in ascending order.
+   */
+  async getMembers(
+    workspaceId: string,
+    includeInactive: boolean = false
+  ): Promise<WorkspaceMemberData[]> {
+    try {
+      const whereClause: any = {
+        workspaceId,
+      };
+
+      // If not including inactive, filter to only active members
+      if (!includeInactive) {
+        whereClause.isActive = true;
+      }
+
+      const members = await this.prisma.workspaceMember.findMany({
+        where: whereClause,
+        select: {
+          userId: true,
+          role: true,
+          joinedAt: true,
+          isActive: true,
+        },
+        orderBy: {
+          joinedAt: "asc",
+        },
+      });
+
+      return members;
+    } catch (error: any) {
+      logger.error("Error getting workspace members:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to get workspace members: ${error.message}`
       );
     }
   }
