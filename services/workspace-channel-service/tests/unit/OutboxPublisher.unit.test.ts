@@ -3,6 +3,7 @@ import { OutboxPublisher } from "../../src/workers/OutboxPublisher";
 import { IOutboxRepository } from "../../src/interfaces/repositories/IOutboxRepository";
 import { IRabbitMQService } from "../../src/interfaces/services/IRabbitMQService";
 import { PrismaClient, OutboxEvent, OutboxStatus } from "@prisma/client";
+import logger from "../../src/utils/logger";
 
 // Mock config
 jest.mock("../../src/config/env", () => ({
@@ -107,16 +108,16 @@ describe("OutboxPublisher - Unit Tests", () => {
     });
 
     it("should not start if already running", async () => {
-      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+      const loggerSpy = jest.spyOn(logger, "warn").mockImplementation();
 
       await outboxPublisher.start();
       await outboxPublisher.start(); // Try to start again
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("already running")
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Outbox publisher already running"
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
       await outboxPublisher.stop();
     });
 
@@ -154,15 +155,13 @@ describe("OutboxPublisher - Unit Tests", () => {
     });
 
     it("should not stop if not running", async () => {
-      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+      const loggerSpy = jest.spyOn(logger, "warn").mockImplementation();
 
       await outboxPublisher.stop();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("not running")
-      );
+      expect(loggerSpy).toHaveBeenCalledWith("Outbox publisher not running");
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it("should wait for current batch to complete", async () => {
@@ -404,7 +403,7 @@ describe("OutboxPublisher - Unit Tests", () => {
 
   describe("error handling", () => {
     it("should handle transaction errors gracefully", async () => {
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+      const loggerSpy = jest.spyOn(logger, "error").mockImplementation();
 
       mockTransaction.mockRejectedValue(new Error("Database error"));
 
@@ -415,12 +414,12 @@ describe("OutboxPublisher - Unit Tests", () => {
 
       await outboxPublisher.stop();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Error processing batch"),
-        expect.any(Error)
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Error processing outbox batch",
+        expect.objectContaining({ error: expect.any(Error) })
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it("should continue polling after batch error", async () => {

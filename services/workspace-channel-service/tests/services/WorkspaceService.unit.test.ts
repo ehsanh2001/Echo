@@ -1036,7 +1036,8 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.acceptInvite(
         "valid-token-123",
-        "user-789"
+        "user-789",
+        "test@example.com"
       );
 
       // Assert - Initial lookups happen outside transaction
@@ -1099,11 +1100,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.acceptInvite("invalid-token", "user-789")
+        workspaceService.acceptInvite(
+          "invalid-token",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.acceptInvite("invalid-token", "user-789")
+        workspaceService.acceptInvite(
+          "invalid-token",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toMatchObject({
         statusCode: 404,
         code: "NOT_FOUND",
@@ -1120,11 +1129,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toMatchObject({
         statusCode: 400,
         code: "BAD_REQUEST",
@@ -1141,11 +1158,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toMatchObject({
         statusCode: 410,
         code: "EXPIRED",
@@ -1159,11 +1184,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toMatchObject({
         statusCode: 404,
         code: "NOT_FOUND",
@@ -1181,11 +1214,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.acceptInvite("valid-token-123", "user-789")
+        workspaceService.acceptInvite(
+          "valid-token-123",
+          "user-789",
+          "test@example.com"
+        )
       ).rejects.toMatchObject({
         statusCode: 403,
         code: "FORBIDDEN",
@@ -1205,7 +1246,8 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.acceptInvite(
         "valid-token-123",
-        "user-789"
+        "user-789",
+        "test@example.com"
       );
 
       // Assert
@@ -1237,7 +1279,11 @@ describe("WorkspaceService (Unit Tests)", () => {
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
       // Act
-      await workspaceService.acceptInvite("valid-token-123", "user-789");
+      await workspaceService.acceptInvite(
+        "valid-token-123",
+        "user-789",
+        "test@example.com"
+      );
 
       // Assert - Should use userId when inviterId is null
       expect(
@@ -1274,7 +1320,11 @@ describe("WorkspaceService (Unit Tests)", () => {
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
       // Act
-      await workspaceService.acceptInvite("valid-token-123", "user-789");
+      await workspaceService.acceptInvite(
+        "valid-token-123",
+        "user-789",
+        "test@example.com"
+      );
 
       // Assert - Verify transaction was used
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);

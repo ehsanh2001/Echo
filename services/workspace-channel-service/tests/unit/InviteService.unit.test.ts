@@ -64,6 +64,7 @@ describe("InviteService", () => {
       countActiveMembers: jest.fn(),
       addOrReactivateMember: jest.fn(),
       findWorkspacesByUserId: jest.fn(),
+      getMembers: jest.fn(),
     };
 
     mockOutboxService = {
@@ -314,7 +315,15 @@ describe("InviteService", () => {
           workspaceId: mockWorkspace.id,
           email: mockInvite.email,
           inviteToken: mockInvite.inviteToken,
-        })
+          inviterUserId: expect.any(String),
+          workspaceName: expect.any(String),
+          workspaceDisplayName: expect.any(String),
+          role: expect.any(String),
+          expiresAt: expect.any(String),
+          inviteUrl: expect.any(String),
+          customMessage: undefined,
+        }),
+        undefined // correlationId
       );
     });
   });
