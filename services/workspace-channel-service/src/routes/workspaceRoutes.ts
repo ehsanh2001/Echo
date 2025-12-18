@@ -115,6 +115,53 @@ workspaceRoutes.post("/:workspaceId/invites", jwtAuth, async (req, res) => {
 });
 
 /**
+ * Get workspace members and channel members
+ * GET /api/ws-ch/workspaces/:workspaceId/members
+ *
+ * Returns all workspace members and channel members for channels the user belongs to
+ * Private channel members are hidden from non-members
+ * User data is enriched from user-service with caching
+ * Protected - requires JWT authentication and workspace membership
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspaceId": "uuid",
+ *     "workspaceName": "my-workspace",
+ *     "workspaceMembers": [
+ *       {
+ *         "userId": "uuid",
+ *         "role": "owner",
+ *         "joinedAt": "2025-10-03T...",
+ *         "user": {
+ *           "id": "uuid",
+ *           "username": "john_doe",
+ *           "displayName": "John Doe",
+ *           "email": "john@example.com",
+ *           "avatarUrl": "https://...",
+ *           "lastSeen": "2025-10-03T..."
+ *         }
+ *       }
+ *     ],
+ *     "channels": [
+ *       {
+ *         "id": "uuid",
+ *         "name": "general",
+ *         "displayName": "General",
+ *         "type": "public",
+ *         "members": [...]
+ *       }
+ *     ]
+ *   },
+ *   "timestamp": "2025-10-03T..."
+ * }
+ */
+workspaceRoutes.get("/:workspaceId/members", jwtAuth, async (req, res) => {
+  await workspaceController.getWorkspaceMembers(req as any, res);
+});
+
+/**
  * Get workspace details
  * GET /api/ws-ch/workspaces/:workspaceId
  *

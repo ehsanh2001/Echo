@@ -4,6 +4,7 @@ import {
   WorkspaceDetailsResponse,
   AcceptInviteResponse,
   UserMembershipsResponse,
+  WorkspaceMembersResponse,
 } from "../../types";
 
 /**
@@ -67,4 +68,17 @@ export interface IWorkspaceService {
     userId: string,
     includeChannels?: boolean
   ): Promise<UserMembershipsResponse>;
+
+  /**
+   * Get workspace members and channel members
+   * - Verifies user is a workspace member
+   * - Returns all active workspace members
+   * - Returns channel members for channels the user belongs to
+   * - Private channel members hidden from non-members
+   * - User data enriched from user-service with caching
+   */
+  getWorkspaceMembers(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceMembersResponse>;
 }

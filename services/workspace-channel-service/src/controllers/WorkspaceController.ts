@@ -9,6 +9,7 @@ import {
   CreateWorkspaceRequest,
   AcceptInviteRequest,
   CreateWorkspaceInviteRequest,
+  WorkspaceMembersResponse,
 } from "../types";
 import { WorkspaceChannelServiceError } from "../utils/errors";
 import { WorkspaceRole } from "@prisma/client";
@@ -327,6 +328,64 @@ export class WorkspaceController {
     }
 
     return request;
+  }
+
+  /**
+   * Get workspace members and channel members
+   * GET /api/ws-ch/workspaces/:workspaceId/members
+   */
+  async getWorkspaceMembers(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user.userId;
+
+      logger.info("Get workspace members request", {
+        userId,
+        workspaceId,
+      });
+
+      // Validate workspaceId
+      if (!workspaceId || workspaceId.trim() === "") {
+        res.status(400).json({
+          success: false,
+          error: "Workspace ID is required",
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      const result = await this.workspaceService.getWorkspaceMembers(
+        userId,
+        workspaceId
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("Error in getWorkspaceMembers controller:", error);
+
+      if (error instanceof WorkspaceChannelServiceError) {
+        res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          code: error.code,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   /**

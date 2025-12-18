@@ -16,6 +16,10 @@ import {
   UserMembershipsResponse,
   WorkspaceMembershipResponse,
   ChannelMembershipResponse,
+  WorkspaceMembersResponse,
+  WorkspaceMemberWithUserInfo,
+  ChannelWithMembers,
+  EnrichedUserInfo,
 } from "../types";
 import {
   validateCreateWorkspaceRequest,
@@ -582,5 +586,232 @@ export class WorkspaceService implements IWorkspaceService {
         "Failed to get user memberships"
       );
     }
+  }
+
+  /**
+   * Get workspace members and channel members for channels user belongs to
+   * Returns enriched user data with caching
+   *
+   * @param userId - The ID of the user requesting the data
+   * @param workspaceId - The workspace ID
+   * @returns WorkspaceMembersResponse with workspace members and channel members
+   * @throws WorkspaceChannelServiceError if user is not a member or workspace not found
+   */
+  async getWorkspaceMembers(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceMembersResponse> {
+    try {
+      logger.info(
+        `📋 Getting workspace members for workspace ${workspaceId} by user ${userId}`
+      );
+
+      // Verify membership and get workspace
+      const { workspace, isAdminOrOwner } =
+        await this.verifyWorkspaceMembershipAndAccess(userId, workspaceId);
+
+      // Get workspace members
+      const workspaceMembers = await this.workspaceRepository.getMembers(
+        workspaceId,
+        isAdminOrOwner
+      );
+
+      // Get channel data with admin access information
+      const { channelsWithMembers, channelIdsWithAdminAccess } =
+        await this.getChannelsWithAdminAccess(userId, workspaceId);
+
+      // Collect all unique user IDs and fetch their details
+      const userDetailsMap = await this.fetchUserDetails(
+        workspaceMembers,
+        channelsWithMembers
+      );
+
+      // Enrich data with user information
+      const enrichedWorkspaceMembers = this.enrichWorkspaceMembersWithUserData(
+        workspaceMembers,
+        userDetailsMap
+      );
+      const enrichedChannels = this.enrichChannelsWithUserData(
+        channelsWithMembers,
+        userDetailsMap
+      );
+
+      logger.info(
+        `✅ Retrieved ${enrichedWorkspaceMembers.length} workspace members and ${enrichedChannels.length} channels with members`
+      );
+
+      return {
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+        workspaceMembers: enrichedWorkspaceMembers,
+        channels: enrichedChannels,
+      };
+    } catch (error) {
+      if (error instanceof WorkspaceChannelServiceError) {
+        throw error;
+      }
+      logger.error("Error getting workspace members:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to get workspace members"
+      );
+    }
+  }
+
+  /**
+   * Verifies user workspace membership and determines admin access level
+   * @private
+   */
+  private async verifyWorkspaceMembershipAndAccess(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ workspace: Workspace; isAdminOrOwner: boolean }> {
+    // Verify user is a workspace member
+    const membership = await this.workspaceRepository.getMembership(
+      userId,
+      workspaceId
+    );
+
+    if (!membership || !membership.isActive) {
+      throw WorkspaceChannelServiceError.forbidden(
+        "You are not a member of this workspace"
+      );
+    }
+
+    // Get workspace info
+    const workspace = await this.workspaceRepository.findById(workspaceId);
+    if (!workspace) {
+      throw WorkspaceChannelServiceError.notFound(
+        "Workspace not found",
+        workspaceId
+      );
+    }
+
+    // Check if user is admin/owner (can see inactive members)
+    const isAdminOrOwner =
+      membership.role === "owner" || membership.role === "admin";
+
+    return { workspace, isAdminOrOwner };
+  }
+
+  /**
+   * Gets channel memberships and determines which channels user has admin access to
+   * @private
+   */
+  private async getChannelsWithAdminAccess(
+    userId: string,
+    workspaceId: string
+  ): Promise<{
+    channelsWithMembers: any[];
+    channelIdsWithAdminAccess: string[];
+  }> {
+    // Get user's channel memberships
+    const userChannelMemberships =
+      await this.channelRepository.getChannelMembershipsByUserId(
+        userId,
+        workspaceId
+      );
+
+    // Extract channel IDs where user has admin/owner role
+    const channelIdsWithAdminAccess = userChannelMemberships
+      .filter(
+        (cm) => cm.membership.role === "owner" || cm.membership.role === "admin"
+      )
+      .map((cm) => cm.channel.id);
+
+    // Get channel members for channels user belongs to
+    const channelsWithMembers =
+      await this.channelRepository.getChannelMembersByWorkspace(
+        workspaceId,
+        userId,
+        channelIdsWithAdminAccess
+      );
+
+    return { channelsWithMembers, channelIdsWithAdminAccess };
+  }
+
+  /**
+   * Collects unique user IDs and fetches their details with caching
+   * @private
+   */
+  private async fetchUserDetails(
+    workspaceMembers: any[],
+    channelsWithMembers: any[]
+  ): Promise<Map<string, EnrichedUserInfo>> {
+    // Collect all unique user IDs
+    const userIds = new Set<string>();
+    workspaceMembers.forEach((member) => userIds.add(member.userId));
+    channelsWithMembers.forEach((channel) =>
+      channel.members.forEach((member: any) => userIds.add(member.userId))
+    );
+
+    // Fetch user details with caching
+    return await this.userServiceClient.getUsersByIds(Array.from(userIds));
+  }
+
+  /**
+   * Enriches workspace members with user data
+   * @private
+   */
+  private enrichWorkspaceMembersWithUserData(
+    workspaceMembers: any[],
+    userDetailsMap: Map<string, EnrichedUserInfo>
+  ): WorkspaceMemberWithUserInfo[] {
+    return workspaceMembers
+      .map((member) => {
+        const userInfo = userDetailsMap.get(member.userId);
+        if (!userInfo) {
+          logger.warn(
+            `User data not found for workspace member: ${member.userId}`
+          );
+          return null;
+        }
+        return {
+          userId: member.userId,
+          role: member.role,
+          joinedAt: member.joinedAt,
+          user: userInfo,
+        };
+      })
+      .filter(
+        (member): member is WorkspaceMemberWithUserInfo => member !== null
+      );
+  }
+
+  /**
+   * Enriches channel members with user data
+   * @private
+   */
+  private enrichChannelsWithUserData(
+    channelsWithMembers: any[],
+    userDetailsMap: Map<string, EnrichedUserInfo>
+  ): ChannelWithMembers[] {
+    return channelsWithMembers.map((channel) => {
+      const enrichedMembers = channel.members
+        .map((member: any) => {
+          const userInfo = userDetailsMap.get(member.userId);
+          if (!userInfo) {
+            logger.warn(
+              `User data not found for channel member: ${member.userId}`
+            );
+            return null;
+          }
+          return {
+            userId: member.userId,
+            channelId: channel.channelId,
+            role: member.role,
+            joinedAt: member.joinedAt,
+            user: userInfo,
+          };
+        })
+        .filter((member: any) => member !== null);
+
+      return {
+        id: channel.channelId,
+        name: channel.channelName,
+        displayName: channel.channelDisplayName,
+        type: channel.channelType as any,
+        members: enrichedMembers as any[],
+      };
+    });
   }
 }
