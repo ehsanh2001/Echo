@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json ./
 
 # Install dependencies
-RUN npm install --production=false
+RUN npm install
 
 # Copy application code
 COPY . .
@@ -39,32 +39,27 @@ RUN npm run build
 
 # Stage 2: Runner
 FROM node:22-alpine AS runner
-WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create a non-root user BEFORE copying files
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+WORKDIR /app
+RUN chown nextjs:nodejs /app
 
-# Set correct permissions
-RUN chown -R nextjs:nodejs /app
-
-# Switch to non-root user
 USER nextjs
 
-# Expose port
+# Copy necessary files from builder with correct ownership
+COPY --chown=nextjs:nodejs --from=builder /app/public ./public
+COPY --chown=nextjs:nodejs --from=builder /app/.next/standalone ./
+COPY --chown=nextjs:nodejs --from=builder /app/.next/static ./.next/static
+
 EXPOSE 3000
 
-# Set hostname
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
-# Start the application
 CMD ["node", "server.js"]

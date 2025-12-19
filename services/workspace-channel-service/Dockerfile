@@ -1,82 +1,66 @@
 # ==================================
-# Stage 1: Builder - Build the application
+# Stage 1: Builder - Bundle the application
 # ==================================
 FROM node:22-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-COPY package*.json ./
+# Copy shared packages (needed for building)
 COPY services/shared ./services/shared/
 
-# Copy package files for dependency installation
-# Copying separately to leverage Docker layer caching
-COPY services/workspace-channel-service/package*.json ./services/workspace-channel-service/
-COPY services/workspace-channel-service/prisma ./services/workspace-channel-service/prisma/
+# Install dependencies for shared packages
+RUN cd services/shared/telemetry && npm install
+RUN cd services/shared/logger && npm install
+RUN cd services/shared/metrics && npm install
+RUN cd services/shared/http-client && npm install
 
-# Install ALL dependencies (including devDependencies for building)
-RUN cd services/workspace-channel-service && npm install
+# Now set up the service
+WORKDIR /app/services/workspace-channel-service
+
+# Copy service package files and prisma schema
+COPY services/workspace-channel-service/package*.json ./
+COPY services/workspace-channel-service/tsup.config.ts ./
+COPY services/workspace-channel-service/tsconfig.json ./
+COPY services/workspace-channel-service/tsconfig.build.json ./
+COPY services/workspace-channel-service/prisma ./prisma/
+
+# Install service dependencies
+RUN npm install
 
 # Copy source code
-COPY services/workspace-channel-service/src ./services/workspace-channel-service/src/
-COPY services/workspace-channel-service/tsconfig.json ./services/workspace-channel-service/
+COPY services/workspace-channel-service/src ./src/
 
-# Generate Prisma Client
-RUN cd services/workspace-channel-service && npx prisma generate
+# Build: prisma generate, tsc (for decorator metadata), then tsup bundle
+RUN npm run build
 
-# Build TypeScript to JavaScript
-RUN cd services/workspace-channel-service && npm run build
+# Prune to production deps only (keeps @prisma/client)
+RUN npm prune --omit=dev
 
 # ==================================
-# Stage 2: Production - Runtime image
+# Stage 2: Production - Minimal runtime
 # ==================================
 FROM node:22-alpine AS production
 
-# Set working directory
-WORKDIR /app
-
-# Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-COPY package*.json ./
-COPY services/shared ./services/shared/
+WORKDIR /app
+RUN chown nodejs:nodejs /app
 
-# Copy package files
-COPY services/workspace-channel-service/package*.json ./services/workspace-channel-service/
-
-# Copy Prisma schema for runtime client generation
-COPY services/workspace-channel-service/prisma ./services/workspace-channel-service/prisma/
-
-# Install ONLY production dependencies
-RUN cd services/workspace-channel-service && npm install --omit=dev && npm cache clean --force
-
-# Generate Prisma Client (needed for production)
-RUN cd services/workspace-channel-service && npx prisma generate
-
-# Copy built application from builder stage
-COPY --from=builder /app/services/workspace-channel-service/dist ./services/workspace-channel-service/dist
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Change ownership of app files to non-root user
-RUN chown -R nodejs:nodejs /app
-
-WORKDIR /app/services/workspace-channel-service
-
-# Switch to non-root user
 USER nodejs
 
-# Expose the application port
+# Copy bundled application
+COPY --chown=nodejs:nodejs --from=builder /app/services/workspace-channel-service/dist ./dist
+COPY --chown=nodejs:nodejs services/workspace-channel-service/package.json ./
+
+# Copy only Prisma client from node_modules (required - native binaries)
+COPY --chown=nodejs:nodejs --from=builder /app/services/workspace-channel-service/node_modules/.prisma ./node_modules/.prisma
+COPY --chown=nodejs:nodejs --from=builder /app/services/workspace-channel-service/node_modules/@prisma ./node_modules/@prisma
+
 EXPOSE 8002
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8002/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
-
-# Start the application
 CMD ["node", "dist/index.js"]

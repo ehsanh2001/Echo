@@ -1,81 +1,65 @@
 # ==================================
-# Stage 1: Builder - Build the application
+# Stage 1: Builder - Bundle the application
 # ==================================
 FROM node:22-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy workspace package.json and shared packages first
-COPY package*.json ./
+# Copy shared packages (needed for building)
 COPY services/shared ./services/shared/
 
-# Copy service-specific files
-COPY services/user-service/package*.json ./services/user-service/
-COPY services/user-service/prisma ./services/user-service/prisma/
+# Install dependencies for shared packages
+RUN cd services/shared/telemetry && npm install
+RUN cd services/shared/logger && npm install
+RUN cd services/shared/metrics && npm install
+RUN cd services/shared/http-client && npm install
 
-# Install ALL dependencies (including devDependencies for building)
-RUN cd services/user-service && npm install
+# Now set up the service
+WORKDIR /app/services/user-service
+
+# Copy service package files and prisma schema
+COPY services/user-service/package*.json ./
+COPY services/user-service/tsup.config.ts ./
+COPY services/user-service/prisma ./prisma/
+
+# Install service dependencies
+RUN npm install
 
 # Copy source code
-COPY services/user-service/src ./services/user-service/src/
-COPY services/user-service/tsconfig.json ./services/user-service/
+COPY services/user-service/src ./src/
+COPY services/user-service/tsconfig.json ./
 
-# Generate Prisma Client
-RUN cd services/user-service && npx prisma generate
+# Bundle with tsup (includes prisma generate)
+RUN npm run build
 
-# Build TypeScript to JavaScript
-RUN cd services/user-service && npm run build
+# Prune to production deps only (keeps @prisma/client)
+RUN npm prune --omit=dev
 
 # ==================================
-# Stage 2: Production - Runtime image
+# Stage 2: Production - Minimal runtime
 # ==================================
 FROM node:22-alpine AS production
 
-# Set working directory
-WORKDIR /app
-
-# Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-# Copy workspace and service package files
-COPY package*.json ./
-COPY services/shared ./services/shared/
-COPY services/user-service/package*.json ./services/user-service/
-COPY services/user-service/prisma ./services/user-service/prisma/
+WORKDIR /app
+RUN chown nodejs:nodejs /app
 
-# Install ONLY production dependencies
-RUN cd services/user-service && npm install --omit=dev && \
-    npm cache clean --force
-
-# Generate Prisma Client (needed for production)
-RUN cd services/user-service && npx prisma generate
-
-# Copy built application from builder stage
-COPY --from=builder /app/services/user-service/dist ./services/user-service/dist
-
-# Set working directory to service directory
-WORKDIR /app/services/user-service
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Change ownership of app files to non-root user
-RUN chown -R nodejs:nodejs /app
-
-# Switch to non-root user
 USER nodejs
 
-# Expose the application port
+# Copy bundled application
+COPY --chown=nodejs:nodejs --from=builder /app/services/user-service/dist ./dist
+COPY --chown=nodejs:nodejs services/user-service/package.json ./
+
+# Copy only Prisma client from node_modules (required - native binaries)
+COPY --chown=nodejs:nodejs --from=builder /app/services/user-service/node_modules/.prisma ./node_modules/.prisma
+COPY --chown=nodejs:nodejs --from=builder /app/services/user-service/node_modules/@prisma ./node_modules/@prisma
+
 EXPOSE 8001
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:8001/api/users/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
-
-# Start the application
 CMD ["node", "dist/index.js"]

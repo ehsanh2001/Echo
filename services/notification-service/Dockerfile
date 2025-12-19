@@ -1,74 +1,60 @@
 # ==================================
-# Stage 1: Builder - Build the application
+# Stage 1: Builder - Bundle the application
 # ==================================
 FROM node:22-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy workspace and shared packages
-COPY package*.json ./
+# Copy shared packages (needed for building)
 COPY services/shared ./services/shared/
 
-# Copy service-specific files
-COPY services/notification-service/package*.json ./services/notification-service/
+# Install dependencies for shared packages
+RUN cd services/shared/telemetry && npm install
+RUN cd services/shared/logger && npm install
+RUN cd services/shared/metrics && npm install
+RUN cd services/shared/http-client && npm install
 
-# Install ALL dependencies (including devDependencies for building)
-RUN cd services/notification-service && npm install
+# Now set up the service
+WORKDIR /app/services/notification-service
+
+# Copy service package files
+COPY services/notification-service/package*.json ./
+COPY services/notification-service/tsup.config.ts ./
+
+# Install service dependencies
+RUN npm install
 
 # Copy source code
-COPY services/notification-service/src ./services/notification-service/src/
-COPY services/notification-service/tsconfig.json ./services/notification-service/
+COPY services/notification-service/src ./src/
+COPY services/notification-service/tsconfig.json ./
 
-# Build TypeScript to JavaScript
-RUN cd services/notification-service && npm run build
+# Bundle with tsup
+RUN npm run build
 
 # ==================================
-# Stage 2: Production - Runtime image
+# Stage 2: Production - Minimal runtime (no node_modules!)
 # ==================================
 FROM node:22-alpine AS production
 
-# Set working directory
-WORKDIR /app
-
-# Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-# Copy workspace and shared packages
-COPY package*.json ./
-COPY services/shared ./services/shared/
+WORKDIR /app
+RUN chown nodejs:nodejs /app
 
-# Copy service-specific files
-COPY services/notification-service/package*.json ./services/notification-service/
-
-# Install ONLY production dependencies
-RUN cd services/notification-service && npm install --omit=dev && \
-    npm cache clean --force
-
-# Copy built application from builder stage
-COPY --from=builder /app/services/notification-service/dist ./services/notification-service/dist
-
-# Copy email templates
-COPY services/notification-service/src/templates ./services/notification-service/dist/templates
-
-# Set working directory to service
-WORKDIR /app/services/notification-service
-
-# Create a non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Change ownership of app directory
-RUN chown -R nodejs:nodejs /app
-
-# Switch to non-root user
 USER nodejs
 
-# Expose application port
+# Copy ONLY the bundled application
+COPY --chown=nodejs:nodejs --from=builder /app/services/notification-service/dist ./dist
+COPY --chown=nodejs:nodejs services/notification-service/package.json ./
+
+# Copy email templates
+COPY --chown=nodejs:nodejs services/notification-service/src/templates ./dist/templates
+
 EXPOSE 8005
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8005/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js"]
