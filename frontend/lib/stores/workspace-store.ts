@@ -6,12 +6,19 @@
  *
  * This store should only contain UI state that is NOT derived from server data:
  * - Which workspace is currently selected (client-side navigation state)
+ * - Which channel is selected per workspace (remembers selection when switching)
  * - UI preferences, filters, etc. (future)
  */
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { persist } from "zustand/middleware";
+
+/** Channel selection info stored per workspace */
+interface ChannelSelection {
+  channelId: string;
+  displayName: string | null;
+}
 
 interface WorkspaceState {
   /** ID of the currently selected workspace (client-side UI state) */
@@ -29,6 +36,9 @@ interface WorkspaceState {
   /** Whether to show workspace members (true) or channel members (false) in the sidebar */
   showWorkspaceMembers: boolean;
 
+  /** Stored channel selection per workspace (remembers last selected channel for each workspace) */
+  channelSelectionPerWorkspace: Record<string, ChannelSelection>;
+
   // Actions
   setSelectedWorkspace: (
     workspaceId: string | null,
@@ -38,6 +48,10 @@ interface WorkspaceState {
     channelId: string | null,
     displayName?: string | null
   ) => void;
+  /** Get the stored channel selection for a specific workspace */
+  getStoredChannelForWorkspace: (
+    workspaceId: string
+  ) => ChannelSelection | null;
   clearSelectedChannel: () => void;
   clearWorkspaceState: () => void;
   setShowWorkspaceMembers: (show: boolean) => void;
@@ -81,13 +95,14 @@ interface WorkspaceState {
 export const useWorkspaceStore = create<WorkspaceState>()(
   devtools(
     persist(
-      (set) => ({
+      (set, get) => ({
         // Initial state
         selectedWorkspaceId: null,
         selectedWorkspaceDisplayName: null,
         selectedChannelId: null,
         selectedChannelDisplayName: null,
         showWorkspaceMembers: false,
+        channelSelectionPerWorkspace: {},
 
         // Actions
         setSelectedWorkspace: (workspaceId, displayName) =>
@@ -96,11 +111,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             selectedWorkspaceDisplayName: displayName || null,
           }),
 
-        setSelectedChannel: (channelId, displayName) =>
-          set({
+        setSelectedChannel: (channelId, displayName) => {
+          const state = get();
+          const workspaceId = state.selectedWorkspaceId;
+
+          // When selecting a channel, automatically show channel members (not workspace members)
+          const updates: Partial<WorkspaceState> = {
             selectedChannelId: channelId,
             selectedChannelDisplayName: displayName || null,
-          }),
+            showWorkspaceMembers: false, // Auto-switch to channel members view
+          };
+
+          // Store the channel selection for the current workspace
+          if (workspaceId && channelId) {
+            updates.channelSelectionPerWorkspace = {
+              ...state.channelSelectionPerWorkspace,
+              [workspaceId]: {
+                channelId,
+                displayName: displayName || null,
+              },
+            };
+          }
+
+          set(updates);
+        },
+
+        getStoredChannelForWorkspace: (workspaceId) => {
+          const state = get();
+          return state.channelSelectionPerWorkspace[workspaceId] || null;
+        },
 
         clearSelectedChannel: () =>
           set({
@@ -132,6 +171,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           selectedChannelId: state.selectedChannelId,
           selectedChannelDisplayName: state.selectedChannelDisplayName,
           showWorkspaceMembers: state.showWorkspaceMembers,
+          channelSelectionPerWorkspace: state.channelSelectionPerWorkspace,
         }),
       }
     ),

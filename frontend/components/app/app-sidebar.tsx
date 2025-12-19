@@ -83,6 +83,9 @@ export function AppSidebar({
   const setSelectedWorkspace = useWorkspaceStore(
     (state) => state.setSelectedWorkspace
   );
+  const getStoredChannelForWorkspace = useWorkspaceStore(
+    (state) => state.getStoredChannelForWorkspace
+  );
 
   // Get selected workspace (combines React Query + Zustand)
   const selectedWorkspace = useSelectedWorkspace();
@@ -97,6 +100,37 @@ export function AppSidebar({
         workspaceId: selectedWorkspace.id,
         workspaceName: selectedWorkspace.displayName || selectedWorkspace.name,
       })) || [];
+
+  // Handle workspace selection with channel restoration/auto-selection
+  const handleSelectWorkspace = (workspaceId: string, displayName: string) => {
+    // Update selected workspace
+    setSelectedWorkspace(workspaceId, displayName);
+
+    // Check if we have a stored channel selection for this workspace
+    const storedChannel = getStoredChannelForWorkspace(workspaceId);
+
+    if (storedChannel) {
+      // Restore the previously selected channel
+      onSelectChannel(storedChannel.channelId, storedChannel.displayName);
+    } else {
+      // First time selecting this workspace - find and select 'general' channel
+      const workspace = workspaces.find((w) => w.id === workspaceId);
+      const generalChannel = workspace?.channels?.find(
+        (ch) =>
+          ch.name.toLowerCase() === "general" && ch.type === ChannelType.PUBLIC
+      );
+
+      if (generalChannel) {
+        onSelectChannel(
+          generalChannel.id,
+          generalChannel.displayName || generalChannel.name
+        );
+      } else {
+        // No general channel, clear selection
+        onSelectChannel(null);
+      }
+    }
+  };
 
   // Check if user can create channels in the selected workspace
   const canCreateChannel =
@@ -246,7 +280,7 @@ export function AppSidebar({
                           >
                             <button
                               onClick={() =>
-                                setSelectedWorkspace(
+                                handleSelectWorkspace(
                                   workspace.id,
                                   workspace.displayName || workspace.name
                                 )
