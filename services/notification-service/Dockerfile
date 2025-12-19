@@ -48,8 +48,10 @@ USER nodejs
 COPY --chown=nodejs:nodejs --from=builder /app/services/notification-service/dist ./dist
 COPY --chown=nodejs:nodejs services/notification-service/package.json ./
 
-# Copy email templates
-COPY --chown=nodejs:nodejs services/notification-service/src/templates ./dist/templates
+# Copy email templates to match the path resolution in TemplateService
+# TemplateService uses: path.join(__dirname, "..", "templates")
+# Since __dirname is /app/dist after bundling, it looks for /app/templates
+COPY --chown=nodejs:nodejs services/notification-service/src/templates ./templates
 
 EXPOSE 8005
 
