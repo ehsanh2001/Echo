@@ -5,12 +5,14 @@ import {
   IOutboxService,
   CreateWorkspaceMemberJoinedEventData,
   CreateChannelMemberJoinedEventData,
+  CreateChannelCreatedEventData,
 } from "../interfaces/services/IOutboxService";
 import { IOutboxRepository } from "../interfaces/repositories/IOutboxRepository";
 import {
   WorkspaceInviteCreatedEventPayload,
   WorkspaceMemberJoinedEventPayload,
   ChannelMemberJoinedEventPayload,
+  ChannelCreatedEventPayload,
   CreateOutboxEventData,
   CreateInviteEventData,
 } from "../types";
@@ -93,6 +95,37 @@ export class OutboxService implements IOutboxService {
     causationId?: string
   ): Promise<OutboxEvent> {
     const payload = this.createChannelMemberJoinedPayload(
+      eventData,
+      correlationId,
+      causationId
+    );
+
+    const outboxData: CreateOutboxEventData = {
+      workspaceId: eventData.workspaceId,
+      channelId: eventData.channelId,
+      aggregateType: payload.aggregateType,
+      aggregateId: eventData.channelId,
+      eventType: payload.eventType,
+      payload: payload,
+    };
+
+    return await this.outboxRepository.create(outboxData);
+  }
+
+  /**
+   * Create a channel created event
+   *
+   * @param eventData - Channel created data with full member information
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  async createChannelCreatedEvent(
+    eventData: CreateChannelCreatedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent> {
+    const payload = this.createChannelCreatedPayload(
       eventData,
       correlationId,
       causationId
@@ -252,6 +285,45 @@ export class OutboxService implements IOutboxService {
       timestamp: new Date().toISOString(),
       version: "1.0",
       data: eventData,
+      metadata: this.createMetadata(correlationId, causationId),
+    };
+  }
+
+  /**
+   * Create channel created event payload
+   */
+  private createChannelCreatedPayload(
+    eventData: CreateChannelCreatedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): ChannelCreatedEventPayload {
+    return {
+      eventId: randomUUID(),
+      eventType: "channel.created",
+      aggregateType: "channel",
+      aggregateId: eventData.channelId,
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: {
+        channelId: eventData.channelId,
+        workspaceId: eventData.workspaceId,
+        channelName: eventData.channelName,
+        channelDisplayName: eventData.channelDisplayName,
+        channelDescription: eventData.channelDescription,
+        channelType: eventData.channelType,
+        createdBy: eventData.createdBy,
+        memberCount: eventData.memberCount,
+        isPrivate: eventData.isPrivate,
+        members: eventData.members.map((m) => ({
+          userId: m.userId,
+          channelId: m.channelId,
+          role: m.role,
+          joinedAt: m.joinedAt.toISOString(),
+          isActive: m.isActive,
+          user: m.user,
+        })),
+        createdAt: eventData.createdAt.toISOString(),
+      },
       metadata: this.createMetadata(correlationId, causationId),
     };
   }

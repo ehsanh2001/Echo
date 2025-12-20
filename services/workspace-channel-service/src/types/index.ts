@@ -301,15 +301,38 @@ export interface WorkspaceInviteCreatedEventPayload extends BaseEventPayload<
 
 // ===== CHANNEL EVENTS (Examples for future) =====
 
-// Channel created event data
+/**
+ * Member data included in channel.created event
+ * Contains full user info needed for frontend cache updates
+ */
+export interface ChannelCreatedMemberData {
+  userId: string;
+  channelId: string;
+  role: ChannelRole;
+  joinedAt: string; // ISO 8601
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+/**
+ * Channel created event data
+ * Enhanced to include full member data for efficient cache updates
+ */
 export interface ChannelCreatedEventData {
   channelId: string;
   workspaceId: string;
   channelName: string;
   channelDisplayName: string | null;
+  channelDescription: string | null;
   channelType: ChannelType;
   createdBy: string;
   memberCount: number;
+  /** Whether this is a private channel (for BFF routing decision) */
+  isPrivate: boolean;
+  /** Full member data including user info for frontend cache */
+  members: ChannelCreatedMemberData[];
+  /** Channel creation timestamp */
+  createdAt: string; // ISO 8601
 }
 
 // Channel created event payload

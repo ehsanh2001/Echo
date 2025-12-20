@@ -4,6 +4,7 @@ import {
   EnrichedUserInfo,
   WorkspaceRole,
   ChannelRole,
+  ChannelType,
 } from "../../types";
 
 /**
@@ -28,6 +29,35 @@ export interface CreateChannelMemberJoinedEventData {
   userId: string;
   role: ChannelRole;
   user: EnrichedUserInfo;
+}
+
+/**
+ * Member data for channel created event
+ */
+export interface CreateChannelCreatedMemberData {
+  userId: string;
+  channelId: string;
+  role: ChannelRole;
+  joinedAt: Date;
+  isActive: boolean;
+  user: EnrichedUserInfo;
+}
+
+/**
+ * Input data for creating a channel created event
+ */
+export interface CreateChannelCreatedEventData {
+  channelId: string;
+  workspaceId: string;
+  channelName: string;
+  channelDisplayName: string | null;
+  channelDescription: string | null;
+  channelType: ChannelType;
+  createdBy: string;
+  memberCount: number;
+  isPrivate: boolean;
+  members: CreateChannelCreatedMemberData[];
+  createdAt: Date;
 }
 
 /**
@@ -73,6 +103,21 @@ export interface IOutboxService {
    */
   createChannelMemberJoinedEvent(
     eventData: CreateChannelMemberJoinedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent>;
+
+  /**
+   * Create a channel created event when a new channel is created
+   * Includes full member data for efficient frontend cache updates
+   *
+   * @param eventData - The channel created data with all members
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  createChannelCreatedEvent(
+    eventData: CreateChannelCreatedEventData,
     correlationId?: string,
     causationId?: string
   ): Promise<OutboxEvent>;

@@ -4,7 +4,9 @@ import logger from "../utils/logger";
 import { IChannelService } from "../interfaces/services/IChannelService";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
+import { IOutboxService } from "../interfaces/services/IOutboxService";
 import { WorkspaceChannelServiceError } from "../utils/errors";
+import { UserServiceClient } from "./userServiceClient";
 import {
   CreateChannelRequest,
   CreateChannelResponse,
@@ -12,6 +14,7 @@ import {
   ChannelType,
   ChannelRole,
   WorkspaceRole,
+  EnrichedUserInfo,
 } from "../types";
 
 /**
@@ -24,6 +27,10 @@ export class ChannelService implements IChannelService {
     private channelRepository: IChannelRepository,
     @inject("IWorkspaceRepository")
     private workspaceRepository: IWorkspaceRepository,
+    @inject("IOutboxService")
+    private outboxService: IOutboxService,
+    @inject("UserServiceClient")
+    private userServiceClient: UserServiceClient,
     @inject(PrismaClient)
     private prisma: PrismaClient
   ) {}
@@ -204,31 +211,113 @@ export class ChannelService implements IChannelService {
       description: request.description || null,
       type: request.type,
       createdBy: userId,
-      memberCount: 1, // Creator is the first member
+      memberCount: 1, // Creator is the first member (will be updated for public channels)
     };
   }
 
   /**
    * Creates channel and adds members atomically
+   * - For PUBLIC channels: auto-adds all workspace members
+   * - For PRIVATE channels: adds only specified participants
+   * - For DIRECT/GROUP_DM: adds specified participants
+   * Also emits a channel.created event with full member data
    */
   private async createChannelWithMembers(
     channelData: CreateChannelData,
     creatorId: string,
     request: CreateChannelRequest
   ): Promise<CreateChannelResponse> {
-    return await this.prisma.$transaction(async (tx) => {
-      // 1. Create channel with creator as owner (creator is automatically added as a member)
-      const channel = await this.channelRepository.create(
+    // 1. Determine which members to add
+    const memberUserIds = await this.determineMembersToAdd(
+      channelData.workspaceId,
+      creatorId,
+      request
+    );
+
+    // 2. Create channel and add members in transaction
+    const { channel, allMembers } =
+      await this.createChannelAndAddMembersInTransaction(
         channelData,
+        creatorId,
+        memberUserIds
+      );
+
+    // 3. Fetch enriched user info for all members
+    const userDetailsMap = await this.enrichMembersWithUserInfo(allMembers);
+
+    // 4. Emit channel.created event with full member data
+    await this.emitChannelCreatedEvent(
+      channel,
+      allMembers,
+      userDetailsMap,
+      request.type,
+      creatorId
+    );
+
+    // 5. Return the complete response
+    return this.buildChannelResponse(channel, allMembers, creatorId);
+  }
+
+  /**
+   * Determines which users should be added to the channel based on type
+   */
+  private async determineMembersToAdd(
+    workspaceId: string,
+    creatorId: string,
+    request: CreateChannelRequest
+  ): Promise<string[]> {
+    if (request.type === ChannelType.public) {
+      // For public channels, get ALL active workspace members
+      const workspaceMembers = await this.workspaceRepository.getMembers(
+        workspaceId,
+        false // Only active members
+      );
+      const memberIds = workspaceMembers.map((m) => m.userId);
+      logger.info(
+        `Public channel: will add ${memberIds.length} workspace members`
+      );
+      return memberIds;
+    } else if (request.type === ChannelType.private) {
+      // For private channels, use participants + creator
+      const memberIds = [
+        creatorId,
+        ...(request.participants || []).filter((id) => id !== creatorId),
+      ];
+      logger.info(
+        `Private channel: will add ${memberIds.length} selected members`
+      );
+      return memberIds;
+    } else {
+      // For direct/group_dm, use participants + creator
+      return [
+        creatorId,
+        ...(request.participants || []).filter((id) => id !== creatorId),
+      ];
+    }
+  }
+
+  /**
+   * Creates channel and adds members in a database transaction
+   */
+  private async createChannelAndAddMembersInTransaction(
+    channelData: CreateChannelData,
+    creatorId: string,
+    memberUserIds: string[]
+  ) {
+    return await this.prisma.$transaction(async (tx) => {
+      // Create channel with creator as owner
+      const channel = await this.channelRepository.create(
+        { ...channelData, memberCount: memberUserIds.length },
         creatorId,
         tx
       );
 
-      // 2. Add participants if this is a direct or group_dm channel
-      if (request.participants && request.participants.length > 0) {
+      // Add additional members (excluding creator who was already added)
+      const additionalMembers = memberUserIds.filter((id) => id !== creatorId);
+      if (additionalMembers.length > 0) {
         await this.channelRepository.addMembers(
           channel.id,
-          request.participants.map((userId) => ({
+          additionalMembers.map((userId) => ({
             userId,
             role: ChannelRole.member,
             joinedBy: creatorId,
@@ -237,7 +326,7 @@ export class ChannelService implements IChannelService {
         );
       }
 
-      // 3. Get all channel members (including creator who was added by create())
+      // Get all channel members with their data
       const allMembers = await tx.channelMember.findMany({
         where: {
           channelId: channel.id,
@@ -248,26 +337,103 @@ export class ChannelService implements IChannelService {
         },
       });
 
-      // 4. Return the complete response
-      return {
-        id: channel.id,
+      return { channel, allMembers };
+    });
+  }
+
+  /**
+   * Fetches enriched user info for channel members
+   */
+  private async enrichMembersWithUserInfo(
+    allMembers: ChannelMember[]
+  ): Promise<Map<string, EnrichedUserInfo>> {
+    try {
+      return await this.userServiceClient.getUsersByIds(
+        allMembers.map((m) => m.userId)
+      );
+    } catch (error) {
+      logger.warn(
+        "Failed to fetch user details for channel members, proceeding without enrichment",
+        error
+      );
+      return new Map<string, EnrichedUserInfo>();
+    }
+  }
+
+  /**
+   * Emits a channel.created event to the outbox
+   */
+  private async emitChannelCreatedEvent(
+    channel: any,
+    allMembers: ChannelMember[],
+    userDetailsMap: Map<string, EnrichedUserInfo>,
+    channelType: ChannelType,
+    creatorId: string
+  ): Promise<void> {
+    const isPrivate = channelType === ChannelType.private;
+    try {
+      await this.outboxService.createChannelCreatedEvent({
+        channelId: channel.id,
         workspaceId: channel.workspaceId,
-        name: channel.name,
-        displayName: channel.displayName,
-        description: channel.description,
-        type: channel.type,
-        createdBy: channel.createdBy ?? creatorId, // Ensure it's never null
-        isArchived: channel.isArchived,
-        isReadOnly: false, // Default value
-        memberCount: channel.memberCount,
-        createdAt: channel.createdAt.toISOString(),
-        updatedAt: channel.updatedAt.toISOString(),
+        channelName: channel.name,
+        channelDisplayName: channel.displayName,
+        channelDescription: channel.description,
+        channelType: channel.type,
+        createdBy: channel.createdBy ?? creatorId,
+        memberCount: allMembers.length,
+        isPrivate,
         members: allMembers.map((m) => ({
           userId: m.userId,
+          channelId: m.channelId,
           role: m.role,
+          joinedAt: m.joinedAt,
+          isActive: m.isActive,
+          user: userDetailsMap.get(m.userId) || {
+            id: m.userId,
+            username: "unknown",
+            displayName: "Unknown User",
+            email: "",
+            avatarUrl: null,
+            lastSeen: null,
+          },
         })),
-      };
-    });
+        createdAt: channel.createdAt,
+      });
+      logger.info(
+        `Created channel.created event for ${channel.name} with ${allMembers.length} members (isPrivate: ${isPrivate})`
+      );
+    } catch (error) {
+      logger.error("Failed to create channel.created event", error);
+      // Don't fail the channel creation if event creation fails
+    }
+  }
+
+  /**
+   * Builds the CreateChannelResponse from channel and members data
+   */
+  private buildChannelResponse(
+    channel: any,
+    allMembers: ChannelMember[],
+    creatorId: string
+  ): CreateChannelResponse {
+    return {
+      id: channel.id,
+      workspaceId: channel.workspaceId,
+      name: channel.name,
+      displayName: channel.displayName,
+      description: channel.description,
+      type: channel.type,
+      createdBy: channel.createdBy ?? creatorId,
+      isArchived: channel.isArchived,
+      isReadOnly: false,
+      memberCount: allMembers.length,
+      createdAt: channel.createdAt.toISOString(),
+      updatedAt: channel.updatedAt.toISOString(),
+      members: allMembers.map((m) => ({
+        userId: m.userId,
+        role: m.role,
+      })),
+    };
   }
 
   /**
