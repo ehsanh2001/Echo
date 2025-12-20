@@ -6,6 +6,18 @@
 import type { MessageWithAuthorResponse } from "@/types/message";
 
 /**
+ * User info included in member events
+ */
+export interface MemberEventUserInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  lastSeen: Date | null;
+}
+
+/**
  * Events sent from client to server
  */
 export interface ClientToServerEvents {
@@ -27,6 +39,46 @@ export interface ServerToClientEvents {
    * Emitted to all users in the channel room
    */
   "message:created": (message: MessageWithAuthorResponse) => void;
+
+  /**
+   * New member joined a workspace
+   * Emitted to all users in the workspace room
+   */
+  "workspace:member:joined": (data: {
+    workspaceId: string;
+    userId: string;
+    user: MemberEventUserInfo;
+  }) => void;
+
+  /**
+   * Member left a workspace
+   * Emitted to all users in the workspace room
+   */
+  "workspace:member:left": (data: {
+    workspaceId: string;
+    userId: string;
+  }) => void;
+
+  /**
+   * New member joined a channel
+   * Emitted to all users in the channel room
+   */
+  "channel:member:joined": (data: {
+    workspaceId: string;
+    channelId: string;
+    userId: string;
+    user: MemberEventUserInfo;
+  }) => void;
+
+  /**
+   * Member left a channel
+   * Emitted to all users in the channel room
+   */
+  "channel:member:left": (data: {
+    workspaceId: string;
+    channelId: string;
+    userId: string;
+  }) => void;
 
   connect: () => void;
 

@@ -35,7 +35,11 @@ import {
   useWorkspaceMemberships,
   useRefetchMemberships,
   useSelectedWorkspace,
+  workspaceKeys,
 } from "@/lib/hooks/useWorkspaces";
+import { memberKeys } from "@/lib/hooks/useMembers";
+import { messageKeys } from "@/lib/hooks/useMessageQueries";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChannelType, WorkspaceRole } from "@/types/workspace";
 
 interface AppSidebarProps {
@@ -75,6 +79,7 @@ export function AppSidebar({
   // Get workspace data from React Query
   const { data, isLoading, error } = useWorkspaceMemberships();
   const workspaces = data?.data?.workspaces || [];
+  const queryClient = useQueryClient();
 
   // Get UI state from Zustand
   const selectedWorkspaceId = useWorkspaceStore(
@@ -141,7 +146,10 @@ export function AppSidebar({
   // Handle refresh with visual feedback
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetchMemberships();
+    // Invalidate all caches to force refetch
+    await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+    await queryClient.invalidateQueries({ queryKey: memberKeys.all });
+    await queryClient.invalidateQueries({ queryKey: messageKeys.all });
     // Add small delay for better UX
     setTimeout(() => setIsRefreshing(false), 500);
   };
@@ -165,9 +173,6 @@ export function AppSidebar({
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-base text-sidebar-foreground truncate">
                   {selectedWorkspace.displayName || selectedWorkspace.name}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {selectedWorkspace.memberCount} members
                 </div>
               </div>
             </>
@@ -291,9 +296,6 @@ export function AppSidebar({
                               <span className="truncate flex-1 text-left">
                                 {workspace.displayName || workspace.name}
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                {workspace.memberCount}
-                              </span>
                             </button>
 
                             {/* Workspace Settings Menu */}
@@ -307,7 +309,10 @@ export function AppSidebar({
                                   <MoreVertical className="h-4 w-4" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-56 bg-dropdown text-dropdown-foreground"
+                              >
                                 {canInvite && (
                                   <>
                                     <DropdownMenuItem
@@ -341,7 +346,6 @@ export function AppSidebar({
                               {workspace.displayName || workspace.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {workspace.memberCount} members •{" "}
                               {workspace.userRole}
                             </p>
                           </div>

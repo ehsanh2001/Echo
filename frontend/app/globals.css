@@ -36,6 +36,8 @@
   --color-primary: rgb(var(--primary));
   --color-popover-foreground: rgb(var(--popover-foreground));
   --color-popover: rgb(var(--popover));
+  --color-dropdown: rgb(var(--dropdown));
+  --color-dropdown-foreground: rgb(var(--dropdown-foreground));
   --color-card-foreground: rgb(var(--card-foreground));
   --color-card: rgb(var(--card));
   --radius-sm: calc(var(--radius) - 4px);
@@ -53,6 +55,8 @@
   --card-foreground: 30 41 59; /* #1e293b */
   --popover: 255 255 255; /* white */
   --popover-foreground: 30 41 59;
+  --dropdown: 200 200 200; /* #f1f5f9 - darker than background in light mode */
+  --dropdown-foreground: 15 23 42;
   --primary: 74 108 247; /* #4a6cf7 - same as dark */
   --primary-foreground: 255 255 255;
   --secondary: 148 163 184; /* #94a3b8 - gray from HTML */
@@ -89,6 +93,8 @@
   --card-foreground: 248 250 252;
   --popover: 30 41 59;
   --popover-foreground: 248 250 252;
+  --dropdown: 60 70 90; /* #1e293b - lighter than background in dark mode */
+  --dropdown-foreground: 248 250 252;
   --primary: 74 108 247; /* #4a6cf7 */
   --primary-foreground: 248 250 252;
   --secondary: 51 65 85; /* #334155 */

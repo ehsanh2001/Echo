@@ -11,6 +11,17 @@ interface QueryProviderProps {
   children: ReactNode;
 }
 
+// Global reference to the QueryClient for use outside React components
+let globalQueryClient: QueryClient | null = null;
+
+/**
+ * Get the global QueryClient instance
+ * Used by Socket.IO handlers that run outside React component lifecycle
+ */
+export function getQueryClient(): QueryClient | null {
+  return globalQueryClient;
+}
+
 /**
  * React Query provider component
  *
@@ -44,28 +55,32 @@ interface QueryProviderProps {
  */
 export function QueryProvider({ children }: QueryProviderProps) {
   // Create QueryClient instance with optimized defaults
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000, // 1 minute - data is fresh for 1 minute
-            gcTime: 10 * 60 * 1000, // 10 minutes - cache garbage collection time
-            retry: (failureCount, error: any) => {
-              // Don't retry for auth errors - redirect to login instead
-              if (error?.status === 401 || error?.status === 403) {
-                return false;
-              }
-              // Retry up to 3 times for other errors (network issues, server errors)
-              return failureCount < 3;
-            },
-          },
-          mutations: {
-            retry: false, // Don't retry mutations by default - user should retry manually
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 60 * 1000, // 1 minute - data is fresh for 1 minute
+          gcTime: 10 * 60 * 1000, // 10 minutes - cache garbage collection time
+          retry: (failureCount, error: any) => {
+            // Don't retry for auth errors - redirect to login instead
+            if (error?.status === 401 || error?.status === 403) {
+              return false;
+            }
+            // Retry up to 3 times for other errors (network issues, server errors)
+            return failureCount < 3;
           },
         },
-      })
-  );
+        mutations: {
+          retry: false, // Don't retry mutations by default - user should retry manually
+        },
+      },
+    });
+
+    // Store global reference
+    globalQueryClient = client;
+
+    return client;
+  });
 
   return (
     <QueryClientProvider client={queryClient}>

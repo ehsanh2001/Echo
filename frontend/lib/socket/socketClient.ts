@@ -9,6 +9,21 @@ import type { ClientToServerEvents, ServerToClientEvents } from "./types";
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: TypedSocket | null = null;
+let eventHandlersRegistered = false;
+
+/**
+ * Register global event listeners that should persist across the socket lifecycle
+ * These are registered once and automatically re-attached on reconnect
+ */
+function registerGlobalEventListeners(socket: TypedSocket) {
+  if (eventHandlersRegistered) return;
+
+  // Import here to avoid circular dependency
+  import("./globalHandlers").then(({ setupGlobalHandlers }) => {
+    setupGlobalHandlers(socket);
+    eventHandlersRegistered = true;
+  });
+}
 
 /**
  * Get or create the Socket.IO client instance
@@ -55,6 +70,12 @@ export function getSocket(): TypedSocket {
           id: socket?.id,
           timestamp: new Date().toISOString(),
         });
+      }
+
+      // CRITICAL: Re-register all event listeners on reconnect
+      // Socket.IO clears handlers on disconnect, so we must re-attach them
+      if (socket) {
+        registerGlobalEventListeners(socket);
       }
     });
 
