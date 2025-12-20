@@ -131,3 +131,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Message highlight animation for reply scroll-to feature */
+@keyframes message-highlight {
+  0% {
+    background-color: hsl(var(--primary) / 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.message-highlight {
+  animation: message-highlight 2s ease-out;
+}

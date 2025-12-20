@@ -215,7 +215,7 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
           !previousDate || !isSameDay(currentDate, previousDate);
 
         return (
-          <div key={message.id} className="mb-4">
+          <div key={message.id} id={`message-${message.id}`} className="mb-4">
             {showDateSeparator && <DateSeparator date={currentDate} />}
             <Message message={message} />
           </div>

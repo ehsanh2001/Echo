@@ -44,12 +44,24 @@ export interface MessageWithAuthorResponse extends MessageResponse {
 }
 
 /**
+ * Parent message preview for reply feature
+ * Used in both composer (showing what's being replied to) and message display (showing parent)
+ */
+export interface ParentMessagePreview {
+  id: string;
+  content: string; // May be truncated for display
+  authorName: string;
+  isReply: boolean; // true if parent also has parentMessageId (nested reply)
+  isDeleted?: boolean; // true if parent message was deleted
+}
+
+/**
  * Request payload for sending a message
  */
 export interface SendMessageRequest {
   content: string;
   clientMessageCorrelationId: string; // Required: client-generated correlation ID
-  parentMessageId?: string; // For threading (future)
+  parentMessageId?: string; // Optional: for reply feature
   threadRootId?: string; // For threading (future)
 }
 
@@ -151,4 +163,12 @@ export interface MessageHistoryResponse {
 export interface GetMessageHistoryResponse {
   success: boolean;
   data: MessageHistoryResponse;
+}
+
+/**
+ * API response wrapper for getting a single message by ID
+ */
+export interface GetMessageByIdResponse {
+  success: boolean;
+  data: MessageWithAuthorResponse;
 }

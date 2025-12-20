@@ -6,6 +6,7 @@ import type {
   SendMessageResponse,
   MessageHistoryParams,
   GetMessageHistoryResponse,
+  GetMessageByIdResponse,
 } from "@/types/message";
 
 /**
@@ -89,6 +90,40 @@ export async function getMessageHistory(
     return response;
   } catch (error) {
     console.error("Error fetching message history:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single message by ID
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelId - The channel ID
+ * @param messageId - The message ID (UUID)
+ * @returns Promise with the message including author info
+ *
+ * @example
+ * ```typescript
+ * const response = await getMessageById(
+ *   'workspace-123',
+ *   'channel-456',
+ *   'message-789'
+ * );
+ * console.log(response.data.content); // Message content
+ * ```
+ */
+export async function getMessageById(
+  workspaceId: string,
+  channelId: string,
+  messageId: string
+): Promise<GetMessageByIdResponse> {
+  try {
+    const response = await apiClient.get<GetMessageByIdResponse>(
+      `/api/workspaces/${workspaceId}/channels/${channelId}/messages/${messageId}`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching message by ID:", error);
     throw error;
   }
 }

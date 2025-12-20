@@ -5,6 +5,8 @@ import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSendMessage } from "@/lib/hooks/useMessageMutations";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useReplyStore } from "@/lib/stores/reply-store";
+import { ParentMessagePreview } from "@/components/message/ParentMessagePreview";
 import { MAX_MESSAGE_LENGTH } from "@/lib/validations";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +37,7 @@ interface MessageInputProps {
  * - Loading state during send
  * - Automatic retry on failure (exponential backoff)
  * - Character limit validation
+ * - Reply functionality with parent message preview
  *
  * @example
  * ```tsx
@@ -54,6 +57,12 @@ export function MessageInput({
   const [content, setContent] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessageMutation = useSendMessage(workspaceId, channelId);
+  const { replyingTo, clearReply } = useReplyStore();
+
+  // Clear reply state when switching channels
+  useEffect(() => {
+    clearReply();
+  }, [channelId, clearReply]);
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -90,11 +99,14 @@ export function MessageInput({
       {
         content: messageContent,
         clientMessageCorrelationId: correlationId,
+        parentMessageId: replyingTo?.id, // Include parent ID if replying
       },
       {
         onSuccess: (response) => {
           // Clear input on success
           setContent("");
+          // Clear reply state
+          clearReply();
           // Reset textarea height
           if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -129,6 +141,21 @@ export function MessageInput({
   return (
     <div className="p-4 border-t border-border shrink-0 bg-background">
       <div className="relative">
+        {/* Reply Preview (shown when replying) */}
+        {replyingTo && (
+          <div className="w-1/2 mb-2">
+            <ParentMessagePreview
+              variant="composer"
+              authorName={
+                replyingTo.author.displayName || replyingTo.author.username
+              }
+              content={replyingTo.content}
+              isReply={!!replyingTo.parentMessageId}
+              onClose={clearReply}
+            />
+          </div>
+        )}
+
         {/* Auto-expanding textarea */}
         <div className="relative">
           <textarea
