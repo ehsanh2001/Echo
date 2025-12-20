@@ -114,6 +114,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         "channel.member.joined"
       );
       await ch.bindQueue(this.queueName, this.exchange, "channel.member.left");
+      await ch.bindQueue(this.queueName, this.exchange, "channel.created");
 
       // Start consuming
       await ch.consume(this.queueName, (msg) => this.handleMessage(msg), {
@@ -218,6 +219,10 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
       case "channel.member.left":
         await this.handleChannelMemberLeft(event);
+        break;
+
+      case "channel.created":
+        await this.handleChannelCreated(event);
         break;
 
       default:
@@ -349,6 +354,45 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       userId,
       room: roomName,
     });
+  }
+
+  /**
+   * Handle channel.created event
+   * Routes to workspace room for public channels or individual user rooms for private channels
+   */
+  private async handleChannelCreated(event: RabbitMQEvent): Promise<void> {
+    // Support both 'payload' and 'data' for compatibility
+    const eventData = (event as any).payload || (event as any).data;
+    const { workspaceId, isPrivate, members } = eventData;
+
+    if (isPrivate) {
+      // Private channel: emit only to specific user rooms
+      // This ensures only invited members receive the event
+      for (const member of members) {
+        const userRoom = `user:${member.userId}`;
+        this.io.to(userRoom).emit("channel:created", eventData);
+      }
+
+      logger.info("Broadcasted private channel.created to user rooms", {
+        workspaceId,
+        channelId: eventData.channelId,
+        memberCount: members.length,
+        isPrivate: true,
+      });
+    } else {
+      // Public channel: broadcast to workspace room
+      // All workspace members will receive the event
+      const roomName = `workspace:${workspaceId}`;
+      this.io.to(roomName).emit("channel:created", eventData);
+
+      logger.info("Broadcasted public channel.created to workspace room", {
+        workspaceId,
+        channelId: eventData.channelId,
+        room: roomName,
+        memberCount: members.length,
+        isPrivate: false,
+      });
+    }
   }
 
   /**
