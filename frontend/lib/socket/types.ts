@@ -4,6 +4,7 @@
  */
 
 import type { MessageWithAuthorResponse } from "@/types/message";
+import type { ChannelCreatedEventPayload } from "@/types/workspace";
 
 /**
  * User info included in member events
@@ -79,6 +80,13 @@ export interface ServerToClientEvents {
     channelId: string;
     userId: string;
   }) => void;
+
+  /**
+   * New channel created
+   * For public channels: emitted to workspace room
+   * For private channels: emitted to each member's user room
+   */
+  "channel:created": (data: ChannelCreatedEventPayload) => void;
 
   connect: () => void;
 

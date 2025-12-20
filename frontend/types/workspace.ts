@@ -118,6 +118,8 @@ export interface CreateChannelRequest {
   displayName?: string;
   description?: string;
   type: ChannelType;
+  /** For private channels: user IDs to add as members */
+  participants?: string[];
 }
 
 export interface ChannelResponse {
@@ -218,4 +220,35 @@ export interface GetWorkspaceMembersResponse {
   success: boolean;
   data: WorkspaceMembersData;
   timestamp: string;
+}
+
+// ============================================================================
+// Socket Event Types
+// ============================================================================
+
+/**
+ * Member data included in channel.created events
+ */
+export interface ChannelCreatedMemberData {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: string;
+  joinedAt: string;
+}
+
+/**
+ * Payload for channel.created socket events
+ */
+export interface ChannelCreatedEventPayload {
+  channelId: string;
+  channelName: string;
+  channelDisplayName: string | null;
+  channelDescription: string | null;
+  workspaceId: string;
+  isPrivate: boolean;
+  createdBy: string;
+  members: ChannelCreatedMemberData[];
+  createdAt: string;
 }

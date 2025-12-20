@@ -10,8 +10,10 @@ import type {
   ChannelMemberWithUser,
   ChannelWithMembers,
   GetUserMembershipsResponse,
+  ChannelCreatedEventPayload,
+  ChannelMembershipResponse,
 } from "@/types/workspace";
-import { WorkspaceRole, ChannelRole } from "@/types/workspace";
+import { WorkspaceRole, ChannelRole, ChannelType } from "@/types/workspace";
 import type { QueryClient } from "@tanstack/react-query";
 import { memberKeys } from "@/lib/hooks/useMembers";
 import { workspaceKeys } from "@/lib/hooks/useWorkspaces";
@@ -214,6 +216,139 @@ export function updateChannelMemberCache(
       data: user
         ? addChannelMember(old.data, channelId, userId, user)!
         : removeChannelMember(old.data, channelId, userId)!,
+    };
+  });
+}
+
+/**
+ * Adds a new channel to the workspace members cache
+ * Used when a channel:created event is received
+ */
+export function addNewChannelToCache(
+  old: WorkspaceMembersData | undefined,
+  eventPayload: ChannelCreatedEventPayload
+): WorkspaceMembersData | undefined {
+  if (!old) return old;
+
+  // Check if channel already exists
+  const exists = old.channels.some(
+    (c: ChannelWithMembers) => c.id === eventPayload.channelId
+  );
+  if (exists) return old;
+
+  // Convert event members to ChannelMemberWithUser format
+  const channelMembers: ChannelMemberWithUser[] = eventPayload.members.map(
+    (member) => ({
+      userId: member.userId,
+      channelId: eventPayload.channelId,
+      role: member.role as ChannelRole,
+      joinedAt: member.joinedAt,
+      isActive: true,
+      user: {
+        id: member.userId,
+        username: member.username,
+        displayName: member.displayName ?? member.username, // Fallback to username if null
+        email: "", // Not provided in event, but not critical
+        avatarUrl: member.avatarUrl,
+        lastSeen: null,
+      },
+    })
+  );
+
+  // Create new channel with members
+  const newChannel: ChannelWithMembers = {
+    id: eventPayload.channelId,
+    name: eventPayload.channelName,
+    displayName: eventPayload.channelDisplayName,
+    type: eventPayload.isPrivate ? ChannelType.PRIVATE : ChannelType.PUBLIC,
+    members: channelMembers,
+  };
+
+  return {
+    ...old,
+    channels: [...old.channels, newChannel],
+  };
+}
+
+/**
+ * Updates the members cache to add a newly created channel
+ */
+export function updateMembersCacheWithNewChannel(
+  queryClient: QueryClient,
+  workspaceId: string,
+  eventPayload: ChannelCreatedEventPayload
+): void {
+  const cacheKey = memberKeys.workspace(workspaceId);
+
+  queryClient.setQueryData<CachedMembersResponse>(cacheKey, (old) => {
+    if (!old) return old;
+
+    return {
+      ...old,
+      data: addNewChannelToCache(old.data, eventPayload)!,
+    };
+  });
+}
+
+/**
+ * Updates the user memberships cache to add a new channel
+ * Used for the sidebar channel list
+ */
+export function updateMembershipsCacheWithNewChannel(
+  queryClient: QueryClient,
+  eventPayload: ChannelCreatedEventPayload
+): void {
+  const cacheKey = workspaceKeys.membershipsWithChannels();
+
+  queryClient.setQueryData<GetUserMembershipsResponse>(cacheKey, (old) => {
+    if (!old?.data) return old;
+
+    // Find the workspace and add the channel to it
+    const updatedWorkspaces = old.data.workspaces.map((workspace) => {
+      if (workspace.id !== eventPayload.workspaceId) return workspace;
+
+      // Check if channel already exists
+      const exists = workspace.channels?.some(
+        (c) => c.id === eventPayload.channelId
+      );
+      if (exists) return workspace;
+
+      // Add the new channel with full ChannelMembershipResponse structure
+      const newChannel: ChannelMembershipResponse = {
+        // Channel model fields
+        id: eventPayload.channelId,
+        workspaceId: eventPayload.workspaceId,
+        name: eventPayload.channelName,
+        displayName: eventPayload.channelDisplayName,
+        description: eventPayload.channelDescription,
+        type: eventPayload.isPrivate ? ChannelType.PRIVATE : ChannelType.PUBLIC,
+        isArchived: false,
+        isReadOnly: false,
+        createdBy: eventPayload.createdBy,
+        memberCount: eventPayload.members.length,
+        lastActivity: null,
+        settings: {},
+        createdAt: eventPayload.createdAt,
+        updatedAt: eventPayload.createdAt,
+        // ChannelMember fields for current user (default values - will be refreshed on next query)
+        role: ChannelRole.MEMBER,
+        joinedAt: eventPayload.createdAt,
+        isMuted: false,
+        joinedBy: eventPayload.createdBy,
+      };
+
+      return {
+        ...workspace,
+        channels: [...(workspace.channels || []), newChannel],
+      };
+    });
+
+    return {
+      ...old,
+      data: {
+        ...old.data,
+        workspaces: updatedWorkspaces,
+      },
     };
   });
 }
