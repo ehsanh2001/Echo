@@ -15,6 +15,7 @@ export interface IMessageService {
    * @param userId - The ID of the user sending the message
    * @param content - The message content
    * @param clientMessageCorrelationId - Client-generated correlation ID for matching optimistic updates
+   * @param parentMessageId - Optional parent message ID for replies
    * @returns Promise resolving to the created message with author information
    * @throws MessageServiceError for business logic violations
    */
@@ -23,7 +24,24 @@ export interface IMessageService {
     channelId: string,
     userId: string,
     content: string,
-    clientMessageCorrelationId: string
+    clientMessageCorrelationId: string,
+    parentMessageId?: string
+  ): Promise<MessageWithAuthorResponse>;
+
+  /**
+   * Get a single message by ID
+   * @param workspaceId - The workspace ID where the channel belongs
+   * @param channelId - The channel ID where the message exists
+   * @param messageId - The message UUID
+   * @param userId - The ID of the user requesting the message (for access control)
+   * @returns Promise resolving to the message with author information
+   * @throws MessageServiceError if message not found or user is not a member
+   */
+  getMessageById(
+    workspaceId: string,
+    channelId: string,
+    messageId: string,
+    userId: string
   ): Promise<MessageWithAuthorResponse>;
 
   /**

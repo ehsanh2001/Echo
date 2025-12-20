@@ -30,6 +30,23 @@ export interface IMessageRepository {
   create(data: CreateMessageData): Promise<MessageResponse>;
 
   /**
+   * Find a message by its unique ID
+   *
+   * @param messageId - Message UUID
+   * @returns Message if found, null otherwise
+   * @throws MessageServiceError if query fails
+   *
+   * @example
+   * ```typescript
+   * const message = await messageRepository.findById('message-uuid');
+   * if (message) {
+   *   console.log('Found message:', message.content);
+   * }
+   * ```
+   */
+  findById(messageId: string): Promise<MessageResponse | null>;
+
+  /**
    * Get messages with cursor-based pagination
    *
    * Returns messages before or after a cursor based on direction parameter.

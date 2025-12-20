@@ -38,22 +38,25 @@ export class MessageService implements IMessageService {
    * Business Flow:
    * 1. Validate content (not empty, within length limits)
    * 2. Verify membership and get author info
-   * 3. Create message via repository
-   * 4. Create response with author info
-   * 5. Publish RabbitMQ event
-   * 6. Return formatted response with author info
+   * 3. Validate parent message if replying
+   * 4. Create message via repository
+   * 5. Create response with author info
+   * 6. Publish RabbitMQ event
+   * 7. Return formatted response with author info
    */
   async sendMessage(
     workspaceId: string,
     channelId: string,
     userId: string,
     content: string,
-    clientMessageCorrelationId: string
+    clientMessageCorrelationId: string,
+    parentMessageId?: string
   ): Promise<MessageWithAuthorResponse> {
     logger.info("Sending message", {
       workspaceId,
       channelId,
       contentLength: content.length,
+      parentMessageId: parentMessageId || null,
     });
 
     // Step 1: Validate content
@@ -65,16 +68,22 @@ export class MessageService implements IMessageService {
       this.getAuthorInfo(userId),
     ]);
 
-    // Step 3: Create message via repository
+    // Step 3: Validate parent message if replying
+    if (parentMessageId) {
+      await this.validateParentMessage(workspaceId, channelId, parentMessageId);
+    }
+
+    // Step 4: Create message via repository
     const message = await this.messageRepository.create({
       workspaceId,
       channelId,
       userId,
       content,
       contentType: "text", // Only plain text for now
+      parentMessageId: parentMessageId || null,
     });
 
-    // Step 4: Create response with author info
+    // Step 5: Create response with author info
     const messageWithAuthor: MessageWithAuthorResponse = {
       ...message,
       author: authorInfo,
@@ -87,9 +96,10 @@ export class MessageService implements IMessageService {
       workspaceId,
       authorId: userId,
       authorUsername: authorInfo.username,
+      parentMessageId: parentMessageId || null,
     });
 
-    // Step 5: Publish RabbitMQ event (async, don't wait)
+    // Step 6: Publish RabbitMQ event (async, don't wait)
     this.publishMessageEvent(messageWithAuthor).catch((error) => {
       logger.error("Failed to publish message event", {
         error,
@@ -98,8 +108,126 @@ export class MessageService implements IMessageService {
       // Don't throw - message creation succeeded
     });
 
-    // Step 6: Return formatted response
+    // Step 7: Return formatted response
     return messageWithAuthor;
+  }
+
+  /**
+   * Get a single message by ID
+   *
+   * Business Flow:
+   * 1. Verify channel membership
+   * 2. Fetch message from repository
+   * 3. Validate message belongs to the specified workspace/channel
+   * 4. Enrich with author information
+   * 5. Return message with author info
+   */
+  async getMessageById(
+    workspaceId: string,
+    channelId: string,
+    messageId: string,
+    userId: string
+  ): Promise<MessageWithAuthorResponse> {
+    logger.info("Getting message by ID", {
+      workspaceId,
+      channelId,
+      messageId,
+    });
+
+    // Step 1: Verify channel membership
+    await this.verifyChannelMembership(workspaceId, channelId, userId);
+
+    // Step 2: Fetch message from repository
+    const message = await this.messageRepository.findById(messageId);
+
+    // Step 3: Validate message exists and belongs to correct workspace/channel
+    if (!message) {
+      throw MessageServiceError.notFound("Message", messageId);
+    }
+
+    if (
+      message.workspaceId !== workspaceId ||
+      message.channelId !== channelId
+    ) {
+      // Message exists but not in the specified workspace/channel
+      throw MessageServiceError.notFound("Message", messageId);
+    }
+
+    // Step 4: Get author info (with fallback)
+    const authorInfo = await this.getAuthorInfoWithFallback(message.userId);
+
+    logger.info("Message retrieved successfully", {
+      messageId: message.id,
+      workspaceId,
+      channelId,
+      userId: message.userId,
+      authorUsername: authorInfo.username,
+      hasParent: !!message.parentMessageId,
+    });
+
+    // Step 5: Return message with author info
+    return {
+      ...message,
+      author: authorInfo,
+    };
+  }
+
+  /**
+   * Validate that parent message exists in the same channel
+   */
+  private async validateParentMessage(
+    workspaceId: string,
+    channelId: string,
+    parentMessageId: string
+  ): Promise<void> {
+    logger.debug("Validating parent message", {
+      parentMessageId,
+      workspaceId,
+      channelId,
+    });
+
+    const parentMessage =
+      await this.messageRepository.findById(parentMessageId);
+
+    if (!parentMessage) {
+      logger.warn("Parent message not found", {
+        parentMessageId,
+        workspaceId,
+        channelId,
+      });
+      throw MessageServiceError.validation("Parent message not found", {
+        field: "parentMessageId",
+        value: parentMessageId,
+      });
+    }
+
+    // Ensure parent message is in the same workspace and channel
+    if (
+      parentMessage.workspaceId !== workspaceId ||
+      parentMessage.channelId !== channelId
+    ) {
+      logger.warn("Parent message in different channel", {
+        parentMessageId,
+        expectedWorkspaceId: workspaceId,
+        expectedChannelId: channelId,
+        actualWorkspaceId: parentMessage.workspaceId,
+        actualChannelId: parentMessage.channelId,
+      });
+      throw MessageServiceError.validation(
+        "Parent message must be in the same channel",
+        {
+          field: "parentMessageId",
+          value: parentMessageId,
+          expectedWorkspaceId: workspaceId,
+          expectedChannelId: channelId,
+        }
+      );
+    }
+
+    logger.debug("Parent message validated successfully", {
+      parentMessageId,
+      parentAuthorId: parentMessage.userId,
+    });
   }
 
   /**
@@ -186,6 +314,25 @@ export class MessageService implements IMessageService {
         "Failed to get user profile",
         { userId }
       );
+    }
+  }
+
+  /**
+   * Get author information with fallback for resilience
+   * Returns fallback data instead of throwing if user service fails
+   */
+  private async getAuthorInfoWithFallback(userId: string): Promise<AuthorInfo> {
+    try {
+      return await this.getAuthorInfo(userId);
+    } catch (error) {
+      logger.error(`Failed to fetch author info for user ${userId}:`, error);
+      // Return fallback author info if user service fails
+      return {
+        id: userId,
+        username: "Unknown User",
+        displayName: "Unknown User",
+        avatarUrl: null,
+      };
     }
   }
 

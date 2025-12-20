@@ -56,4 +56,26 @@ router.get(
   messageController.getMessageHistory
 );
 
+/**
+ * GET /api/messages/workspaces/:workspaceId/channels/:channelId/messages/:messageId
+ * Get a single message by ID
+ *
+ * @route GET /workspaces/:workspaceId/channels/:channelId/messages/:messageId
+ * @middleware jwtAuth - Requires valid JWT token
+ * @param {string} workspaceId - Workspace ID (path parameter)
+ * @param {string} channelId - Channel ID (path parameter)
+ * @param {string} messageId - Message ID (path parameter)
+ * @returns {200} Message with author information
+ * @returns {400} Bad request - Invalid input
+ * @returns {401} Unauthorized - Invalid or missing JWT token
+ * @returns {403} Forbidden - User not a member of channel
+ * @returns {404} Not found - Message not found
+ * @returns {500} Internal server error
+ */
+router.get(
+  "/workspaces/:workspaceId/channels/:channelId/messages/:messageId",
+  jwtAuth,
+  messageController.getMessageById
+);
+
 export { router as messageRoutes };

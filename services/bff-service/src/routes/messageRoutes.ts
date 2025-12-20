@@ -111,4 +111,47 @@ messageRoutes.post("/", jwtAuth, MessageController.sendMessage);
  */
 messageRoutes.get("/", jwtAuth, MessageController.getMessageHistory);
 
+/**
+ * GET /api/workspaces/:workspaceId/channels/:channelId/messages/:messageId
+ * Get a single message by ID
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Path Parameters:
+ *   - messageId: UUID of the message to retrieve
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "id": "message-id",
+ *     "workspaceId": "workspace-id",
+ *     "channelId": "channel-id",
+ *     "userId": "user-id",
+ *     "content": "Hello!",
+ *     "contentType": "text",
+ *     "messageNumber": 42,
+ *     "isEdited": false,
+ *     "parentMessageId": "parent-message-id",
+ *     "createdAt": "2025-10-27T...",
+ *     "updatedAt": "2025-10-27T...",
+ *     "author": {
+ *       "id": "user-id",
+ *       "username": "john_doe",
+ *       "displayName": "John Doe",
+ *       "avatarUrl": "https://..."
+ *     }
+ *   }
+ * }
+ *
+ * Error Responses:
+ * - 400: Bad request (invalid message ID format)
+ * - 401: Unauthorized (invalid/missing token)
+ * - 403: Forbidden (user not member of channel)
+ * - 404: Not found (message does not exist)
+ * - 500: Internal server error
+ */
+messageRoutes.get("/:messageId", jwtAuth, MessageController.getMessageById);
+
 export default messageRoutes;

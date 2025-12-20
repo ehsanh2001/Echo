@@ -75,6 +75,64 @@ export class MessageRepository implements IMessageRepository {
   }
 
   /**
+   * Find a message by its unique ID
+   *
+   * @param messageId - Message UUID
+   * @returns Message if found, null otherwise
+   * @throws MessageServiceError if query fails
+   */
+  async findById(messageId: string): Promise<MessageResponse | null> {
+    try {
+      const message = await this.prisma.message.findUnique({
+        where: { id: messageId },
+        select: {
+          id: true,
+          workspaceId: true,
+          channelId: true,
+          messageNo: true,
+          userId: true,
+          content: true,
+          contentType: true,
+          isEdited: true,
+          editCount: true,
+          deliveryStatus: true,
+          parentMessageId: true,
+          threadRootId: true,
+          threadDepth: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!message) {
+        return null;
+      }
+
+      // Convert bigint messageNo to number for JSON serialization
+      return {
+        ...message,
+        messageNo: Number(message.messageNo),
+      };
+    } catch (error) {
+      // Re-throw if already a MessageServiceError
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      // Wrap other errors as database errors with automatic logging
+      throw MessageServiceError.databaseWithLogging(
+        "Failed to find message by ID due to internal error",
+        "findById",
+        {
+          messageId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        }
+      );
+    }
+  }
+
+  /**
    * Create a new message in the database
    *
    * Automatically generates the next message number and inserts the message

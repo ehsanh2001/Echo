@@ -73,6 +73,47 @@ export class MessageController {
   };
 
   /**
+   * GET /api/workspaces/:workspaceId/channels/:channelId/messages/:messageId
+   * Forward get message by ID to message service
+   */
+  static getMessageById = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { workspaceId, channelId, messageId } = req.params;
+      const authHeader = req.headers.authorization;
+
+      logger.info("Forwarding get message by ID request to message service", {
+        workspaceId,
+        channelId,
+        messageId,
+        userId: req.user?.userId,
+      });
+
+      const response = await httpClient.get(
+        `${MessageController.MESSAGE_SERVICE_URL}/api/messages/workspaces/${workspaceId}/channels/${channelId}/messages/${messageId}`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+        }
+      );
+
+      logger.info("Message retrieved successfully", {
+        workspaceId,
+        channelId,
+        messageId,
+        statusCode: response.status,
+      });
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      MessageController.handleError(error, res, "Get message by ID");
+    }
+  };
+
+  /**
    * Handle errors from message service
    * Maps axios errors to appropriate HTTP responses
    */

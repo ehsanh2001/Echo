@@ -31,15 +31,21 @@ export class MessageController {
       const { workspaceId, channelId } = req.params;
 
       // Extract body
-      const { content, clientMessageCorrelationId } = req.body;
+      const { content, clientMessageCorrelationId, parentMessageId } = req.body;
 
       // Validate request (throws if invalid)
-      this.validateSendMessageRequest(workspaceId, channelId, content);
+      this.validateSendMessageRequest(
+        workspaceId,
+        channelId,
+        content,
+        parentMessageId
+      );
 
       logger.info(`Sending message to channel`, {
         workspaceId,
         channelId,
         userId,
+        parentMessageId: parentMessageId || null,
       });
 
       // Call service layer
@@ -48,11 +54,53 @@ export class MessageController {
         channelId as string,
         userId,
         content as string,
-        clientMessageCorrelationId as string
+        clientMessageCorrelationId as string,
+        parentMessageId as string | undefined
       );
 
       // Return success response
       res.status(201).json({
+        success: true,
+        data: messageWithAuthor,
+      });
+    } catch (error) {
+      this.handleError(error, res);
+    }
+  };
+
+  /**
+   * Get a single message by ID
+   * GET /api/messages/workspaces/:workspaceId/channels/:channelId/messages/:messageId
+   */
+  getMessageById = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Extract authenticated user
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user.userId;
+
+      // Extract path parameters
+      const { workspaceId, channelId, messageId } = req.params;
+
+      // Validate path parameters
+      this.validateGetMessageByIdRequest(workspaceId, channelId, messageId);
+
+      logger.info(`Getting message by ID`, {
+        workspaceId,
+        channelId,
+        messageId,
+        userId,
+      });
+
+      // Call service layer
+      const messageWithAuthor = await this.messageService.getMessageById(
+        workspaceId as string,
+        channelId as string,
+        messageId as string,
+        userId
+      );
+
+      // Return success response
+      res.status(200).json({
         success: true,
         data: messageWithAuthor,
       });
@@ -214,12 +262,55 @@ export class MessageController {
   }
 
   /**
+   * Validate get message by ID request parameters
+   */
+  private validateGetMessageByIdRequest(
+    workspaceId: string | undefined,
+    channelId: string | undefined,
+    messageId: string | undefined
+  ): void {
+    // Validate workspaceId
+    if (!isUUID(workspaceId)) {
+      throw MessageServiceError.validation(
+        "Workspace ID is required and must be a valid UUID",
+        {
+          field: "workspaceId",
+          value: workspaceId,
+        }
+      );
+    }
+
+    // Validate channelId
+    if (!isUUID(channelId)) {
+      throw MessageServiceError.validation(
+        "Channel ID is required and must be a valid UUID",
+        {
+          field: "channelId",
+          value: channelId,
+        }
+      );
+    }
+
+    // Validate messageId
+    if (!isUUID(messageId)) {
+      throw MessageServiceError.validation(
+        "Message ID is required and must be a valid UUID",
+        {
+          field: "messageId",
+          value: messageId,
+        }
+      );
+    }
+  }
+
+  /**
    * Validate send message request parameters
    */
   private validateSendMessageRequest(
     workspaceId: string | undefined,
     channelId: string | undefined,
-    content: any
+    content: any,
+    parentMessageId?: string
   ): void {
     // Validate workspaceId
     if (!isUUID(workspaceId)) {
@@ -248,6 +339,19 @@ export class MessageController {
       throw MessageServiceError.validation("Message content is required", {
         field: "content",
       });
+    }
+
+    // Validate parentMessageId if provided
+    if (parentMessageId !== undefined && parentMessageId !== null) {
+      if (!isUUID(parentMessageId)) {
+        throw MessageServiceError.validation(
+          "Parent message ID must be a valid UUID",
+          {
+            field: "parentMessageId",
+            value: parentMessageId,
+          }
+        );
+      }
     }
   }
 
