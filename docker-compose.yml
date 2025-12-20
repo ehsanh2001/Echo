@@ -288,7 +288,7 @@ services:
       dockerfile: ./services/bff-service/Dockerfile
     container_name: echo-bff-service
     ports:
-      - "8004:8080"
+      - "8004:8004"
     env_file:
       - .env # Load shared variables
       - ./services/bff-service/.env # Load service-specific variables (overrides shared)
