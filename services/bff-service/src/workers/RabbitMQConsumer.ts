@@ -156,9 +156,11 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       await runWithContextAsync({ userId, timestamp: new Date() }, async () => {
         logger.info("Received RabbitMQ event", {
           type: event.type,
+          eventType: (event as any).eventType,
           routingKey: msg.fields.routingKey,
           correlationId,
           userId,
+          rawEventKeys: Object.keys(event),
         });
 
         // Route event to appropriate handler
@@ -184,11 +186,22 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
   /**
    * Route event to appropriate Socket.IO broadcast
+   * Handles both 'type' and 'eventType' property names for compatibility
    */
   private async routeEvent(event: RabbitMQEvent): Promise<void> {
-    switch (event.type) {
+    // Support both 'type' and 'eventType' for compatibility
+    const eventType = (event as any).type || (event as any).eventType;
+
+    logger.info("Routing event", {
+      eventType,
+      hasType: !!(event as any).type,
+      hasEventType: !!(event as any).eventType,
+      eventKeys: Object.keys(event),
+    });
+
+    switch (eventType) {
       case "message.created":
-        await this.handleMessageCreated(event);
+        await this.handleMessageCreated(event as any);
         break;
 
       case "workspace.member.joined":
@@ -208,7 +221,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         break;
 
       default:
-        logger.warn("Unknown event type", { type: (event as any).type });
+        logger.warn("Unknown event type", { type: eventType });
     }
   }
 
@@ -241,7 +254,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
   private async handleWorkspaceMemberJoined(
     event: RabbitMQEvent
   ): Promise<void> {
-    const { workspaceId, userId, user } = (event as any).payload;
+    // Support both 'payload' and 'data' for compatibility
+    const eventData = (event as any).payload || (event as any).data;
+    const { workspaceId, userId, user } = eventData;
 
     // Broadcast to workspace room
     const roomName = `workspace:${workspaceId}`;
@@ -264,7 +279,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
    * Broadcast to all clients in the workspace room
    */
   private async handleWorkspaceMemberLeft(event: RabbitMQEvent): Promise<void> {
-    const { workspaceId, userId } = (event as any).payload;
+    // Support both 'payload' and 'data' for compatibility
+    const eventData = (event as any).payload || (event as any).data;
+    const { workspaceId, userId } = eventData;
 
     // Broadcast to workspace room
     const roomName = `workspace:${workspaceId}`;
@@ -286,7 +303,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
    * Broadcast to all clients in the channel room
    */
   private async handleChannelMemberJoined(event: RabbitMQEvent): Promise<void> {
-    const { workspaceId, channelId, userId, user } = (event as any).payload;
+    // Support both 'payload' and 'data' for compatibility
+    const eventData = (event as any).payload || (event as any).data;
+    const { workspaceId, channelId, userId, user } = eventData;
 
     // Broadcast to channel room
     const roomName = `workspace:${workspaceId}:channel:${channelId}`;
@@ -311,7 +330,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
    * Broadcast to all clients in the channel room
    */
   private async handleChannelMemberLeft(event: RabbitMQEvent): Promise<void> {
-    const { workspaceId, channelId, userId } = (event as any).payload;
+    // Support both 'payload' and 'data' for compatibility
+    const eventData = (event as any).payload || (event as any).data;
+    const { workspaceId, channelId, userId } = eventData;
 
     // Broadcast to channel room
     const roomName = `workspace:${workspaceId}:channel:${channelId}`;
