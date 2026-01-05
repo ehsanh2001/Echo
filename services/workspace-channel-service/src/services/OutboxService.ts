@@ -13,6 +13,8 @@ import {
   WorkspaceMemberJoinedEventPayload,
   ChannelMemberJoinedEventPayload,
   ChannelCreatedEventPayload,
+  ChannelDeletedEventPayload,
+  ChannelDeletedEventData,
   CreateOutboxEventData,
   CreateInviteEventData,
 } from "../types";
@@ -126,6 +128,37 @@ export class OutboxService implements IOutboxService {
     causationId?: string
   ): Promise<OutboxEvent> {
     const payload = this.createChannelCreatedPayload(
+      eventData,
+      correlationId,
+      causationId
+    );
+
+    const outboxData: CreateOutboxEventData = {
+      workspaceId: eventData.workspaceId,
+      channelId: eventData.channelId,
+      aggregateType: payload.aggregateType,
+      aggregateId: eventData.channelId,
+      eventType: payload.eventType,
+      payload: payload,
+    };
+
+    return await this.outboxRepository.create(outboxData);
+  }
+
+  /**
+   * Create a channel deleted event
+   *
+   * @param eventData - Channel deleted data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  async createChannelDeletedEvent(
+    eventData: ChannelDeletedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent> {
+    const payload = this.createChannelDeletedPayload(
       eventData,
       correlationId,
       causationId
@@ -323,6 +356,30 @@ export class OutboxService implements IOutboxService {
           user: m.user,
         })),
         createdAt: eventData.createdAt.toISOString(),
+      },
+      metadata: this.createMetadata(correlationId, causationId),
+    };
+  }
+
+  /**
+   * Create channel deleted event payload
+   */
+  private createChannelDeletedPayload(
+    eventData: ChannelDeletedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): ChannelDeletedEventPayload {
+    return {
+      eventId: randomUUID(),
+      eventType: "channel.deleted",
+      aggregateType: "channel",
+      aggregateId: eventData.channelId,
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: {
+        channelId: eventData.channelId,
+        workspaceId: eventData.workspaceId,
+        deletedBy: eventData.deletedBy,
       },
       metadata: this.createMetadata(correlationId, causationId),
     };

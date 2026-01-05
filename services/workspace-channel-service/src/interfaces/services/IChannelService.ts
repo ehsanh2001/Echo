@@ -60,4 +60,21 @@ export interface IChannelService {
    * @returns Promise resolving to true if available, false if taken
    */
   isChannelNameAvailable(workspaceId: string, name: string): Promise<boolean>;
+
+  /**
+   * Deletes a channel from a workspace
+   * Only channel owners or workspace owners can delete a channel.
+   * The "general" channel cannot be deleted.
+   *
+   * @param workspaceId - The workspace ID
+   * @param channelId - The channel ID to delete
+   * @param userId - The user ID attempting to delete the channel
+   * @returns Promise resolving to the deleted channel info
+   * @throws WorkspaceChannelServiceError if validation fails or user lacks permission
+   */
+  deleteChannel(
+    workspaceId: string,
+    channelId: string,
+    userId: string
+  ): Promise<{ channelId: string; workspaceId: string }>;
 }

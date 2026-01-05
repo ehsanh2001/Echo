@@ -159,4 +159,30 @@ export interface IChannelRepository {
     userId: string,
     channelIdsWithAdminAccess?: string[]
   ): Promise<ChannelWithMembersData[]>;
+
+  /**
+   * Finds a channel by its ID within a workspace.
+   * Includes workspaceId for partition-aware queries.
+   *
+   * @param workspaceId - The workspace ID (partition key)
+   * @param channelId - The channel ID
+   * @returns {Promise<Channel | null>} The channel if found, null otherwise
+   */
+  findById(workspaceId: string, channelId: string): Promise<Channel | null>;
+
+  /**
+   * Deletes a channel and all its members.
+   * This is a hard delete - the channel and all associated data will be permanently removed.
+   * Includes workspaceId for partition-aware queries.
+   *
+   * @param workspaceId - The workspace ID (partition key)
+   * @param channelId - The channel ID to delete
+   * @param transaction - Optional Prisma transaction context
+   * @returns {Promise<void>}
+   */
+  deleteChannel(
+    workspaceId: string,
+    channelId: string,
+    transaction?: any
+  ): Promise<void>;
 }

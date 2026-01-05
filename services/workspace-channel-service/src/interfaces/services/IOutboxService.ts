@@ -5,6 +5,7 @@ import {
   WorkspaceRole,
   ChannelRole,
   ChannelType,
+  ChannelDeletedEventData,
 } from "../../types";
 
 /**
@@ -118,6 +119,20 @@ export interface IOutboxService {
    */
   createChannelCreatedEvent(
     eventData: CreateChannelCreatedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): Promise<OutboxEvent>;
+
+  /**
+   * Create a channel deleted event when a channel is deleted
+   *
+   * @param eventData - The channel deleted data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @returns Promise resolving to the created outbox event
+   */
+  createChannelDeletedEvent(
+    eventData: ChannelDeletedEventData,
     correlationId?: string,
     causationId?: string
   ): Promise<OutboxEvent>;

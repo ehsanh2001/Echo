@@ -271,6 +271,57 @@ export class ChannelController {
   }
 
   /**
+   * Delete a channel from a workspace
+   * DELETE /api/ws-ch/workspaces/:workspaceId/channels/:channelId
+   * Only channel owner or workspace owner can delete a channel
+   * The "general" channel cannot be deleted
+   */
+  async deleteChannel(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { workspaceId, channelId } = req.params;
+      const userId = req.user.userId;
+
+      logger.info(
+        `Delete channel request: workspaceId=${workspaceId}, channelId=${channelId}, userId=${userId}`
+      );
+
+      // Validate workspace ID
+      if (!workspaceId || typeof workspaceId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid workspace ID is required"
+        );
+      }
+
+      // Validate channel ID
+      if (!channelId || typeof channelId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Valid channel ID is required"
+        );
+      }
+
+      // Validate user ID
+      if (!userId) {
+        throw WorkspaceChannelServiceError.unauthorized("User ID is required");
+      }
+
+      // Delete the channel
+      await this.channelService.deleteChannel(workspaceId, channelId, userId);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          channelId,
+          workspaceId,
+          deleted: true,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("deleteChannel", error, res);
+    }
+  }
+
+  /**
    * Centralized error handler for controller methods
    */
   private handleControllerError(

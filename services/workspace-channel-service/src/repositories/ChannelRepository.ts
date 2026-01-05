@@ -479,4 +479,80 @@ export class ChannelRepository implements IChannelRepository {
       );
     }
   }
+
+  /**
+   * Finds a channel by its ID within a workspace.
+   * Includes workspaceId for partition-aware queries.
+   */
+  async findById(
+    workspaceId: string,
+    channelId: string
+  ): Promise<Channel | null> {
+    try {
+      return await this.prisma.channel.findFirst({
+        where: {
+          id: channelId,
+          workspaceId,
+        },
+      });
+    } catch (error: any) {
+      logger.error("Error finding channel by ID:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to find channel: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Deletes a channel and all its members.
+   * Uses a transaction to ensure atomicity.
+   * Includes workspaceId for partition-aware queries.
+   */
+  async deleteChannel(
+    workspaceId: string,
+    channelId: string,
+    transaction?: any
+  ): Promise<void> {
+    try {
+      const executeDelete = async (tx: any) => {
+        // First delete all channel members (due to foreign key constraint)
+        // Include workspaceId via channel relation for partition-aware query
+        await tx.channelMember.deleteMany({
+          where: {
+            channelId,
+            channel: { workspaceId },
+          },
+        });
+
+        // Then delete the channel itself with workspaceId for partition pruning
+        await tx.channel.deleteMany({
+          where: {
+            id: channelId,
+            workspaceId,
+          },
+        });
+      };
+
+      if (transaction) {
+        await executeDelete(transaction);
+      } else {
+        await this.prisma.$transaction(async (tx) => {
+          await executeDelete(tx);
+        });
+      }
+
+      logger.info("Channel deleted successfully", { channelId });
+    } catch (error: any) {
+      logger.error("Error deleting channel:", error);
+
+      // Handle case where channel doesn't exist
+      if (error.code === "P2025") {
+        throw WorkspaceChannelServiceError.notFound("Channel", channelId);
+      }
+
+      throw WorkspaceChannelServiceError.database(
+        `Failed to delete channel: ${error.message}`
+      );
+    }
+  }
 }

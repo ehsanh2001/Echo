@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ChannelController } from "../controllers/ChannelController";
-import { jwtAuth } from "../middleware/jwtAuth";
+import { AuthenticatedRequest, jwtAuth } from "../middleware/jwtAuth";
 
 /**
  * Channel routes
@@ -101,6 +101,48 @@ channelRoutes.post("/", jwtAuth, async (req, res) => {
  */
 channelRoutes.get("/:channelId/members/:userId", async (req, res) => {
   await channelController.getChannelMember(req, res);
+});
+
+/**
+ * Delete a channel from a workspace
+ * DELETE /api/ws-ch/workspaces/:workspaceId/channels/:channelId
+ *
+ * Only the channel owner or workspace owner can delete a channel.
+ * The "general" channel cannot be deleted.
+ *
+ * Response (200 - Channel deleted):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "channelId": "channel-id",
+ *     "workspaceId": "workspace-id",
+ *     "deleted": true
+ *   },
+ *   "timestamp": "2025-10-17T..."
+ * }
+ *
+ * Response (403 - Forbidden):
+ * {
+ *   "success": false,
+ *   "error": {
+ *     "code": "FORBIDDEN",
+ *     "message": "Only channel owner or workspace owner can delete a channel"
+ *   },
+ *   "timestamp": "2025-10-17T..."
+ * }
+ *
+ * Response (400 - Cannot delete general channel):
+ * {
+ *   "success": false,
+ *   "error": {
+ *     "code": "BAD_REQUEST",
+ *     "message": "Cannot delete the general channel"
+ *   },
+ *   "timestamp": "2025-10-17T..."
+ * }
+ */
+channelRoutes.delete("/:channelId", jwtAuth, async (req, res) => {
+  await channelController.deleteChannel(req as AuthenticatedRequest, res);
 });
 
 export default channelRoutes;

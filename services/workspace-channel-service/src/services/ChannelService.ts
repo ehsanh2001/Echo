@@ -504,4 +504,81 @@ export class ChannelService implements IChannelService {
       );
     }
   }
+
+  /**
+   * Deletes a channel from a workspace.
+   * Only channel owners or workspace owners can delete a channel.
+   * The "general" channel cannot be deleted.
+   */
+  async deleteChannel(
+    workspaceId: string,
+    channelId: string,
+    userId: string
+  ): Promise<{ channelId: string; workspaceId: string }> {
+    try {
+      // 1. Find the channel (include workspaceId for partition-aware query)
+      const channel = await this.channelRepository.findById(
+        workspaceId,
+        channelId
+      );
+      if (!channel) {
+        throw WorkspaceChannelServiceError.notFound("Channel", channelId);
+      }
+
+      // 3. Check if this is the "general" channel (protected)
+      if (channel.name.toLowerCase() === "general") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "The general channel cannot be deleted"
+        );
+      }
+
+      // 4. Check permissions: user must be channel owner OR workspace owner
+      const [channelMember, workspaceMember] = await Promise.all([
+        this.channelRepository.getChannelMember(channelId, userId),
+        this.workspaceRepository.getMembership(userId, workspaceId),
+      ]);
+
+      const isChannelOwner = channelMember?.role === ChannelRole.owner;
+      const isWorkspaceOwner = workspaceMember?.role === WorkspaceRole.owner;
+
+      if (!isChannelOwner && !isWorkspaceOwner) {
+        throw WorkspaceChannelServiceError.forbidden(
+          "Only channel owners or workspace owners can delete a channel"
+        );
+      }
+
+      // 5. Delete the channel and create outbox event in a single transaction
+      // This follows the Transactional Outbox pattern - both the domain change (deletion)
+      // and the event creation must succeed or fail together atomically
+      await this.prisma.$transaction(async (tx) => {
+        // Delete the channel and its members (include workspaceId for partition-aware query)
+        await this.channelRepository.deleteChannel(workspaceId, channelId, tx);
+
+        // Create outbox event for channel deleted (in same transaction)
+        // The OutboxPublisher worker will poll this and publish to RabbitMQ
+        await this.outboxService.createChannelDeletedEvent({
+          channelId,
+          workspaceId,
+          deletedBy: userId,
+        });
+      });
+
+      logger.info("Channel deleted successfully", {
+        channelId,
+        workspaceId,
+        deletedBy: userId,
+        channelName: channel.name,
+      });
+
+      return { channelId, workspaceId };
+    } catch (error) {
+      if (error instanceof WorkspaceChannelServiceError) {
+        throw error;
+      }
+      logger.error("Error deleting channel:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to delete channel due to unexpected error"
+      );
+    }
+  }
 }
