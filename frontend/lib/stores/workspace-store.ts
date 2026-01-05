@@ -20,6 +20,9 @@ interface ChannelSelection {
   displayName: string | null;
 }
 
+/** Main panel view types */
+type MainPanelView = "messages" | "create-channel";
+
 interface WorkspaceState {
   /** ID of the currently selected workspace (client-side UI state) */
   selectedWorkspaceId: string | null;
@@ -35,6 +38,9 @@ interface WorkspaceState {
 
   /** Whether to show workspace members (true) or channel members (false) in the sidebar */
   showWorkspaceMembers: boolean;
+
+  /** Current view in the main panel (messages or create-channel) */
+  mainPanelView: MainPanelView;
 
   /** Stored channel selection per workspace (remembers last selected channel for each workspace) */
   channelSelectionPerWorkspace: Record<string, ChannelSelection>;
@@ -56,6 +62,7 @@ interface WorkspaceState {
   clearWorkspaceState: () => void;
   setShowWorkspaceMembers: (show: boolean) => void;
   toggleMembersView: () => void;
+  setMainPanelView: (view: MainPanelView) => void;
 }
 
 /**
@@ -102,6 +109,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         selectedChannelId: null,
         selectedChannelDisplayName: null,
         showWorkspaceMembers: false,
+        mainPanelView: "messages" as MainPanelView,
         channelSelectionPerWorkspace: {},
 
         // Actions
@@ -162,6 +170,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set((state) => ({
             showWorkspaceMembers: !state.showWorkspaceMembers,
           })),
+
+        setMainPanelView: (view) => set({ mainPanelView: view }),
       }),
       {
         name: "workspace-ui-state", // LocalStorage key
@@ -172,6 +182,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           selectedChannelDisplayName: state.selectedChannelDisplayName,
           showWorkspaceMembers: state.showWorkspaceMembers,
           channelSelectionPerWorkspace: state.channelSelectionPerWorkspace,
+          // Don't persist mainPanelView - always start with messages view
         }),
       }
     ),

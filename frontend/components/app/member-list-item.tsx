@@ -18,7 +18,8 @@ interface MemberListItemProps {
 /**
  * Get initials from a display name
  */
-function getInitials(displayName: string): string {
+function getInitials(displayName: string | null | undefined): string {
+  if (!displayName) return "??";
   const parts = displayName.trim().split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -68,10 +69,15 @@ export const MemberListItem = memo(function MemberListItem({
             </div>
           </div>
 
-          {/* Role Badge - Only show for non-member roles */}
-          {role !== "member" && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
-              {role}
+          {/* Role Badge - Show distinct badges for owner and admin */}
+          {role === "owner" && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 flex-shrink-0">
+              Owner
+            </span>
+          )}
+          {role === "admin" && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-500/20 flex-shrink-0">
+              Admin
             </span>
           )}
         </button>
@@ -79,7 +85,8 @@ export const MemberListItem = memo(function MemberListItem({
       <TooltipContent side="left">
         <p>
           {user.displayName || user.username}
-          {role !== "member" && ` • ${role}`}
+          {role === "owner" && " • Owner"}
+          {role === "admin" && " • Admin"}
         </p>
       </TooltipContent>
     </Tooltip>

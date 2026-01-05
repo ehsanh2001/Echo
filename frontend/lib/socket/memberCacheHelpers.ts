@@ -243,14 +243,14 @@ export function addNewChannelToCache(
       channelId: eventPayload.channelId,
       role: member.role as ChannelRole,
       joinedAt: member.joinedAt,
-      isActive: true,
+      isActive: member.isActive ?? true,
       user: {
-        id: member.userId,
-        username: member.username,
-        displayName: member.displayName ?? member.username, // Fallback to username if null
-        email: "", // Not provided in event, but not critical
-        avatarUrl: member.avatarUrl,
-        lastSeen: null,
+        id: member.user.id,
+        username: member.user.username,
+        displayName: member.user.displayName ?? member.user.username, // Fallback to username if null
+        email: member.user.email ?? "", // May not be provided
+        avatarUrl: member.user.avatarUrl,
+        lastSeen: member.user.lastSeen ?? null,
       },
     })
   );
@@ -272,6 +272,7 @@ export function addNewChannelToCache(
 
 /**
  * Updates the members cache to add a newly created channel
+ * If cache doesn't exist, invalidates it so it will be fetched fresh
  */
 export function updateMembersCacheWithNewChannel(
   queryClient: QueryClient,
@@ -279,15 +280,23 @@ export function updateMembersCacheWithNewChannel(
   eventPayload: ChannelCreatedEventPayload
 ): void {
   const cacheKey = memberKeys.workspace(workspaceId);
+  const existingData =
+    queryClient.getQueryData<CachedMembersResponse>(cacheKey);
 
-  queryClient.setQueryData<CachedMembersResponse>(cacheKey, (old) => {
-    if (!old) return old;
+  if (existingData) {
+    // Cache exists - update it directly
+    queryClient.setQueryData<CachedMembersResponse>(cacheKey, (old) => {
+      if (!old) return old;
 
-    return {
-      ...old,
-      data: addNewChannelToCache(old.data, eventPayload)!,
-    };
-  });
+      return {
+        ...old,
+        data: addNewChannelToCache(old.data, eventPayload)!,
+      };
+    });
+  } else {
+    // Cache doesn't exist - invalidate so it will be fetched fresh when needed
+    queryClient.invalidateQueries({ queryKey: cacheKey });
+  }
 }
 
 /**

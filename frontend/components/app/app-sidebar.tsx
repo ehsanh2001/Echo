@@ -12,6 +12,7 @@ import {
   MoreVertical,
   UserPlus,
   Settings,
+  Lock,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -28,7 +29,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
-import { CreateChannelModal } from "@/components/channel/CreateChannelModal";
 import { InviteMembersModal } from "@/components/workspace/InviteMembersModal";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
@@ -68,7 +68,6 @@ export function AppSidebar({
   const [dmsExpanded, setDmsExpanded] = useState(true);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
-  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [showInviteMembersModal, setShowInviteMembersModal] = useState(false);
   const [selectedWorkspaceForInvite, setSelectedWorkspaceForInvite] = useState<{
     id: string;
@@ -91,15 +90,20 @@ export function AppSidebar({
   const getStoredChannelForWorkspace = useWorkspaceStore(
     (state) => state.getStoredChannelForWorkspace
   );
+  const setMainPanelView = useWorkspaceStore((state) => state.setMainPanelView);
 
   // Get selected workspace (combines React Query + Zustand)
   const selectedWorkspace = useSelectedWorkspace();
   const refetchMemberships = useRefetchMemberships();
 
-  // Get channels from the selected workspace only (only public channels for now)
+  // Get channels from the selected workspace only (public + private channels user is a member of)
   const channels =
     selectedWorkspace?.channels
-      ?.filter((channel) => channel.type === ChannelType.PUBLIC)
+      ?.filter(
+        (channel) =>
+          channel.type === ChannelType.PUBLIC ||
+          channel.type === ChannelType.PRIVATE
+      )
       .map((channel) => ({
         ...channel,
         workspaceId: selectedWorkspace.id,
@@ -383,7 +387,7 @@ export function AppSidebar({
                     type="button"
                     aria-label="Add Channel"
                     disabled={!canCreateChannel}
-                    onClick={() => setShowCreateChannelModal(true)}
+                    onClick={() => setMainPanelView("create-channel")}
                     className="text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
@@ -442,7 +446,11 @@ export function AppSidebar({
                               : "hover:bg-sidebar-accent"
                           }`}
                         >
-                          <Hash className="w-5 h-5 flex-shrink-0" />
+                          {channel.type === ChannelType.PRIVATE ? (
+                            <Lock className="w-4 h-4 flex-shrink-0" />
+                          ) : (
+                            <Hash className="w-5 h-5 flex-shrink-0" />
+                          )}
                           <span className="truncate flex-1 text-left">
                             {channel.name}
                           </span>
@@ -483,22 +491,6 @@ export function AppSidebar({
           await onWorkspaceCreated?.(workspaceId);
         }}
       />
-
-      {/* Create Channel Modal - Opens when + button is clicked in Channels section */}
-      {selectedWorkspaceId && (
-        <CreateChannelModal
-          open={showCreateChannelModal}
-          onOpenChange={setShowCreateChannelModal}
-          workspaceId={selectedWorkspaceId}
-          onSuccess={async (channelId, channelName) => {
-            setShowCreateChannelModal(false);
-            // Wait for channel creation callback to complete (refetch data)
-            await onChannelCreated?.(channelId, channelName);
-            // Now select the channel after data is refreshed
-            onSelectChannel(channelId, channelName);
-          }}
-        />
-      )}
 
       {/* Invite Members Modal - Opens when Invite Members is clicked from workspace menu */}
       {selectedWorkspaceForInvite && (

@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createChannel } from "@/lib/api/channel";
 import { workspaceKeys } from "@/lib/hooks/useWorkspaces";
+import { memberKeys } from "@/lib/hooks/useMembers";
 import type {
   CreateChannelRequest,
   CreateChannelResponse,
@@ -28,10 +29,15 @@ export function useCreateChannel() {
   return useMutation({
     mutationFn: (data: CreateChannelRequest) => createChannel(data),
 
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       // Force refetch workspace memberships to refresh channel list immediately
       queryClient.refetchQueries({
         queryKey: workspaceKeys.membershipsWithChannels(),
+      });
+
+      // Also refetch workspace members to get the new channel with its members
+      queryClient.refetchQueries({
+        queryKey: memberKeys.workspace(variables.workspaceId),
       });
 
       // Don't show toast here - parent component will show success alert

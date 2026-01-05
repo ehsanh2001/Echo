@@ -4,38 +4,36 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { channelFormSchema, type ChannelFormData } from "@/lib/validations";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Check, X, AlertCircle, Lock, Hash } from "lucide-react";
+import {
+  Loader2,
+  Check,
+  X,
+  AlertCircle,
+  Lock,
+  Hash,
+  ArrowLeft,
+} from "lucide-react";
 import { checkChannelName } from "@/lib/api/channel";
 import { useCreateChannel } from "@/lib/hooks/useChannelMutations";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { CreateChannelRequest, ChannelType } from "@/types/workspace";
 import { MemberSelector } from "./MemberSelector";
 
-interface CreateChannelModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface CreateChannelPanelProps {
   workspaceId: string;
   onSuccess?: (channelId: string, channelName: string) => void;
+  onCancel: () => void;
 }
 
-export function CreateChannelModal({
-  open,
-  onOpenChange,
+export function CreateChannelPanel({
   workspaceId,
   onSuccess,
-}: CreateChannelModalProps) {
+  onCancel,
+}: CreateChannelPanelProps) {
   // React Hook Form setup
   const form = useForm<ChannelFormData>({
     resolver: zodResolver(channelFormSchema),
@@ -45,7 +43,7 @@ export function CreateChannelModal({
       description: "",
       type: "public",
     },
-    mode: "onChange", // Validate on change for better UX
+    mode: "onChange",
   });
 
   // State for name availability check
@@ -83,19 +81,17 @@ export function CreateChannelModal({
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
       form.setValue("name", generatedName, { shouldValidate: true });
-      setNameAvailable(null); // Reset availability when name changes
+      setNameAvailable(null);
     }
   }, [displayName]);
 
   // Debounced name availability check
   useEffect(() => {
-    // Don't check if name is empty, has validation errors, or no workspace selected
     if (!channelName || form.formState.errors.name || !workspaceId) {
       setNameAvailable(null);
       return;
     }
 
-    // Debounce the availability check
     const timeoutId = setTimeout(async () => {
       setIsCheckingName(true);
 
@@ -108,7 +104,6 @@ export function CreateChannelModal({
             message: "This channel name is already taken",
           });
         } else {
-          // Clear the error if name is available
           if (form.formState.errors.name?.type === "manual") {
             form.clearErrors("name");
           }
@@ -119,14 +114,13 @@ export function CreateChannelModal({
       } finally {
         setIsCheckingName(false);
       }
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [channelName, workspaceId]);
 
   // Handle form submission
   const onSubmit = async (data: ChannelFormData) => {
-    // Don't submit if name is not available
     if (nameAvailable === false) {
       form.setError("name", {
         type: "manual",
@@ -135,7 +129,6 @@ export function CreateChannelModal({
       return;
     }
 
-    // Don't submit if still checking availability
     if (isCheckingName || nameAvailable === null) {
       return;
     }
@@ -146,62 +139,64 @@ export function CreateChannelModal({
       displayName: data.displayName.trim(),
       description: data.description?.trim() || undefined,
       type: data.type as ChannelType,
-      // Include participants for private channels
       participants: data.type === "private" ? selectedMemberIds : undefined,
     };
 
     createChannelMutation.mutate(channelData, {
       onSuccess: (response) => {
-        // Success! Call onSuccess callback with channel ID and name
         onSuccess?.(
           response.data.id,
           response.data.displayName || response.data.name
         );
-
-        // Reset form
         form.reset();
         setNameAvailable(null);
         setSelectedMemberIds([]);
-
-        // Close modal
-        onOpenChange(false);
       },
     });
   };
 
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!open) {
-      form.reset();
-      setNameAvailable(null);
-      setSelectedMemberIds([]);
-    }
-  }, [open]);
+  const handleCancel = () => {
+    form.reset();
+    setNameAvailable(null);
+    setSelectedMemberIds([]);
+    onCancel();
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        {/* Modal Header */}
-        <DialogHeader>
-          <DialogTitle>Create New Channel</DialogTitle>
-          <DialogDescription>
-            {selectedWorkspaceDisplayName ? (
-              <>
-                Create a channel in{" "}
+    <div className="flex-1 flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            disabled={createChannelMutation.isPending}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold">Create New Channel</h2>
+            {selectedWorkspaceDisplayName && (
+              <p className="text-sm text-muted-foreground mt-1">
+                in{" "}
                 <span className="font-semibold">
                   {selectedWorkspaceDisplayName}
-                </span>{" "}
-                for team discussions and collaboration.
-              </>
-            ) : (
-              "Create a channel for team discussions and collaboration."
+                </span>
+              </p>
             )}
-          </DialogDescription>
-        </DialogHeader>
+          </div>
+        </div>
+      </div>
 
-        {/* Channel Creation Form */}
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-4 py-4">
+      {/* Scrollable Form Content */}
+      <div className="flex-1 overflow-y-auto">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="max-w-2xl mx-auto p-6"
+        >
+          <div className="space-y-6">
             {/* Channel Type Selector - Side by Side on Larger Screens */}
             <div className="space-y-2">
               <Label>
@@ -268,7 +263,7 @@ export function CreateChannelModal({
               </div>
             )}
 
-            {/* Display Name Field - User-friendly name shown in UI */}
+            {/* Display Name Field */}
             <div className="space-y-2">
               <Label htmlFor="displayName">
                 Display Name <span className="text-destructive">*</span>
@@ -281,7 +276,6 @@ export function CreateChannelModal({
                   form.formState.errors.displayName ? "border-destructive" : ""
                 }
               />
-              {/* Display Name Error Message */}
               {form.formState.errors.displayName && (
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
@@ -293,12 +287,11 @@ export function CreateChannelModal({
               </p>
             </div>
 
-            {/* Channel Name Field - Auto-generated URL-friendly identifier */}
+            {/* Channel Name Field */}
             <div className="space-y-2">
               <Label htmlFor="name">
                 Channel Name <span className="text-destructive">*</span>
               </Label>
-              {/* Name Input with Validation Status */}
               <div className="relative">
                 <Input
                   id="name"
@@ -310,7 +303,6 @@ export function CreateChannelModal({
                       : "pr-10"
                   }
                 />
-                {/* Loading/Success Indicator inside input */}
                 {isCheckingName && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -322,14 +314,12 @@ export function CreateChannelModal({
                   </div>
                 )}
               </div>
-              {/* Name Error Message */}
               {form.formState.errors.name && (
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <X className="h-3 w-3" />
                   {form.formState.errors.name.message}
                 </p>
               )}
-              {/* Name Available Success Message */}
               {nameAvailable === true && !form.formState.errors.name && (
                 <p className="text-sm text-green-600 flex items-center gap-1">
                   <Check className="h-3 w-3" />
@@ -341,7 +331,7 @@ export function CreateChannelModal({
               </p>
             </div>
 
-            {/* Description Field - Optional channel description */}
+            {/* Description Field */}
             <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea
@@ -362,14 +352,13 @@ export function CreateChannelModal({
             </div>
           </div>
 
-          {/* Form Actions */}
-          <DialogFooter>
+          {/* Form Actions - Fixed at bottom */}
+          <div className="flex gap-3 justify-end pt-6 mt-6 border-t">
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleCancel}
               disabled={createChannelMutation.isPending}
-              aria-label="Cancel channel creation"
             >
               Cancel
             </Button>
@@ -378,7 +367,6 @@ export function CreateChannelModal({
               disabled={
                 createChannelMutation.isPending || !!form.formState.errors.name
               }
-              aria-label="Create new channel"
             >
               {createChannelMutation.isPending ? (
                 <>
@@ -389,9 +377,9 @@ export function CreateChannelModal({
                 "Create Channel"
               )}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

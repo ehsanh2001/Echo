@@ -11,6 +11,7 @@ import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { useWorkspaceMemberships } from "@/lib/hooks/useWorkspaces";
 import { useState } from "react";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
+import { CreateChannelPanel } from "@/components/channel/CreateChannelPanel";
 import { MessageInput } from "@/components/message/MessageInput";
 import { MessageList } from "@/components/message/MessageList";
 
@@ -27,8 +28,37 @@ export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
   const selectedChannelDisplayName = useWorkspaceStore(
     (state) => state.selectedChannelDisplayName
   );
+  const mainPanelView = useWorkspaceStore((state) => state.mainPanelView);
+  const setMainPanelView = useWorkspaceStore((state) => state.setMainPanelView);
+  const setSelectedChannel = useWorkspaceStore(
+    (state) => state.setSelectedChannel
+  );
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
+
+  // Handle channel creation success
+  const handleChannelCreated = (channelId: string, channelName: string) => {
+    // Select the newly created channel
+    setSelectedChannel(channelId, channelName);
+    // Return to messages view
+    setMainPanelView("messages");
+  };
+
+  // Handle cancel create channel
+  const handleCancelCreateChannel = () => {
+    setMainPanelView("messages");
+  };
+
+  // Show Create Channel Panel
+  if (mainPanelView === "create-channel" && selectedWorkspaceId) {
+    return (
+      <CreateChannelPanel
+        workspaceId={selectedWorkspaceId}
+        onSuccess={handleChannelCreated}
+        onCancel={handleCancelCreateChannel}
+      />
+    );
+  }
 
   // Empty state when no channel is selected
   if (!selectedChannelId) {

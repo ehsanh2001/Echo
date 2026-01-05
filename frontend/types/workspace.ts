@@ -227,15 +227,28 @@ export interface GetWorkspaceMembersResponse {
 // ============================================================================
 
 /**
+ * User info nested in channel.created event members
+ */
+export interface ChannelCreatedMemberUser {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  lastSeen: string | null;
+}
+
+/**
  * Member data included in channel.created events
+ * Note: User info is nested in a 'user' object from the backend
  */
 export interface ChannelCreatedMemberData {
   userId: string;
-  username: string;
-  displayName: string | null;
-  avatarUrl: string | null;
+  channelId: string;
   role: string;
   joinedAt: string;
+  isActive: boolean;
+  user: ChannelCreatedMemberUser;
 }
 
 /**
