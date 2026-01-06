@@ -72,6 +72,45 @@ export class ChannelController {
   };
 
   /**
+   * DELETE /api/workspaces/:workspaceId/channels/:channelId
+   * Forward delete channel to workspace-channel service
+   *
+   * Only channel owner or workspace owner can delete a channel.
+   * The "general" channel cannot be deleted.
+   */
+  static deleteChannel = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { workspaceId, channelId } = req.params;
+      const authHeader = req.headers.authorization;
+
+      logger.info(
+        "Forwarding delete channel request to workspace-channel service",
+        {
+          workspaceId,
+          channelId,
+          userId: req.user?.userId,
+        }
+      );
+
+      const response = await httpClient.delete(
+        `${ChannelController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${workspaceId}/channels/${channelId}`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+        }
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      ChannelController.handleError(error, res, "Delete channel");
+    }
+  };
+
+  /**
    * Handle errors from workspace-channel service
    * Maps axios errors to appropriate HTTP responses
    */

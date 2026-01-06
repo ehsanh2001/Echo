@@ -154,7 +154,35 @@ export interface ChannelMemberLeftEvent {
 }
 
 /**
- * Union type of all events BFF consumes
+ * Channel deleted event (from workspace-channel service via outbox pattern)
+ * Emitted when a channel is permanently deleted
+ * Note: This uses different structure (eventType, data) than other events (type, payload)
+ * because it comes from the transactional outbox pattern
+ */
+export interface ChannelDeletedEvent {
+  eventId: string;
+  eventType: "channel.deleted";
+  aggregateType: "channel";
+  aggregateId: string;
+  timestamp: string;
+  version: string;
+  data: {
+    channelId: string;
+    workspaceId: string;
+    channelName: string;
+    deletedBy: string;
+  };
+  metadata: {
+    correlationId?: string;
+    causationId?: string;
+    userId?: string;
+    traceId?: string;
+  };
+}
+
+/**
+ * Union type of events consumed from the non-critical queue
+ * Note: ChannelDeletedEvent is handled separately via the critical queue
  */
 export type RabbitMQEvent =
   | MessageCreatedEvent

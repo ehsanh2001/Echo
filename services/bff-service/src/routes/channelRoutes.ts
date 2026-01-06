@@ -86,6 +86,35 @@ channelRoutes.get(
  */
 channelRoutes.post("/", jwtAuth, ChannelController.createChannel);
 
+/**
+ * DELETE /api/workspaces/:workspaceId/channels/:channelId
+ * Delete a channel
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "channelId": "channel-id",
+ *     "workspaceId": "workspace-id",
+ *     "deleted": true
+ *   },
+ *   "timestamp": "..."
+ * }
+ *
+ * Error Responses:
+ * - 400: Cannot delete the general channel
+ * - 403: Only channel owner or workspace owner can delete
+ * - 404: Channel not found
+ *
+ * Note: This triggers a channel.deleted event which:
+ * - Notifies all channel members via Socket.IO
+ * - Deletes all channel messages in message-service
+ */
+channelRoutes.delete("/:channelId", jwtAuth, ChannelController.deleteChannel);
+
 // Mount message routes under /:channelId/messages
 // This creates nested routes like /api/workspaces/:workspaceId/channels/:channelId/messages
 channelRoutes.use("/:channelId/messages", messageRoutes);

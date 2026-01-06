@@ -443,6 +443,7 @@ export interface ChannelMemberLeftEventPayload extends BaseEventPayload<
 export interface ChannelDeletedEventData {
   channelId: string;
   workspaceId: string;
+  channelName: string;
   deletedBy: string;
 }
 
