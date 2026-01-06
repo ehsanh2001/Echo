@@ -16,4 +16,16 @@ export interface IWorkspaceChannelServiceClient {
     channelId: string,
     userId: string
   ): Promise<ChannelMember | null>;
+
+  /**
+   * Invalidate all cached channel membership entries for a channel
+   * Called when a channel is deleted to prevent stale cache hits
+   * @param workspaceId - The workspace ID
+   * @param channelId - The channel ID
+   * @returns Promise resolving to the number of cache entries deleted
+   */
+  invalidateChannelMembershipCache(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number>;
 }

@@ -5,6 +5,7 @@ import { runWithContextAsync } from "@echo/telemetry";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import { IMessageService } from "../interfaces/services/IMessageService";
 import { IHealthService } from "../interfaces/services/IHealthService";
+import { IWorkspaceChannelServiceClient } from "../interfaces/external/IWorkspaceChannelServiceClient";
 import { config } from "../config/env";
 import logger from "../utils/logger";
 
@@ -62,7 +63,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
   constructor(
     @inject("IMessageService") private readonly messageService: IMessageService,
-    @inject("IHealthService") private readonly healthService: IHealthService
+    @inject("IHealthService") private readonly healthService: IHealthService,
+    @inject("IWorkspaceChannelServiceClient")
+    private readonly workspaceChannelServiceClient: IWorkspaceChannelServiceClient
   ) {
     // All message-service instances share the same queue (work queue pattern)
     this.queueName = `message_service_channel_deleted_queue`;
@@ -354,33 +357,49 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
   /**
    * Handle channel.deleted event
-   * Deletes all messages for the deleted channel
+   * Invalidates membership cache and deletes all messages for the deleted channel
    */
   private async handleChannelDeleted(
     event: ChannelDeletedEventPayload
   ): Promise<void> {
     const { channelId, workspaceId, deletedBy } = event.data;
 
-    logger.info("Processing channel deletion - deleting all messages", {
+    logger.info("Processing channel deletion", {
       channelId,
       workspaceId,
       deletedBy,
     });
 
     try {
-      // Delete all messages for this channel
+      // First, invalidate the channel membership cache to prevent stale cache hits
+      // This ensures that any in-flight requests will get fresh data (which will fail
+      // since the channel no longer exists in workspace-channel-service)
+      const cacheEntriesDeleted =
+        await this.workspaceChannelServiceClient.invalidateChannelMembershipCache(
+          workspaceId,
+          channelId
+        );
+
+      logger.info("Invalidated channel membership cache", {
+        channelId,
+        workspaceId,
+        cacheEntriesDeleted,
+      });
+
+      // Then delete all messages for this channel
       const deletedCount = await this.messageService.deleteMessagesByChannel(
         workspaceId,
         channelId
       );
 
-      logger.info("Successfully deleted messages for channel", {
+      logger.info("Successfully processed channel deletion", {
         channelId,
         workspaceId,
-        deletedCount,
+        deletedMessageCount: deletedCount,
+        cacheEntriesDeleted,
       });
     } catch (error) {
-      logger.error("Failed to delete messages for channel", {
+      logger.error("Failed to process channel deletion", {
         channelId,
         workspaceId,
         error,

@@ -99,6 +99,51 @@ export class WorkspaceChannelServiceClient implements IWorkspaceChannelServiceCl
   }
 
   /**
+   * Invalidate all cached channel membership entries for a channel
+   * Uses pattern matching to delete all user memberships for this channel
+   */
+  async invalidateChannelMembershipCache(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number> {
+    try {
+      // Cache key pattern: {prefix}channel:member:{workspaceId}:{channelId}:{userId}
+      // We want to delete all entries for this channel (all users)
+      const pattern = this.cache.buildKey(
+        "channel",
+        "member",
+        workspaceId,
+        channelId,
+        "*"
+      );
+
+      logger.info("Invalidating channel membership cache", {
+        workspaceId,
+        channelId,
+        pattern,
+      });
+
+      const deletedCount = await this.cache.deleteByPattern(pattern);
+
+      logger.info("Channel membership cache invalidated", {
+        workspaceId,
+        channelId,
+        deletedCount,
+      });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error("Failed to invalidate channel membership cache", {
+        workspaceId,
+        channelId,
+        error,
+      });
+      // Don't throw - cache invalidation failure should not break event processing
+      return 0;
+    }
+  }
+
+  /**
    * Fetch channel member from service with retry logic
    */
   private async fetchChannelMemberWithRetry(

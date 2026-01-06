@@ -100,6 +100,47 @@ export class CacheService implements ICacheService {
   }
 
   /**
+   * Delete all keys matching a pattern
+   * Uses Redis SCAN to avoid blocking on large keyspaces
+   */
+  async deleteByPattern(pattern: string): Promise<number> {
+    let deletedCount = 0;
+    let cursor = "0";
+
+    try {
+      // Use SCAN to iterate through keys without blocking
+      do {
+        const result = await this.redis.scan(cursor, {
+          MATCH: pattern,
+          COUNT: 100, // Process in batches of 100
+        });
+
+        cursor = String(result.cursor);
+        const keys = result.keys;
+
+        if (keys.length > 0) {
+          const deleted = await this.redis.del(keys);
+          deletedCount += deleted;
+          logger.debug(`Deleted ${deleted} keys matching pattern: ${pattern}`);
+        }
+      } while (cursor !== "0");
+
+      logger.info(`Cache deleteByPattern completed`, {
+        pattern,
+        deletedCount,
+      });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error(
+        `Cache deleteByPattern error for pattern ${pattern}:`,
+        error
+      );
+      return deletedCount;
+    }
+  }
+
+  /**
    * Check if a key exists in cache
    */
   async exists(key: string): Promise<boolean> {

@@ -27,6 +27,14 @@ export interface ICacheService {
   delete(key: string): Promise<boolean>;
 
   /**
+   * Delete all keys matching a pattern
+   * Uses Redis SCAN to avoid blocking on large keyspaces
+   * @param pattern - The pattern to match (e.g., "prefix:*:suffix")
+   * @returns Promise resolving to the number of keys deleted
+   */
+  deleteByPattern(pattern: string): Promise<number>;
+
+  /**
    * Check if a key exists in cache
    * @param key - The cache key
    * @returns Promise resolving to true if key exists, false otherwise
