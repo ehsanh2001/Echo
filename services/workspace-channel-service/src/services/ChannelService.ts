@@ -551,17 +551,23 @@ export class ChannelService implements IChannelService {
       // This follows the Transactional Outbox pattern - both the domain change (deletion)
       // and the event creation must succeed or fail together atomically
       await this.prisma.$transaction(async (tx) => {
-        // Delete the channel and its members (include workspaceId for partition-aware query)
-        await this.channelRepository.deleteChannel(workspaceId, channelId, tx);
+        // Create outbox event FIRST (before deletion) to satisfy foreign key constraint
+        // The outbox_events table has a FK to channels, so we need to create the event
+        // while the channel still exists
+        await this.outboxService.createChannelDeletedEvent(
+          {
+            channelId,
+            workspaceId,
+            channelName: channel.name,
+            deletedBy: userId,
+          },
+          undefined, // correlationId
+          undefined, // causationId
+          tx // transaction context
+        );
 
-        // Create outbox event for channel deleted (in same transaction)
-        // The OutboxPublisher worker will poll this and publish to RabbitMQ
-        await this.outboxService.createChannelDeletedEvent({
-          channelId,
-          workspaceId,
-          channelName: channel.name,
-          deletedBy: userId,
-        });
+        // Then delete the channel and its members (include workspaceId for partition-aware query)
+        await this.channelRepository.deleteChannel(workspaceId, channelId, tx);
       });
 
       logger.info("Channel deleted successfully", {

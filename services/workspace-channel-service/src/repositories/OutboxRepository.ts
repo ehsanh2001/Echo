@@ -19,9 +19,13 @@ export class OutboxRepository implements IOutboxRepository {
   /**
    * Create a new outbox event
    * @param data - Outbox event creation data
+   * @param tx - Optional Prisma transaction context for transactional outbox pattern
    * @returns Promise resolving to the created outbox event
    */
-  async create(data: CreateOutboxEventData): Promise<OutboxEvent> {
+  async create(
+    data: CreateOutboxEventData,
+    tx?: PrismaTransaction
+  ): Promise<OutboxEvent> {
     try {
       // Build the data object conditionally to satisfy exactOptionalPropertyTypes
       const createData: any = {
@@ -43,7 +47,9 @@ export class OutboxRepository implements IOutboxRepository {
         createData.channelId = data.channelId;
       }
 
-      return await this.prisma.outboxEvent.create({
+      // Use transaction context if provided, otherwise use main Prisma instance
+      const prismaClient = tx ?? this.prisma;
+      return await prismaClient.outboxEvent.create({
         data: createData,
       });
     } catch (error: any) {

@@ -14,9 +14,13 @@ export interface IOutboxRepository {
   /**
    * Create a new outbox event
    * @param data - Outbox event creation data
+   * @param tx - Optional Prisma transaction context
    * @returns Promise resolving to the created outbox event
    */
-  create(data: CreateOutboxEventData): Promise<OutboxEvent>;
+  create(
+    data: CreateOutboxEventData,
+    tx?: PrismaTransaction
+  ): Promise<OutboxEvent>;
 
   /**
    * Find and lock pending outbox events for processing (multi-instance safe)

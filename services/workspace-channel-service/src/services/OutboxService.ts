@@ -7,7 +7,10 @@ import {
   CreateChannelMemberJoinedEventData,
   CreateChannelCreatedEventData,
 } from "../interfaces/services/IOutboxService";
-import { IOutboxRepository } from "../interfaces/repositories/IOutboxRepository";
+import {
+  IOutboxRepository,
+  PrismaTransaction,
+} from "../interfaces/repositories/IOutboxRepository";
 import {
   WorkspaceInviteCreatedEventPayload,
   WorkspaceMemberJoinedEventPayload,
@@ -151,12 +154,14 @@ export class OutboxService implements IOutboxService {
    * @param eventData - Channel deleted data
    * @param correlationId - Optional correlation ID for distributed tracing
    * @param causationId - Optional causation ID
+   * @param tx - Optional Prisma transaction context for transactional outbox pattern
    * @returns Promise resolving to the created outbox event
    */
   async createChannelDeletedEvent(
     eventData: ChannelDeletedEventData,
     correlationId?: string,
-    causationId?: string
+    causationId?: string,
+    tx?: PrismaTransaction
   ): Promise<OutboxEvent> {
     const payload = this.createChannelDeletedPayload(
       eventData,
@@ -173,7 +178,7 @@ export class OutboxService implements IOutboxService {
       payload: payload,
     };
 
-    return await this.outboxRepository.create(outboxData);
+    return await this.outboxRepository.create(outboxData, tx);
   }
 
   /**
@@ -379,6 +384,7 @@ export class OutboxService implements IOutboxService {
       data: {
         channelId: eventData.channelId,
         workspaceId: eventData.workspaceId,
+        channelName: eventData.channelName,
         deletedBy: eventData.deletedBy,
       },
       metadata: this.createMetadata(correlationId, causationId),
