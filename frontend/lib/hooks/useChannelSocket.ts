@@ -11,6 +11,7 @@
  * Handles channel:deleted events by:
  * - Removing the channel from the workspace members cache
  * - Removing the channel from the user memberships cache (sidebar)
+ * - Removing the channel's message cache
  * - Leaving the socket room for the deleted channel
  * - If user is viewing deleted channel, redirect to general channel
  * - Showing a toast notification
@@ -26,6 +27,7 @@ import {
   updateMembersCacheOnChannelDeleted,
   updateMembershipsCacheOnChannelDeleted,
 } from "@/lib/socket/memberCacheHelpers";
+import { messageKeys } from "@/lib/hooks/useMessageQueries";
 import { useCurrentUser } from "@/lib/stores/user-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import type {
@@ -128,6 +130,18 @@ function createChannelDeletedHandler(
 
     // Update the memberships cache (sidebar channel list)
     updateMembershipsCacheOnChannelDeleted(queryClient, data);
+
+    // Remove the message cache for the deleted channel
+    // This prevents stale message queries and errors when trying to fetch
+    // messages for a channel that no longer exists
+    queryClient.removeQueries({
+      queryKey: messageKeys.channel(data.workspaceId, data.channelId),
+    });
+
+    logDev("[Socket] Removed message cache for deleted channel", {
+      workspaceId: data.workspaceId,
+      channelId: data.channelId,
+    });
 
     // Leave the socket room for the deleted channel
     const socket = getSocket();

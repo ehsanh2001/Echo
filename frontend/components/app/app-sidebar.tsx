@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 import { InviteMembersModal } from "@/components/workspace/InviteMembersModal";
+import { ChannelContextMenu } from "@/components/channel/ChannelContextMenu";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   useWorkspaceMemberships,
@@ -146,6 +147,40 @@ export function AppSidebar({
     selectedWorkspace &&
     (selectedWorkspace.userRole === WorkspaceRole.OWNER ||
       selectedWorkspace.userRole === WorkspaceRole.ADMIN);
+
+  // Handle channel deletion success - immediately update UI for the deleting user
+  const handleChannelDeleted = (deletedChannelId: string) => {
+    // If the deleted channel was selected, redirect to general channel
+    if (selectedChannel === deletedChannelId && selectedWorkspaceId) {
+      const generalChannel = channels.find(
+        (ch) => ch.name.toLowerCase() === "general"
+      );
+
+      if (generalChannel) {
+        onSelectChannel(
+          generalChannel.id,
+          generalChannel.displayName || generalChannel.name
+        );
+      } else {
+        // Fallback: clear selection
+        onSelectChannel(null);
+      }
+    }
+
+    // Immediately invalidate caches to refresh the UI
+    // The socket event will also update other users' caches
+    if (selectedWorkspaceId) {
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.membershipsWithChannels(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: memberKeys.workspace(selectedWorkspaceId),
+      });
+      queryClient.removeQueries({
+        queryKey: messageKeys.channel(selectedWorkspaceId, deletedChannelId),
+      });
+    }
+  };
 
   // Handle refresh with visual feedback
   const handleRefresh = async () => {
@@ -430,48 +465,76 @@ export function AppSidebar({
                     )}
                   </div>
                 ) : (
-                  channels.map((channel) => (
-                    <Tooltip key={channel.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() =>
-                            onSelectChannel(
-                              channel.id,
-                              channel.displayName || channel.name
-                            )
-                          }
-                          className={`w-full px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm relative ${
-                            selectedChannel === channel.id
-                              ? "bg-sidebar-accent/50 border-l-2 border-primary"
-                              : "hover:bg-sidebar-accent"
-                          }`}
-                        >
-                          {channel.type === ChannelType.PRIVATE ? (
-                            <Lock className="w-4 h-4 flex-shrink-0" />
-                          ) : (
-                            <Hash className="w-5 h-5 flex-shrink-0" />
-                          )}
-                          <span className="truncate flex-1 text-left">
-                            {channel.name}
-                          </span>
-                          {/* No unread counts for now */}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <div className="text-left">
-                          <p className="font-semibold">#{channel.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {channel.workspaceName}
-                          </p>
-                          {channel.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {channel.description}
+                  channels.map((channel) => {
+                    const isGeneralChannel =
+                      channel.name.toLowerCase() === "general";
+
+                    return (
+                      <Tooltip key={channel.id}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`group w-full flex items-center text-sidebar-foreground transition-colors text-sm relative ${
+                              selectedChannel === channel.id
+                                ? "bg-sidebar-accent/50 border-l-2 border-primary"
+                                : "hover:bg-sidebar-accent"
+                            }`}
+                          >
+                            <button
+                              onClick={() =>
+                                onSelectChannel(
+                                  channel.id,
+                                  channel.displayName || channel.name
+                                )
+                              }
+                              className="flex-1 px-4 py-2 flex items-center gap-2"
+                            >
+                              {channel.type === ChannelType.PRIVATE ? (
+                                <Lock className="w-4 h-4 flex-shrink-0" />
+                              ) : (
+                                <Hash className="w-5 h-5 flex-shrink-0" />
+                              )}
+                              <span className="truncate flex-1 text-left">
+                                {channel.name}
+                              </span>
+                            </button>
+
+                            {/* Channel Context Menu */}
+                            <div className="pr-2">
+                              <ChannelContextMenu
+                                channelId={channel.id}
+                                channelName={channel.name}
+                                channelDisplayName={channel.displayName}
+                                workspaceId={channel.workspaceId}
+                                channelRole={channel.role}
+                                workspaceRole={
+                                  selectedWorkspace?.userRole ||
+                                  WorkspaceRole.MEMBER
+                                }
+                                isGeneralChannel={isGeneralChannel}
+                                isMuted={channel.isMuted}
+                                onDeleteSuccess={() =>
+                                  handleChannelDeleted(channel.id)
+                                }
+                              />
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <div className="text-left">
+                            <p className="font-semibold">#{channel.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {channel.workspaceName}
                             </p>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))
+                            {channel.description && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {channel.description}
+                              </p>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })
                 )}
               </nav>
             )}

@@ -29,6 +29,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           success: "!bg-green-600 !text-white !border-green-700",
+          info: "!bg-blue-600 !text-white !border-blue-700",
           error: "!bg-red-600 !text-white !border-red-700",
           closeButton:
             "!absolute !left-auto !right-2 !top-2 !transform-none !bg-white/20 hover:!bg-white/30",
