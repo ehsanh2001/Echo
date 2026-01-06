@@ -10,6 +10,10 @@ import { IMessageService } from "./interfaces/services/IMessageService";
 import { MessageService } from "./services/MessageService";
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { RabbitMQService } from "./services/RabbitMQService";
+import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
+import { RabbitMQConsumer } from "./workers/RabbitMQConsumer";
+import { IHealthService } from "./interfaces/services/IHealthService";
+import { HealthService } from "./services/HealthService";
 import { IUserServiceClient } from "./interfaces/external/IUserServiceClient";
 import { UserServiceClient } from "./services/UserServiceClient";
 import { IWorkspaceChannelServiceClient } from "./interfaces/external/IWorkspaceChannelServiceClient";
@@ -37,6 +41,9 @@ container.registerSingleton<IMessageRepository>(
 
 // ===== SERVICES =====
 
+// Register HealthService as IHealthService implementation (must be registered first for other services to inject)
+container.registerSingleton<IHealthService>("IHealthService", HealthService);
+
 // Register CacheService as ICacheService implementation
 container.registerSingleton<ICacheService>("ICacheService", CacheService);
 
@@ -45,6 +52,11 @@ container.registerSingleton<IMessageService>("IMessageService", MessageService);
 
 // Register RabbitMQService as IRabbitMQService implementation and initialize
 const rabbitMQService = new RabbitMQService();
+
+// Wire up health service to RabbitMQ service (after HealthService is registered)
+const healthService = container.resolve<IHealthService>("IHealthService");
+rabbitMQService.setHealthService(healthService);
+
 rabbitMQService.initialize().catch((error) => {
   logger.error("❌ Failed to initialize RabbitMQ during startup:", error);
   // Don't throw - allow service to start even if RabbitMQ is unavailable
@@ -73,6 +85,13 @@ container.registerSingleton<IWorkspaceChannelServiceClient>(
 // Register MessageController
 container.registerSingleton<MessageController>(MessageController);
 
-// TODO: Register workers when created
+// ===== WORKERS =====
+
+// Register RabbitMQConsumer as IRabbitMQConsumer implementation
+// Note: Initialization is done in index.ts after all services are registered
+container.registerSingleton<IRabbitMQConsumer>(
+  "IRabbitMQConsumer",
+  RabbitMQConsumer
+);
 
 export { container };

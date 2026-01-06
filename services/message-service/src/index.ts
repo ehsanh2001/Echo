@@ -14,6 +14,8 @@ import logger from "./utils/logger";
 import { config } from "./config/env";
 import { container } from "./container"; // Auto-configure dependency injection
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
+import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
+import { IHealthService } from "./interfaces/services/IHealthService";
 import { messageRoutes } from "./routes/messageRoutes";
 import morgan from "morgan";
 
@@ -49,29 +51,32 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
 app.get("/health", async (req, res) => {
-  const healthInfo = {
-    status: "healthy",
-    service: config.service.name,
-    version: "1.0.0",
-    timestamp: new Date().toISOString(),
-  };
+  const healthService = container.resolve<IHealthService>("IHealthService");
+  const { response, statusCode } = await healthService.checkHealth(
+    config.service.name,
+    "1.0.0"
+  );
+  res.status(statusCode).json(response);
+});
 
-  try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
+// Kubernetes-style liveness probe - if fails, container should be restarted
+app.get("/health/live", async (req, res) => {
+  const healthService = container.resolve<IHealthService>("IHealthService");
+  const { response, statusCode } = await healthService.checkLiveness(
+    config.service.name,
+    "1.0.0"
+  );
+  res.status(statusCode).json(response);
+});
 
-    res.status(200).json(healthInfo);
-  } catch (error) {
-    logger.error("Health check failed:", error);
-
-    const unhealthyInfo = {
-      ...healthInfo,
-      status: "unhealthy",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-
-    res.status(503).json(unhealthyInfo);
-  }
+// Kubernetes-style readiness probe - if fails, traffic should not be routed
+app.get("/health/ready", async (req, res) => {
+  const healthService = container.resolve<IHealthService>("IHealthService");
+  const { response, statusCode } = await healthService.checkReadiness(
+    config.service.name,
+    "1.0.0"
+  );
+  res.status(statusCode).json(response);
 });
 
 // API routes
@@ -114,10 +119,18 @@ const startServer = async () => {
     await prisma.$connect();
     logger.info("✅ Database connected");
 
+    // Initialize RabbitMQ consumer for channel.deleted events
+    const rabbitMQConsumer =
+      container.resolve<IRabbitMQConsumer>("IRabbitMQConsumer");
+    await rabbitMQConsumer.initialize();
+    logger.info("✅ RabbitMQ consumer initialized");
+
     const server = app.listen(config.port, () => {
       logger.info(`🚀 ${config.service.name} running on port ${config.port}`);
       logger.info(`📊 Environment: ${config.nodeEnv}`);
       logger.info(`🏥 Health check: http://localhost:${config.port}/health`);
+      logger.info(`❤️  Liveness: http://localhost:${config.port}/health/live`);
+      logger.info(`✅ Readiness: http://localhost:${config.port}/health/ready`);
     });
 
     // Graceful shutdown
@@ -128,11 +141,15 @@ const startServer = async () => {
         logger.info("✅ HTTP server closed");
 
         try {
+          // Close RabbitMQ consumer
+          await rabbitMQConsumer.close();
+          logger.info("✅ RabbitMQ consumer disconnected");
+
           // Get RabbitMQ service for cleanup
           const rabbitMQService =
             container.resolve<IRabbitMQService>("IRabbitMQService");
           await rabbitMQService.close();
-          logger.info("✅ RabbitMQ disconnected");
+          logger.info("✅ RabbitMQ publisher disconnected");
 
           await prisma.$disconnect();
           logger.info("✅ Database disconnected");

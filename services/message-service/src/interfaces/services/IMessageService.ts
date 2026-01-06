@@ -59,4 +59,18 @@ export interface IMessageService {
     userId: string,
     params: MessageHistoryQueryParams
   ): Promise<MessageHistoryResponse>;
+
+  /**
+   * Delete all messages for a channel
+   * Called when a channel is deleted via RabbitMQ event
+   *
+   * @param workspaceId - The workspace ID (partition key)
+   * @param channelId - The channel ID whose messages should be deleted
+   * @returns Number of messages deleted
+   * @throws MessageServiceError if deletion fails
+   */
+  deleteMessagesByChannel(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number>;
 }

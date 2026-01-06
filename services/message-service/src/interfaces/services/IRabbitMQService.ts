@@ -1,4 +1,5 @@
 import { MessageWithAuthorResponse } from "../../types";
+import { IHealthService } from "./IHealthService";
 
 /**
  * Message event for RabbitMQ publishing
@@ -38,4 +39,10 @@ export interface IRabbitMQService {
    * @returns Promise that resolves when connection is closed
    */
   close(): Promise<void>;
+
+  /**
+   * Set health service for reporting connection status
+   * @param healthService - The health service instance
+   */
+  setHealthService(healthService: IHealthService): void;
 }

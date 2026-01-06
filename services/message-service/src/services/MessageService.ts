@@ -553,4 +553,37 @@ export class MessageService implements IMessageService {
       };
     }
   }
+
+  /**
+   * Delete all messages for a channel
+   *
+   * Called when a channel.deleted event is received from RabbitMQ.
+   * Uses bulk delete with workspaceId for partition-aware queries.
+   *
+   * @param workspaceId - The workspace ID (partition key)
+   * @param channelId - The channel ID whose messages should be deleted
+   * @returns Number of messages deleted
+   */
+  async deleteMessagesByChannel(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number> {
+    logger.info("Deleting all messages for channel", {
+      workspaceId,
+      channelId,
+    });
+
+    const deletedCount = await this.messageRepository.deleteByChannelId(
+      workspaceId,
+      channelId
+    );
+
+    logger.info("Messages deleted for channel", {
+      workspaceId,
+      channelId,
+      deletedCount,
+    });
+
+    return deletedCount;
+  }
 }

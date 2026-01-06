@@ -1,7 +1,8 @@
-import { injectable } from "tsyringe";
+import { injectable, inject } from "tsyringe";
 import { createClient, RedisClientType } from "redis";
 import logger from "../utils/logger";
 import { ICacheService } from "../interfaces/services/ICacheService";
+import { IHealthService } from "../interfaces/services/IHealthService";
 import { config } from "../config/env";
 
 /**
@@ -13,7 +14,9 @@ export class CacheService implements ICacheService {
   private readonly redis: RedisClientType;
   private readonly keyPrefix: string;
 
-  constructor() {
+  constructor(
+    @inject("IHealthService") private readonly healthService: IHealthService
+  ) {
     // Create and configure Redis client internally
     this.redis = createClient({
       url: config.redis.url,
@@ -25,16 +28,29 @@ export class CacheService implements ICacheService {
     // Set up event listeners
     this.redis.on("error", (err) => {
       logger.error("Redis connection error:", err);
+      this.healthService.setRedisHealth(false);
     });
 
     this.redis.on("connect", () => {
       logger.info("Redis connected successfully");
+      this.healthService.setRedisHealth(true);
+    });
+
+    this.redis.on("reconnecting", () => {
+      logger.info("Redis reconnecting...");
+      this.healthService.setRedisHealth(false);
+    });
+
+    this.redis.on("ready", () => {
+      logger.info("Redis ready");
+      this.healthService.setRedisHealth(true);
     });
 
     // Connect to Redis
-    this.redis
-      .connect()
-      .catch((err) => logger.error("Redis connect error:", err));
+    this.redis.connect().catch((err) => {
+      logger.error("Redis connect error:", err);
+      this.healthService.setRedisHealth(false);
+    });
   }
 
   /**

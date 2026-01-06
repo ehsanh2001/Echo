@@ -6,6 +6,7 @@ import {
   IRabbitMQService,
   MessageCreatedEvent,
 } from "../interfaces/services/IRabbitMQService";
+import { IHealthService } from "../interfaces/services/IHealthService";
 import { config } from "../config/env";
 
 /**
@@ -24,9 +25,18 @@ export class RabbitMQService implements IRabbitMQService {
   private channel: amqp.Channel | null = null;
   private readonly exchangeName: string;
   private readonly exchangeType = "topic";
+  private healthService: IHealthService | null = null;
 
   constructor() {
     this.exchangeName = config.rabbitmq.exchange;
+  }
+
+  /**
+   * Set health service for reporting connection status
+   * Called after container setup since RabbitMQService is manually instantiated
+   */
+  setHealthService(healthService: IHealthService): void {
+    this.healthService = healthService;
   }
 
   /**
@@ -74,6 +84,9 @@ export class RabbitMQService implements IRabbitMQService {
       await ch.assertExchange(this.exchangeName, this.exchangeType, {
         durable: true, // Exchange survives broker restart
       });
+
+      // Report healthy status to health service
+      this.healthService?.setRabbitMQPublisherHealth(true);
 
       logger.info(
         `✅ RabbitMQ connected - Exchange: ${this.exchangeName} (${this.exchangeType})`
@@ -195,5 +208,8 @@ export class RabbitMQService implements IRabbitMQService {
   private handleConnectionClose(): void {
     this.channel = null;
     this.connection = null;
+
+    // Report unhealthy status to health service
+    this.healthService?.setRabbitMQPublisherHealth(false);
   }
 }
