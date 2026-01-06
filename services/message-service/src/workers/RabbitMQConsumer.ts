@@ -21,6 +21,7 @@ interface ChannelDeletedEventPayload {
   data: {
     channelId: string;
     workspaceId: string;
+    channelName: string;
     deletedBy: string;
   };
   metadata: {

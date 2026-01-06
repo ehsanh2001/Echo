@@ -559,6 +559,7 @@ export class ChannelService implements IChannelService {
         await this.outboxService.createChannelDeletedEvent({
           channelId,
           workspaceId,
+          channelName: channel.name,
           deletedBy: userId,
         });
       });
