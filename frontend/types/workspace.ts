@@ -155,6 +155,19 @@ export interface CreateChannelResponse {
   timestamp: string;
 }
 
+/**
+ * Response from DELETE /api/workspaces/:workspaceId/channels/:channelId
+ */
+export interface DeleteChannelResponse {
+  success: boolean;
+  data: {
+    channelId: string;
+    workspaceId: string;
+    deleted: boolean;
+  };
+  timestamp: string;
+}
+
 // ===== WORKSPACE MEMBERS TYPES =====
 
 /**
@@ -264,4 +277,14 @@ export interface ChannelCreatedEventPayload {
   createdBy: string;
   members: ChannelCreatedMemberData[];
   createdAt: string;
+}
+
+/**
+ * Payload for channel:deleted socket events
+ */
+export interface ChannelDeletedEventPayload {
+  channelId: string;
+  channelName: string;
+  workspaceId: string;
+  deletedBy: string;
 }

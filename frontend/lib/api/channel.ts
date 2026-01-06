@@ -8,6 +8,7 @@ import type {
   CreateChannelRequest,
   CreateChannelResponse,
   CheckChannelNameResponse,
+  DeleteChannelResponse,
 } from "@/types/workspace";
 
 /**
@@ -42,6 +43,29 @@ export async function createChannel(
     const response = await apiClient.post<CreateChannelResponse>(
       `/api/workspaces/${data.workspaceId}/channels`,
       data
+    );
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * Delete a channel from a workspace
+ * Only channel owner or workspace owner can delete a channel.
+ * The "general" channel cannot be deleted.
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelId - The channel ID to delete
+ * @returns Promise with deletion confirmation
+ */
+export async function deleteChannel(
+  workspaceId: string,
+  channelId: string
+): Promise<DeleteChannelResponse> {
+  try {
+    const response = await apiClient.delete<DeleteChannelResponse>(
+      `/api/workspaces/${workspaceId}/channels/${channelId}`
     );
     return response;
   } catch (error: any) {

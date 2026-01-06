@@ -11,6 +11,7 @@ import type {
   ChannelWithMembers,
   GetUserMembershipsResponse,
   ChannelCreatedEventPayload,
+  ChannelDeletedEventPayload,
   ChannelMembershipResponse,
 } from "@/types/workspace";
 import { WorkspaceRole, ChannelRole, ChannelType } from "@/types/workspace";
@@ -250,7 +251,7 @@ export function addNewChannelToCache(
         displayName: member.user.displayName ?? member.user.username, // Fallback to username if null
         email: member.user.email ?? "", // May not be provided
         avatarUrl: member.user.avatarUrl,
-        lastSeen: member.user.lastSeen ?? null,
+        lastSeen: member.user.lastSeen ? new Date(member.user.lastSeen) : null,
       },
     })
   );
@@ -349,6 +350,92 @@ export function updateMembershipsCacheWithNewChannel(
       return {
         ...workspace,
         channels: [...(workspace.channels || []), newChannel],
+      };
+    });
+
+    return {
+      ...old,
+      data: {
+        ...old.data,
+        workspaces: updatedWorkspaces,
+      },
+    };
+  });
+}
+
+// ============================================================================
+// Channel Deletion Cache Helpers
+// ============================================================================
+
+/**
+ * Removes a channel from the workspace members cache
+ */
+export function removeChannelFromCache(
+  old: WorkspaceMembersData | undefined,
+  channelId: string
+): WorkspaceMembersData | undefined {
+  if (!old) return old;
+
+  return {
+    ...old,
+    channels: old.channels.filter(
+      (channel: ChannelWithMembers) => channel.id !== channelId
+    ),
+  };
+}
+
+/**
+ * Updates the members cache to remove a deleted channel
+ * If cache doesn't exist, invalidates it so it will be fetched fresh
+ */
+export function updateMembersCacheOnChannelDeleted(
+  queryClient: QueryClient,
+  workspaceId: string,
+  channelId: string
+): void {
+  const cacheKey = memberKeys.workspace(workspaceId);
+  const existingData =
+    queryClient.getQueryData<CachedMembersResponse>(cacheKey);
+
+  if (existingData) {
+    // Cache exists - update it directly
+    queryClient.setQueryData<CachedMembersResponse>(cacheKey, (old) => {
+      if (!old) return old;
+
+      return {
+        ...old,
+        data: removeChannelFromCache(old.data, channelId)!,
+      };
+    });
+  } else {
+    // Cache doesn't exist - invalidate so it will be fetched fresh when needed
+    queryClient.invalidateQueries({ queryKey: cacheKey });
+  }
+}
+
+/**
+ * Updates the user memberships cache to remove a deleted channel
+ * Used for the sidebar channel list
+ */
+export function updateMembershipsCacheOnChannelDeleted(
+  queryClient: QueryClient,
+  eventPayload: ChannelDeletedEventPayload
+): void {
+  const cacheKey = workspaceKeys.membershipsWithChannels();
+
+  queryClient.setQueryData<GetUserMembershipsResponse>(cacheKey, (old) => {
+    if (!old?.data) return old;
+
+    // Find the workspace and remove the channel from it
+    const updatedWorkspaces = old.data.workspaces.map((workspace) => {
+      if (workspace.id !== eventPayload.workspaceId) return workspace;
+
+      // Remove the deleted channel
+      return {
+        ...workspace,
+        channels: workspace.channels?.filter(
+          (c) => c.id !== eventPayload.channelId
+        ),
       };
     });
 

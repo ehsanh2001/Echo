@@ -4,12 +4,13 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createChannel } from "@/lib/api/channel";
+import { createChannel, deleteChannel } from "@/lib/api/channel";
 import { workspaceKeys } from "@/lib/hooks/useWorkspaces";
 import { memberKeys } from "@/lib/hooks/useMembers";
 import type {
   CreateChannelRequest,
   CreateChannelResponse,
+  DeleteChannelResponse,
 } from "@/types/workspace";
 import { toast } from "sonner";
 
@@ -92,32 +93,53 @@ export function useUpdateChannel() {
 
 /**
  * Hook for deleting a channel
- * (Placeholder for future implementation)
+ *
+ * Automatically:
+ * - Manages loading/error states
+ * - Invalidates workspace cache on success to refresh channel list
+ * - Shows error toast on failure
+ *
+ * Note: The actual cache update is handled by the socket event handler
+ * which removes the channel from all caches when channel:deleted is received.
+ * This ensures all connected clients get the update, not just the one who deleted.
  */
 export function useDeleteChannel() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       workspaceId,
       channelId,
     }: {
       workspaceId: string;
       channelId: string;
-    }) => {
-      // TODO: Implement delete API call
-      throw new Error("Not implemented yet");
-    },
+    }): Promise<DeleteChannelResponse> => deleteChannel(workspaceId, channelId),
 
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      // Force refetch workspace memberships to ensure channel list is up to date
+      // This is a backup - the socket event handler should update the cache first
       queryClient.invalidateQueries({
         queryKey: workspaceKeys.membershipsWithChannels(),
       });
-      toast.success("Channel deleted successfully!");
+
+      // Also invalidate workspace members cache
+      queryClient.invalidateQueries({
+        queryKey: memberKeys.workspace(variables.workspaceId),
+      });
+
+      // Don't show toast here - the UI component will handle success feedback
+      // (e.g., closing the dialog and redirecting)
     },
 
     onError: (error: any) => {
-      toast.error(error?.message || "Failed to delete channel");
+      // Show error toast with specific message if available
+      const errorMessage =
+        error?.message || "Failed to delete channel. Please try again.";
+      toast.error(errorMessage);
+      console.error("Error deleting channel:", error);
     },
+
+    // Don't retry delete operations - they should be intentional
+    retry: false,
   });
 }

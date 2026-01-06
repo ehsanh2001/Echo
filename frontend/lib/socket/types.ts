@@ -4,7 +4,10 @@
  */
 
 import type { MessageWithAuthorResponse } from "@/types/message";
-import type { ChannelCreatedEventPayload } from "@/types/workspace";
+import type {
+  ChannelCreatedEventPayload,
+  ChannelDeletedEventPayload,
+} from "@/types/workspace";
 
 /**
  * User info included in member events
@@ -87,6 +90,12 @@ export interface ServerToClientEvents {
    * For private channels: emitted to each member's user room
    */
   "channel:created": (data: ChannelCreatedEventPayload) => void;
+
+  /**
+   * Channel deleted
+   * Emitted to all users in the channel room before the room is destroyed
+   */
+  "channel:deleted": (data: ChannelDeletedEventPayload) => void;
 
   connect: () => void;
 
