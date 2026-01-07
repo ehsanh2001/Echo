@@ -12,6 +12,7 @@ import {
   workspaceKeys,
 } from "@/lib/hooks/useWorkspaces";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useUserStore } from "@/lib/stores/user-store";
 import { useWorkspaceRooms } from "@/lib/hooks/useWorkspaceRooms";
 import { useMessageSocket } from "@/lib/hooks/useMessageSocket";
 import { useMemberSocket } from "@/lib/hooks/useMemberSocket";
@@ -29,11 +30,14 @@ function AppPageContent() {
   const workspaceMembershipsQuery = useWorkspaceMemberships(true);
   const workspaces = workspaceMembershipsQuery.data?.data?.workspaces;
 
+  // Get current user for socket hooks
+  const currentUser = useUserStore((state) => state.user);
+
   // Join all workspace and channel rooms via Socket.IO
   useWorkspaceRooms({ workspaces });
 
   // Listen to Socket.IO message events and update React Query cache
-  useMessageSocket();
+  useMessageSocket(currentUser?.id ?? null);
 
   // Listen to Socket.IO member events and update React Query cache
   useMemberSocket();

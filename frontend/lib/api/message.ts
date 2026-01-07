@@ -7,6 +7,9 @@ import type {
   MessageHistoryParams,
   GetMessageHistoryResponse,
   GetMessageByIdResponse,
+  MarkAsReadRequest,
+  ReadReceiptApiResponse,
+  WorkspaceUnreadCountsApiResponse,
 } from "@/types/message";
 
 /**
@@ -124,6 +127,116 @@ export async function getMessageById(
     return response;
   } catch (error) {
     console.error("Error fetching message by ID:", error);
+    throw error;
+  }
+}
+
+// ===== READ RECEIPT API FUNCTIONS =====
+
+/**
+ * Mark messages as read in a channel
+ *
+ * Updates the user's read position to the specified message number.
+ * Only updates if the new position is ahead of the current position.
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelId - The channel ID
+ * @param data - Mark as read request with messageNo and optional messageId
+ * @returns Promise with the updated read receipt
+ *
+ * @example
+ * ```typescript
+ * await markChannelAsRead('workspace-123', 'channel-456', {
+ *   messageNo: 150,
+ *   messageId: 'message-uuid'
+ * });
+ * ```
+ */
+export async function markChannelAsRead(
+  workspaceId: string,
+  channelId: string,
+  data: MarkAsReadRequest
+): Promise<ReadReceiptApiResponse> {
+  try {
+    const response = await apiClient.post<ReadReceiptApiResponse>(
+      `/api/workspaces/${workspaceId}/channels/${channelId}/read-receipt`,
+      data
+    );
+    return response;
+  } catch (error) {
+    console.error("Error marking channel as read:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get the user's read receipt for a channel
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelId - The channel ID
+ * @returns Promise with the read receipt (or null if never read)
+ *
+ * @example
+ * ```typescript
+ * const receipt = await getReadReceipt('workspace-123', 'channel-456');
+ * if (receipt.data) {
+ *   console.log('Last read message:', receipt.data.lastReadMessageNo);
+ * }
+ * ```
+ */
+export async function getReadReceipt(
+  workspaceId: string,
+  channelId: string
+): Promise<ReadReceiptApiResponse> {
+  try {
+    const response = await apiClient.get<ReadReceiptApiResponse>(
+      `/api/workspaces/${workspaceId}/channels/${channelId}/read-receipt`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching read receipt:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get unread counts for all channels in a workspace
+ *
+ * Fetches unread message counts for the specified channels.
+ * Should be called with all channel IDs the user is a member of.
+ *
+ * @param workspaceId - The workspace ID
+ * @param channelIds - Array of channel IDs to get unread counts for
+ * @returns Promise with unread counts per channel and total
+ *
+ * @example
+ * ```typescript
+ * const counts = await getWorkspaceUnreadCounts(
+ *   'workspace-123',
+ *   ['channel-1', 'channel-2', 'channel-3']
+ * );
+ * console.log('Total unread:', counts.data.totalUnread);
+ * counts.data.channels.forEach(ch => {
+ *   console.log(`${ch.channelId}: ${ch.unreadCount} unread`);
+ * });
+ * ```
+ */
+export async function getWorkspaceUnreadCounts(
+  workspaceId: string,
+  channelIds: string[]
+): Promise<WorkspaceUnreadCountsApiResponse> {
+  try {
+    const response = await apiClient.get<WorkspaceUnreadCountsApiResponse>(
+      `/api/workspaces/${workspaceId}/unread-counts`,
+      {
+        params: {
+          channelIds: channelIds.join(","),
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching workspace unread counts:", error);
     throw error;
   }
 }

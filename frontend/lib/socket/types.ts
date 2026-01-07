@@ -104,11 +104,30 @@ export interface ServerToClientEvents {
    */
   "workspace:deleted": (data: WorkspaceDeletedEventPayload) => void;
 
+  /**
+   * Read receipt updated
+   * Emitted to user's room when their read position is updated
+   * Used for syncing read state across tabs/devices
+   */
+  "read-receipt:updated": (data: ReadReceiptUpdatedPayload) => void;
+
   connect: () => void;
 
   disconnect: (reason: string) => void;
 
   error: (error: Error) => void;
+}
+
+/**
+ * Read receipt updated event payload
+ */
+export interface ReadReceiptUpdatedPayload {
+  workspaceId: string;
+  channelId: string;
+  userId: string;
+  lastReadMessageNo: number;
+  lastReadMessageId: string | null;
+  lastReadAt: string; // ISO-8601
 }
 
 /**

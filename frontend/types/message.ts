@@ -172,3 +172,65 @@ export interface GetMessageByIdResponse {
   success: boolean;
   data: MessageWithAuthorResponse;
 }
+
+// ===== READ RECEIPT TYPES =====
+
+/**
+ * Read receipt response structure
+ * Tracks the last message a user has read in a channel
+ */
+export interface ReadReceiptResponse {
+  workspaceId: string;
+  channelId: string;
+  userId: string;
+  lastReadMessageNo: number;
+  lastReadMessageId: string | null;
+  lastReadAt: string; // ISO-8601
+}
+
+/**
+ * Channel unread info for a single channel
+ */
+export interface ChannelUnreadInfo {
+  channelId: string;
+  unreadCount: number;
+  lastMessageNo: number;
+  lastReadMessageNo: number;
+}
+
+/**
+ * Workspace unread counts response
+ */
+export interface WorkspaceUnreadCountsResponse {
+  workspaceId: string;
+  channels: ChannelUnreadInfo[];
+  totalUnread: number;
+}
+
+/**
+ * Request body for marking messages as read
+ */
+export interface MarkAsReadRequest {
+  messageNo: number;
+  messageId?: string;
+}
+
+/**
+ * API response wrapper for read receipt operations
+ */
+export interface ReadReceiptApiResponse {
+  success: boolean;
+  data: ReadReceiptResponse;
+  message: string;
+  timestamp: string;
+}
+
+/**
+ * API response wrapper for workspace unread counts
+ */
+export interface WorkspaceUnreadCountsApiResponse {
+  success: boolean;
+  data: WorkspaceUnreadCountsResponse;
+  message: string;
+  timestamp: string;
+}

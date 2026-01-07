@@ -5,12 +5,17 @@
  * Handles two types of messages:
  * 1. Own messages (with clientMessageCorrelationId) - replaces optimistic message
  * 2. Messages from other users - adds to cache if channel is loaded
+ *
+ * Also updates unread counts in Zustand store when messages arrive
+ * for channels that are not currently active.
  */
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getSocket } from "@/lib/socket/socketClient";
 import { messageKeys } from "./useMessageQueries";
+import { useUnreadStore } from "@/lib/stores/unread-store";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import type {
   MessageWithAuthorResponse,
   MessageHistoryResponse,
@@ -148,8 +153,17 @@ function updateCacheWithMessage(
 /**
  * Handles incoming message:created events
  * Updates React Query cache if channel is loaded
+ * Also increments unread count for non-active channels
  */
-function createMessageHandler(queryClient: ReturnType<typeof useQueryClient>) {
+function createMessageHandler(
+  queryClient: ReturnType<typeof useQueryClient>,
+  incrementUnread: (workspaceId: string, channelId: string) => void,
+  getActiveChannel: () => {
+    workspaceId: string | null;
+    channelId: string | null;
+  },
+  currentUserId: string | null
+) {
   return function handleMessageCreated(message: MessageWithAuthorResponse) {
     logDev("[Socket] Received message:created", {
       messageId: message.id,
@@ -166,16 +180,34 @@ function createMessageHandler(queryClient: ReturnType<typeof useQueryClient>) {
     const cache =
       queryClient.getQueryData<InfiniteData<MessageHistoryResponse>>(cacheKey);
 
-    if (!cache) {
-      logDev("[Socket] No cache for channel, ignoring message");
-      return;
+    if (cache) {
+      // Update the cache
+      queryClient.setQueryData<InfiniteData<MessageHistoryResponse>>(
+        cacheKey,
+        (old) => updateCacheWithMessage(old, message)
+      );
+    } else {
+      logDev("[Socket] No cache for channel, skipping cache update");
     }
 
-    // Update the cache
-    queryClient.setQueryData<InfiniteData<MessageHistoryResponse>>(
-      cacheKey,
-      (old) => updateCacheWithMessage(old, message)
-    );
+    // Handle unread count increment
+    // Don't increment for:
+    // 1. Own messages (we're the sender)
+    // 2. Messages in the currently active channel
+    const { workspaceId: activeWorkspaceId, channelId: activeChannelId } =
+      getActiveChannel();
+    const isOwnMessage = message.userId === currentUserId;
+    const isActiveChannel =
+      message.workspaceId === activeWorkspaceId &&
+      message.channelId === activeChannelId;
+
+    if (!isOwnMessage && !isActiveChannel) {
+      logDev("[Socket] Incrementing unread count for non-active channel", {
+        workspaceId: message.workspaceId,
+        channelId: message.channelId,
+      });
+      incrementUnread(message.workspaceId, message.channelId);
+    }
   };
 }
 
@@ -184,21 +216,46 @@ function createMessageHandler(queryClient: ReturnType<typeof useQueryClient>) {
  *
  * Should be called once at the app level (in main app page).
  * Listens to all message:created events and updates the appropriate channel cache.
+ * Also increments unread counts for messages in non-active channels.
+ *
+ * @param currentUserId - The ID of the current authenticated user
  *
  * @example
  * ```tsx
  * function AppPage() {
- *   useMessageSocket(); // Listen to all message events
+ *   const { user } = useAuth();
+ *   useMessageSocket(user?.id ?? null); // Listen to all message events
  *   return <div>App content</div>;
  * }
  * ```
  */
-export function useMessageSocket() {
+export function useMessageSocket(currentUserId: string | null) {
   const queryClient = useQueryClient();
+  const incrementUnread = useUnreadStore((state) => state.incrementUnread);
+  const selectedWorkspaceId = useWorkspaceStore(
+    (state) => state.selectedWorkspaceId
+  );
+  const selectedChannelId = useWorkspaceStore(
+    (state) => state.selectedChannelId
+  );
+
+  // Memoize the getActiveChannel function to avoid recreating handler
+  const getActiveChannel = useCallback(
+    () => ({
+      workspaceId: selectedWorkspaceId,
+      channelId: selectedChannelId,
+    }),
+    [selectedWorkspaceId, selectedChannelId]
+  );
 
   useEffect(() => {
     const socket = getSocket();
-    const handleMessageCreated = createMessageHandler(queryClient);
+    const handleMessageCreated = createMessageHandler(
+      queryClient,
+      incrementUnread,
+      getActiveChannel,
+      currentUserId
+    );
 
     // Register message event listener
     socket.on("message:created", handleMessageCreated);
@@ -209,5 +266,5 @@ export function useMessageSocket() {
       socket.off("message:created", handleMessageCreated);
       logDev("[Socket] Message listener removed");
     };
-  }, [queryClient]);
+  }, [queryClient, incrementUnread, getActiveChannel, currentUserId]);
 }
