@@ -6,6 +6,7 @@ import {
   ChannelRole,
   ChannelType,
   ChannelDeletedEventData,
+  WorkspaceDeletedEventData,
 } from "../../types";
 import { PrismaTransaction } from "../repositories/IOutboxRepository";
 
@@ -135,6 +136,22 @@ export interface IOutboxService {
    */
   createChannelDeletedEvent(
     eventData: ChannelDeletedEventData,
+    correlationId?: string,
+    causationId?: string,
+    tx?: PrismaTransaction
+  ): Promise<OutboxEvent>;
+
+  /**
+   * Create a workspace deleted event when a workspace is deleted
+   *
+   * @param eventData - The workspace deleted data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @param tx - Optional Prisma transaction context for transactional outbox pattern
+   * @returns Promise resolving to the created outbox event
+   */
+  createWorkspaceDeletedEvent(
+    eventData: WorkspaceDeletedEventData,
     correlationId?: string,
     causationId?: string,
     tx?: PrismaTransaction

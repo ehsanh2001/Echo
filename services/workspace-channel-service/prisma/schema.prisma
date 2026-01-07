@@ -58,7 +58,6 @@ model Workspace {
   channels  Channel[]
   invites   Invite[]
   auditLogs AuditLog[]
-  outbox    OutboxEvent[]
 
   @@map("workspaces")
   @@index([isPublic, isArchived]) // For public workspace discovery
@@ -66,7 +65,7 @@ model Workspace {
 
 model WorkspaceMember {
   id           String   @id @default(uuid()) @db.Uuid
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId  String    @db.Uuid @map("workspace_id")
   userId       String    @db.Uuid @map("user_id")
   role         WorkspaceRole @default(member)
@@ -86,7 +85,7 @@ model WorkspaceMember {
 
 model Channel {
   id          String   @id @default(uuid()) @db.Uuid
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId String    @db.Uuid @map("workspace_id")
   name        String
   displayName String?  @map("display_name")
@@ -104,7 +103,6 @@ model Channel {
   members      ChannelMember[]
   invites      Invite[]
   auditLogs    AuditLog[]
-  outbox       OutboxEvent[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -115,7 +113,7 @@ model Channel {
 
 model ChannelMember {
   id        String   @id @default(uuid()) @db.Uuid
-  channel   Channel  @relation(fields: [channelId], references: [id])
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   channelId String    @db.Uuid @map("channel_id")
   userId    String    @db.Uuid @map("user_id")
   joinedBy  String?   @db.Uuid @map("joined_by")
@@ -133,9 +131,9 @@ model ChannelMember {
 
 model Invite {
   id          String   @id @default(uuid()) @db.Uuid
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId String?   @db.Uuid @map("workspace_id")
-  channel     Channel?   @relation(fields: [channelId], references: [id])
+  channel     Channel?   @relation(fields: [channelId], references: [id], onDelete: Cascade)
   channelId   String?   @db.Uuid @map("channel_id")
   inviterId   String?   @db.Uuid @map("inviter_id")
   email       String?   
@@ -178,9 +176,9 @@ model AuditLog {
 
 model OutboxEvent {
   id           String    @id @default(uuid()) @db.Uuid
-  workspace    Workspace? @relation(fields: [workspaceId], references: [id])
+  // No FK constraints - these are just routing metadata for event consumers
+  // The workspace/channel may be deleted before the event is published
   workspaceId  String?   @db.Uuid @map("workspace_id")
-  channel      Channel?   @relation(fields: [channelId], references: [id])
   channelId    String?   @db.Uuid @map("channel_id")
   aggregateType String @map("aggregate_type")
   aggregateId   String?   @db.Uuid @map("aggregate_id")

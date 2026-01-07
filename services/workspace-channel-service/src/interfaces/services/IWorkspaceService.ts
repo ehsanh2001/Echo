@@ -81,4 +81,18 @@ export interface IWorkspaceService {
     userId: string,
     workspaceId: string
   ): Promise<WorkspaceMembersResponse>;
+
+  /**
+   * Delete a workspace and all related data
+   * - Validates user is the workspace owner
+   * - Deletes all channels and their members
+   * - Deletes all workspace members
+   * - Deletes all invites
+   * - Creates workspace.deleted outbox event
+   * All operations are atomic (in a transaction)
+   */
+  deleteWorkspace(
+    workspaceId: string,
+    userId: string
+  ): Promise<{ workspaceId: string }>;
 }

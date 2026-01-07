@@ -3,6 +3,7 @@ import { PrismaClient, Workspace, WorkspaceMember } from "@prisma/client";
 import logger from "../utils/logger";
 import { IWorkspaceRepository } from "../interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../interfaces/repositories/IChannelRepository";
+import { PrismaTransaction } from "../interfaces/repositories/IOutboxRepository";
 import {
   CreateWorkspaceData,
   CreateWorkspaceMemberData,
@@ -360,6 +361,52 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       logger.error("Error getting workspace members:", error);
       throw WorkspaceChannelServiceError.database(
         `Failed to get workspace members: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Gets all channel IDs for a workspace.
+   * Used before workspace deletion to get channel list for Socket.IO room cleanup.
+   */
+  async getChannelIds(workspaceId: string): Promise<string[]> {
+    try {
+      const channels = await this.prisma.channel.findMany({
+        where: { workspaceId },
+        select: { id: true },
+      });
+      return channels.map((c) => c.id);
+    } catch (error: any) {
+      logger.error("Error getting channel IDs for workspace:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to get channel IDs: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Deletes a workspace and all related data.
+   *
+   * With ON DELETE CASCADE, the database handles:
+   * - workspace_members → CASCADE
+   * - channels → CASCADE (which cascades channel_members)
+   * - invites → CASCADE
+   */
+  async deleteWorkspace(
+    workspaceId: string,
+    tx: PrismaTransaction
+  ): Promise<void> {
+    try {
+      await tx.workspace.delete({
+        where: { id: workspaceId },
+      });
+      logger.debug("Deleted workspace (cascaded members, channels, invites)", {
+        workspaceId,
+      });
+    } catch (error: any) {
+      logger.error("Error deleting workspace:", error);
+      throw WorkspaceChannelServiceError.database(
+        `Failed to delete workspace: ${error.message}`
       );
     }
   }

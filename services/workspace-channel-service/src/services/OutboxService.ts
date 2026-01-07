@@ -18,6 +18,8 @@ import {
   ChannelCreatedEventPayload,
   ChannelDeletedEventPayload,
   ChannelDeletedEventData,
+  WorkspaceDeletedEventPayload,
+  WorkspaceDeletedEventData,
   CreateOutboxEventData,
   CreateInviteEventData,
 } from "../types";
@@ -386,6 +388,65 @@ export class OutboxService implements IOutboxService {
         workspaceId: eventData.workspaceId,
         channelName: eventData.channelName,
         deletedBy: eventData.deletedBy,
+      },
+      metadata: this.createMetadata(correlationId, causationId),
+    };
+  }
+
+  /**
+   * Create a workspace deleted event when a workspace is deleted
+   *
+   * @param eventData - The workspace deleted data
+   * @param correlationId - Optional correlation ID for distributed tracing
+   * @param causationId - Optional causation ID
+   * @param tx - Optional Prisma transaction context for transactional outbox pattern
+   * @returns Promise resolving to the created outbox event
+   */
+  async createWorkspaceDeletedEvent(
+    eventData: WorkspaceDeletedEventData,
+    correlationId?: string,
+    causationId?: string,
+    tx?: PrismaTransaction
+  ): Promise<OutboxEvent> {
+    const payload = this.createWorkspaceDeletedPayload(
+      eventData,
+      correlationId,
+      causationId
+    );
+
+    // workspaceId is preserved for routing and cleanup by consumers
+    // (no FK constraint, so safe to keep even after workspace deletion)
+    const outboxData: CreateOutboxEventData = {
+      workspaceId: eventData.workspaceId,
+      aggregateType: payload.aggregateType,
+      aggregateId: eventData.workspaceId,
+      eventType: payload.eventType,
+      payload: payload,
+    };
+
+    return await this.outboxRepository.create(outboxData, tx);
+  }
+
+  /**
+   * Create workspace deleted event payload
+   */
+  private createWorkspaceDeletedPayload(
+    eventData: WorkspaceDeletedEventData,
+    correlationId?: string,
+    causationId?: string
+  ): WorkspaceDeletedEventPayload {
+    return {
+      eventId: randomUUID(),
+      eventType: "workspace.deleted",
+      aggregateType: "workspace",
+      aggregateId: eventData.workspaceId,
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: {
+        workspaceId: eventData.workspaceId,
+        workspaceName: eventData.workspaceName,
+        deletedBy: eventData.deletedBy,
+        channelIds: eventData.channelIds,
       },
       metadata: this.createMetadata(correlationId, causationId),
     };

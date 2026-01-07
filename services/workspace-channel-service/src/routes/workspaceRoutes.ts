@@ -194,4 +194,30 @@ workspaceRoutes.get("/:workspaceId", jwtAuth, async (req, res) => {
   await workspaceController.getWorkspaceDetails(req as any, res);
 });
 
+/**
+ * Delete a workspace
+ * DELETE /api/ws-ch/workspaces/:workspaceId
+ *
+ * Deletes a workspace and all related data (channels, members, invites, messages)
+ * Only workspace owners can delete a workspace
+ * Protected - requires JWT authentication
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspaceId": "uuid"
+ *   },
+ *   "message": "Workspace deleted successfully",
+ *   "timestamp": "2025-10-03T..."
+ * }
+ *
+ * Error Responses:
+ * - 403: User is not workspace owner
+ * - 404: Workspace not found
+ */
+workspaceRoutes.delete("/:workspaceId", jwtAuth, async (req, res) => {
+  await workspaceController.deleteWorkspace(req as any, res);
+});
+
 export default workspaceRoutes;

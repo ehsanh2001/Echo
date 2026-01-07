@@ -504,8 +504,9 @@ export class ChannelRepository implements IChannelRepository {
   }
 
   /**
-   * Deletes a channel and all its members.
-   * Uses a transaction to ensure atomicity.
+   * Deletes a channel.
+   * With ON DELETE CASCADE configured in the database, channel_members
+   * are automatically deleted when the channel is deleted.
    * Includes workspaceId for partition-aware queries.
    */
   async deleteChannel(
@@ -515,16 +516,7 @@ export class ChannelRepository implements IChannelRepository {
   ): Promise<void> {
     try {
       const executeDelete = async (tx: any) => {
-        // First delete all channel members (due to foreign key constraint)
-        // Include workspaceId via channel relation for partition-aware query
-        await tx.channelMember.deleteMany({
-          where: {
-            channelId,
-            channel: { workspaceId },
-          },
-        });
-
-        // Then delete the channel itself with workspaceId for partition pruning
+        // Delete the channel - CASCADE handles channel_members automatically
         await tx.channel.deleteMany({
           where: {
             id: channelId,
@@ -541,7 +533,10 @@ export class ChannelRepository implements IChannelRepository {
         });
       }
 
-      logger.info("Channel deleted successfully", { channelId });
+      logger.info("Channel deleted successfully (cascaded members)", {
+        channelId,
+        workspaceId,
+      });
     } catch (error: any) {
       logger.error("Error deleting channel:", error);
 

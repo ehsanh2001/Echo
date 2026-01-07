@@ -460,4 +460,49 @@ export class WorkspaceController {
       });
     }
   }
+
+  /**
+   * Delete a workspace
+   * DELETE /api/ws-ch/workspaces/:workspaceId
+   */
+  async deleteWorkspace(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user.userId;
+
+      logger.info("Delete workspace request initiated", {
+        workspaceId,
+        userId,
+      });
+
+      // Validate workspaceId
+      if (!workspaceId || typeof workspaceId !== "string") {
+        throw WorkspaceChannelServiceError.badRequest(
+          "Workspace ID is required"
+        );
+      }
+
+      const result = await this.workspaceService.deleteWorkspace(
+        workspaceId,
+        userId
+      );
+
+      logger.info("Workspace deleted successfully", {
+        workspaceId: result.workspaceId,
+        deletedBy: userId,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: "Workspace deleted successfully",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.handleControllerError("deleteWorkspace", error, res);
+    }
+  }
 }

@@ -1,5 +1,5 @@
 import { injectable, inject } from "tsyringe";
-import { Workspace, Invite } from "@prisma/client";
+import { Workspace, Invite, WorkspaceRole } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
 import logger from "../utils/logger";
 import { IWorkspaceService } from "../interfaces/services/IWorkspaceService";
@@ -905,5 +905,78 @@ export class WorkspaceService implements IWorkspaceService {
         members: enrichedMembers as any[],
       };
     });
+  }
+
+  /**
+   * Deletes a workspace and all related data.
+   * Only workspace owners can delete a workspace.
+   *
+   * Follows the Transactional Outbox pattern - both the domain change (deletion)
+   * and the event creation succeed or fail together atomically.
+   */
+  async deleteWorkspace(
+    workspaceId: string,
+    userId: string
+  ): Promise<{ workspaceId: string }> {
+    try {
+      // 1. Find the workspace
+      const workspace = await this.workspaceRepository.findById(workspaceId);
+      if (!workspace) {
+        throw WorkspaceChannelServiceError.notFound("Workspace", workspaceId);
+      }
+
+      // 2. Check permissions: user must be workspace owner
+      const workspaceMember = await this.workspaceRepository.getMembership(
+        userId,
+        workspaceId
+      );
+
+      if (!workspaceMember || workspaceMember.role !== WorkspaceRole.owner) {
+        throw WorkspaceChannelServiceError.forbidden(
+          "Only workspace owners can delete a workspace"
+        );
+      }
+
+      // 3. Get all channel IDs before deletion (for Socket.IO room cleanup)
+      const channelIds =
+        await this.workspaceRepository.getChannelIds(workspaceId);
+
+      // 4. Delete the workspace and create outbox event in a single transaction
+      await this.prisma.$transaction(async (tx) => {
+        // Create outbox event FIRST (before deletion)
+        // Note: workspaceId is set to null in the event to avoid FK constraint issues
+        await this.outboxService.createWorkspaceDeletedEvent(
+          {
+            workspaceId,
+            workspaceName: workspace.displayName || workspace.name,
+            deletedBy: userId,
+            channelIds,
+          },
+          undefined, // correlationId
+          undefined, // causationId
+          tx // transaction context
+        );
+
+        // Then delete the workspace and all related data
+        await this.workspaceRepository.deleteWorkspace(workspaceId, tx);
+      });
+
+      logger.info("Workspace deleted successfully", {
+        workspaceId,
+        deletedBy: userId,
+        workspaceName: workspace.name,
+        channelCount: channelIds.length,
+      });
+
+      return { workspaceId };
+    } catch (error) {
+      if (error instanceof WorkspaceChannelServiceError) {
+        throw error;
+      }
+      logger.error("Error deleting workspace:", error);
+      throw WorkspaceChannelServiceError.database(
+        "Failed to delete workspace due to unexpected error"
+      );
+    }
   }
 }

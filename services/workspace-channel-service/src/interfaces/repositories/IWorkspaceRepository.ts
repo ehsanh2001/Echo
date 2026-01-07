@@ -4,6 +4,7 @@ import {
   CreateWorkspaceMemberData,
   WorkspaceMemberData,
 } from "../../types";
+import { PrismaTransaction } from "./IOutboxRepository";
 
 /**
  * Interface for workspace repository operations
@@ -127,4 +128,27 @@ export interface IWorkspaceRepository {
       isActive: boolean;
     }>
   >;
+
+  /**
+   * Deletes a workspace and all associated data in a single transaction.
+   * Cascading deletes handle:
+   * - workspace_members
+   * - channels → channel_members
+   * - invites
+   *
+   *
+   * @param workspaceId - The workspace ID to delete
+   * @param tx - Prisma transaction context
+   * @returns Promise resolving when deletion is complete
+   */
+  deleteWorkspace(workspaceId: string, tx: PrismaTransaction): Promise<void>;
+
+  /**
+   * Gets all channel IDs for a workspace.
+   * Used before workspace deletion to get channel list for Socket.IO room cleanup.
+   *
+   * @param workspaceId - The workspace ID
+   * @returns Promise resolving to array of channel IDs
+   */
+  getChannelIds(workspaceId: string): Promise<string[]>;
 }

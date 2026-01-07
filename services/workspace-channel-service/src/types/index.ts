@@ -455,11 +455,31 @@ export interface ChannelDeletedEventPayload extends BaseEventPayload<
   aggregateType: "channel";
 }
 
+// ===== WORKSPACE DELETED EVENT =====
+
+// Workspace deleted event data
+export interface WorkspaceDeletedEventData {
+  workspaceId: string;
+  workspaceName: string;
+  deletedBy: string;
+  /** List of deleted channel IDs for BFF room cleanup */
+  channelIds: string[];
+}
+
+// Workspace deleted event payload
+export interface WorkspaceDeletedEventPayload extends BaseEventPayload<
+  "workspace.deleted",
+  WorkspaceDeletedEventData
+> {
+  aggregateType: "workspace";
+}
+
 // ===== UNION TYPES FOR TYPE SAFETY =====
 
 // All event types in this service
 export type ServiceEventType =
   | "workspace.invite.created"
+  | "workspace.deleted"
   | "channel.created"
   | "channel.deleted"
   | "channel.member.added"
@@ -471,6 +491,7 @@ export type AggregateType = "workspace" | "channel" | "user" | "message";
 // Union of all event payloads for type safety
 export type EventPayload =
   | WorkspaceInviteCreatedEventPayload
+  | WorkspaceDeletedEventPayload
   | ChannelCreatedEventPayload
   | ChannelDeletedEventPayload
   | ChannelMemberAddedEventPayload
