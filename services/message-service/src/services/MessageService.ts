@@ -586,4 +586,29 @@ export class MessageService implements IMessageService {
 
     return deletedCount;
   }
+
+  /**
+   * Delete all messages for a workspace
+   *
+   * Called when a workspace.deleted event is received from RabbitMQ.
+   * Deletes all messages across all channels in the workspace in a single operation.
+   *
+   * @param workspaceId - The workspace ID whose messages should be deleted
+   * @returns Number of messages deleted
+   */
+  async deleteMessagesByWorkspace(workspaceId: string): Promise<number> {
+    logger.info("Deleting all messages for workspace", {
+      workspaceId,
+    });
+
+    const deletedCount =
+      await this.messageRepository.deleteByWorkspaceId(workspaceId);
+
+    logger.info("Messages deleted for workspace", {
+      workspaceId,
+      deletedCount,
+    });
+
+    return deletedCount;
+  }
 }

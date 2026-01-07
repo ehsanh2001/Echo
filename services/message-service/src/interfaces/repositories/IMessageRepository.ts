@@ -112,4 +112,22 @@ export interface IMessageRepository {
    * ```
    */
   deleteByChannelId(workspaceId: string, channelId: string): Promise<number>;
+
+  /**
+   * Delete all messages for a workspace
+   *
+   * Used when a workspace is deleted to remove all messages across all channels.
+   * Queries by workspaceId only (partition key) for efficient bulk deletion.
+   *
+   * @param workspaceId - Workspace UUID (partition key)
+   * @returns Number of messages deleted
+   * @throws MessageServiceError if deletion fails
+   *
+   * @example
+   * ```typescript
+   * const count = await messageRepository.deleteByWorkspaceId('workspace-uuid');
+   * console.log(`Deleted ${count} messages across all channels`);
+   * ```
+   */
+  deleteByWorkspaceId(workspaceId: string): Promise<number>;
 }

@@ -363,4 +363,43 @@ export class MessageRepository implements IMessageRepository {
       );
     }
   }
+
+  /**
+   * Delete all messages for a workspace
+   *
+   * Uses bulk delete with workspaceId (partition key) for efficient deletion
+   * across all channels in the workspace. Called when a workspace is deleted.
+   *
+   * @param workspaceId - Workspace UUID (partition key)
+   * @returns Number of messages deleted
+   * @throws MessageServiceError if deletion fails
+   */
+  async deleteByWorkspaceId(workspaceId: string): Promise<number> {
+    try {
+      // Use deleteMany with only workspaceId for partition-aware bulk deletion
+      const result = await this.prisma.message.deleteMany({
+        where: {
+          workspaceId,
+        },
+      });
+
+      return result.count;
+    } catch (error) {
+      // Re-throw if already a MessageServiceError
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      // Wrap other errors as database errors with automatic logging
+      throw MessageServiceError.databaseWithLogging(
+        "Failed to delete messages for workspace due to internal error",
+        "deleteByWorkspaceId",
+        {
+          workspaceId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        }
+      );
+    }
+  }
 }

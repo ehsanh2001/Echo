@@ -73,4 +73,14 @@ export interface IMessageService {
     workspaceId: string,
     channelId: string
   ): Promise<number>;
+
+  /**
+   * Delete all messages for a workspace
+   * Called when a workspace is deleted via RabbitMQ event
+   *
+   * @param workspaceId - The workspace ID whose messages should be deleted
+   * @returns Number of messages deleted
+   * @throws MessageServiceError if deletion fails
+   */
+  deleteMessagesByWorkspace(workspaceId: string): Promise<number>;
 }
