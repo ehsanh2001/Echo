@@ -4,11 +4,12 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createWorkspace } from "@/lib/api/workspace";
+import { createWorkspace, deleteWorkspace } from "@/lib/api/workspace";
 import { workspaceKeys } from "@/lib/hooks/useWorkspaces";
 import type {
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
+  DeleteWorkspaceResponse,
 } from "@/types/workspace";
 import { toast } from "sonner";
 
@@ -141,24 +142,43 @@ export function useUpdateWorkspace() {
 
 /**
  * Hook for deleting a workspace
- * (Placeholder for future implementation)
+ *
+ * Automatically:
+ * - Manages loading/error states
+ * - Invalidates workspace cache on success to refresh workspace list
+ * - Shows error toast on failure
+ *
+ * Note: The actual cache update is handled by the socket event handler
+ * which removes the workspace from all caches when workspace:deleted is received.
+ * This ensures all connected clients get the update, not just the one who deleted.
  */
 export function useDeleteWorkspace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (workspaceId: string) => {
-      // TODO: Implement delete API call
-      throw new Error("Not implemented yet");
-    },
+    mutationFn: (workspaceId: string): Promise<DeleteWorkspaceResponse> =>
+      deleteWorkspace(workspaceId),
 
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
-      toast.success("Workspace deleted successfully!");
+    onSuccess: (response, workspaceId) => {
+      // Force refetch workspace memberships to ensure workspace list is up to date
+      // This is a backup - the socket event handler should update the cache first
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.membershipsWithChannels(),
+      });
+
+      // Don't show toast here - the UI component will handle success feedback
+      // (e.g., closing the dialog and redirecting)
     },
 
     onError: (error: any) => {
-      toast.error(error?.message || "Failed to delete workspace");
+      // Show error toast with specific message if available
+      const errorMessage =
+        error?.message || "Failed to delete workspace. Please try again.";
+      toast.error(errorMessage);
+      console.error("Error deleting workspace:", error);
     },
+
+    // Don't retry delete operations - they should be intentional
+    retry: false,
   });
 }

@@ -7,6 +7,7 @@ import type { MessageWithAuthorResponse } from "@/types/message";
 import type {
   ChannelCreatedEventPayload,
   ChannelDeletedEventPayload,
+  WorkspaceDeletedEventPayload,
 } from "@/types/workspace";
 
 /**
@@ -96,6 +97,12 @@ export interface ServerToClientEvents {
    * Emitted to all users in the channel room before the room is destroyed
    */
   "channel:deleted": (data: ChannelDeletedEventPayload) => void;
+
+  /**
+   * Workspace deleted
+   * Emitted to all users in the workspace room before the room is destroyed
+   */
+  "workspace:deleted": (data: WorkspaceDeletedEventPayload) => void;
 
   connect: () => void;
 

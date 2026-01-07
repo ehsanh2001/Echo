@@ -118,3 +118,22 @@ export async function getWorkspaceMembers(
     throw error;
   }
 }
+
+/**
+ * Delete a workspace
+ * Only workspace owners can delete a workspace.
+ * Deletes the workspace and all associated data (channels, messages, members, etc.).
+ *
+ * @param workspaceId - The workspace ID to delete
+ * @returns Promise with deletion confirmation
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<any> {
+  try {
+    const response = await apiClient.delete(
+      `${WORKSPACE_BASE_URL}/${workspaceId}`
+    );
+    return response;
+  } catch (error: any) {
+    throw error;
+  }
+}

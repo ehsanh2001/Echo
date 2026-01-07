@@ -12,6 +12,7 @@ import type {
   GetUserMembershipsResponse,
   ChannelCreatedEventPayload,
   ChannelDeletedEventPayload,
+  WorkspaceDeletedEventPayload,
   ChannelMembershipResponse,
 } from "@/types/workspace";
 import { WorkspaceRole, ChannelRole, ChannelType } from "@/types/workspace";
@@ -447,4 +448,47 @@ export function updateMembershipsCacheOnChannelDeleted(
       },
     };
   });
+}
+
+// ============================================================================
+// Workspace Deletion Cache Helpers
+// ============================================================================
+
+/**
+ * Updates the user memberships cache to remove a deleted workspace
+ * Used for the sidebar workspace list
+ */
+export function updateMembershipsCacheOnWorkspaceDeleted(
+  queryClient: QueryClient,
+  eventPayload: WorkspaceDeletedEventPayload
+): void {
+  const cacheKey = workspaceKeys.membershipsWithChannels();
+
+  queryClient.setQueryData<GetUserMembershipsResponse>(cacheKey, (old) => {
+    if (!old?.data) return old;
+
+    // Remove the deleted workspace
+    const updatedWorkspaces = old.data.workspaces.filter(
+      (workspace) => workspace.id !== eventPayload.workspaceId
+    );
+
+    return {
+      ...old,
+      data: {
+        ...old.data,
+        workspaces: updatedWorkspaces,
+      },
+    };
+  });
+}
+
+/**
+ * Removes workspace members cache for a deleted workspace
+ */
+export function removeMembersCacheOnWorkspaceDeleted(
+  queryClient: QueryClient,
+  workspaceId: string
+): void {
+  const cacheKey = memberKeys.workspace(workspaceId);
+  queryClient.removeQueries({ queryKey: cacheKey });
 }
