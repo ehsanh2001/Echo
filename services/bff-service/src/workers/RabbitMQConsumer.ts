@@ -1,37 +1,35 @@
 import { injectable } from "tsyringe";
 import amqp from "amqplib";
 import { Server as SocketIOServer } from "socket.io";
-import { v4 as uuidv4 } from "uuid";
-import { runWithContextAsync } from "@echo/telemetry";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
-import { RabbitMQEvent, ChannelDeletedEvent } from "../types/rabbitmq.types";
+import {
+  RabbitMQEvent,
+  ChannelDeletedEvent,
+  WorkspaceDeletedEvent,
+} from "../types/rabbitmq.types";
 import { config } from "../config/env";
 import logger from "../utils/logger";
+import { RabbitMQEventConsumer } from "./RabbitMQEventConsumer";
+import { RabbitMQEventConsumerNoDLX } from "./RabbitMQEventConsumerNoDLX";
 
 /**
  * RabbitMQ Consumer for BFF Service
  *
- * Consumes events from the shared echo.events exchange and broadcasts them to connected
- * Socket.IO clients in real-time.
- *
- * Exchange consumed:
- * - 'echo.events' exchange: All service events (message.created, workspace.invite.created, etc.)
+ * Orchestrates RabbitMQ connection and manages multiple event consumers.
+ * Uses two types of consumers:
+ * - RabbitMQEventConsumerNoDLX: For non-critical real-time events (message.created, etc.)
+ * - RabbitMQEventConsumer: For critical events with retry pattern (channel.deleted, workspace.deleted)
  *
  * Features:
- * - Topic routing for message events
  * - Automatic reconnection on connection failure
- * - Broadcasts events to Socket.IO rooms based on workspaceId/channelId
- * - Message acknowledgment for reliable delivery
+ * - Multiple event consumer management
+ * - Work queue pattern for horizontal scaling
  * - Graceful shutdown
  */
 @injectable()
 export class RabbitMQConsumer implements IRabbitMQConsumer {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
-  private readonly queueName: string;
-  private readonly criticalQueueName: string;
-  private readonly waitingRoomQueueName: string;
-  private readonly parkingLotQueueName: string;
   private readonly exchange = config.rabbitmq.exchange;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
@@ -39,16 +37,14 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
   private readonly maxRetries = 3;
   private readonly waitingRoomTTL = 30000; // 30 seconds
 
-  constructor(private readonly io: SocketIOServer) {
-    // All BFF instances share the same queue (work queue pattern)
-    // RabbitMQ distributes messages among consumers, Socket.IO Redis adapter
-    // ensures events reach all connected clients across all BFF instances
-    this.queueName = `bff_service_queue`;
-    // Critical queue for events that need retry guarantees (e.g., channel.deleted)
-    this.criticalQueueName = `bff_service_critical_queue`;
-    this.waitingRoomQueueName = `${this.criticalQueueName}_waiting_room`;
-    this.parkingLotQueueName = `${this.criticalQueueName}_parking_lot`;
-  }
+  private nonCriticalConsumer: RabbitMQEventConsumerNoDLX<RabbitMQEvent> | null =
+    null;
+  private channelDeletedConsumer: RabbitMQEventConsumer<ChannelDeletedEvent> | null =
+    null;
+  private workspaceDeletedConsumer: RabbitMQEventConsumer<WorkspaceDeletedEvent> | null =
+    null;
+
+  constructor(private readonly io: SocketIOServer) {}
 
   /**
    * Initialize RabbitMQ consumer
@@ -98,96 +94,13 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         durable: true,
       });
 
-      // ===== NON-CRITICAL QUEUE (ephemeral) =====
-      // For events like message.created that can be missed without critical impact
-      await ch.assertQueue(this.queueName, {
-        exclusive: false, // Shared among all BFF instances
-        durable: false, // Don't need persistence since BFF processes in real-time
-        autoDelete: true, // Delete queue when all consumers disconnect
-      });
-
-      // ===== CRITICAL QUEUE (durable with retry pattern) =====
-      // For events like channel.deleted that must be processed reliably
-
-      // Declare parking lot queue for permanently failed messages (after 3 retries)
-      await ch.assertQueue(this.parkingLotQueueName, {
-        exclusive: false,
-        durable: true,
-        autoDelete: false,
-      });
-
-      // Declare waiting room queue with TTL and dead letter back to critical queue
-      await ch.assertQueue(this.waitingRoomQueueName, {
-        exclusive: false,
-        durable: true,
-        autoDelete: false,
-        arguments: {
-          "x-message-ttl": this.waitingRoomTTL,
-          "x-dead-letter-exchange": "",
-          "x-dead-letter-routing-key": this.criticalQueueName,
-        },
-      });
-
-      // Declare critical queue with DLX to waiting room
-      await ch.assertQueue(this.criticalQueueName, {
-        exclusive: false,
-        durable: true,
-        autoDelete: false,
-        arguments: {
-          "x-dead-letter-exchange": "",
-          "x-dead-letter-routing-key": this.waitingRoomQueueName,
-        },
-      });
-
-      // Bind non-critical queue to echo.events exchange with routing keys
-      await ch.bindQueue(this.queueName, this.exchange, "message.created");
-      await ch.bindQueue(
-        this.queueName,
-        this.exchange,
-        "workspace.member.joined"
-      );
-      await ch.bindQueue(
-        this.queueName,
-        this.exchange,
-        "workspace.member.left"
-      );
-      await ch.bindQueue(
-        this.queueName,
-        this.exchange,
-        "channel.member.joined"
-      );
-      await ch.bindQueue(this.queueName, this.exchange, "channel.member.left");
-      await ch.bindQueue(this.queueName, this.exchange, "channel.created");
-
-      // Bind critical queue to channel.deleted (needs retry guarantees)
-      await ch.bindQueue(
-        this.criticalQueueName,
-        this.exchange,
-        "channel.deleted"
-      );
-
-      // Start consuming from non-critical queue
-      await ch.consume(this.queueName, (msg) => this.handleMessage(msg), {
-        noAck: false, // Manual acknowledgment for reliability
-      });
-
-      // Start consuming from critical queue (with retry pattern)
-      await ch.consume(
-        this.criticalQueueName,
-        (msg) => this.handleCriticalMessage(msg),
-        {
-          noAck: false,
-        }
-      );
+      // Set up event consumers
+      await this.setupEventConsumers();
 
       // Reset reconnect attempts on successful connection
       this.reconnectAttempts = 0;
 
       logger.info("✅ RabbitMQ consumer initialized", {
-        queue: this.queueName,
-        criticalQueue: this.criticalQueueName,
-        waitingRoom: this.waitingRoomQueueName,
-        parkingLot: this.parkingLotQueueName,
         exchange: this.exchange,
         maxRetries: this.maxRetries,
         waitingRoomTTL: `${this.waitingRoomTTL}ms`,
@@ -200,232 +113,89 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
   }
 
   /**
-   * Handle incoming message from RabbitMQ
+   * Set up event consumers for all event types
    */
-  private async handleMessage(msg: amqp.ConsumeMessage | null): Promise<void> {
-    if (!msg || !this.channel) {
-      return;
-    }
-
-    try {
-      // Parse event
-      const event: RabbitMQEvent = JSON.parse(msg.content.toString());
-
-      // Extract correlationId and userId from event metadata
-      const metadata = (event as any).metadata;
-      const correlationId = metadata?.correlationId || uuidv4();
-      const userId = metadata?.userId;
-
-      // Run message processing in OTel context
-      await runWithContextAsync({ userId, timestamp: new Date() }, async () => {
-        logger.info("Received RabbitMQ event", {
-          type: event.type,
-          eventType: (event as any).eventType,
-          routingKey: msg.fields.routingKey,
-          correlationId,
-          userId,
-          rawEventKeys: Object.keys(event),
-        });
-
-        // Route event to appropriate handler
-        await this.routeEvent(event);
-
-        // Acknowledge message
-        if (this.channel) {
-          this.channel.ack(msg);
-        }
-      });
-    } catch (error) {
-      logger.error("Error processing RabbitMQ message", {
-        error,
-        routingKey: msg.fields.routingKey,
-      });
-
-      // Reject message (don't requeue to avoid infinite loops)
-      if (this.channel) {
-        this.channel.nack(msg, false, false);
-      }
-    }
-  }
-
-  /**
-   * Handle incoming message from critical queue (with retry pattern)
-   * Uses Waiting Room and Parking Lot pattern for failed messages
-   */
-  private async handleCriticalMessage(
-    msg: amqp.ConsumeMessage | null
-  ): Promise<void> {
-    if (!msg || !this.channel) {
-      return;
-    }
-
-    let parsedEvent: ChannelDeletedEvent | null = null;
-
-    try {
-      // Parse event
-      parsedEvent = JSON.parse(msg.content.toString());
-
-      if (!parsedEvent) {
-        throw new Error("Failed to parse critical message content");
-      }
-
-      const event = parsedEvent;
-
-      // Extract correlationId and userId from event metadata
-      const correlationId = event.metadata?.correlationId || uuidv4();
-      const userId = event.metadata?.userId;
-
-      // Build context object only with defined values
-      const context: { timestamp: Date; userId?: string } = {
-        timestamp: new Date(),
-      };
-      if (userId) {
-        context.userId = userId;
-      }
-
-      // Run message processing in OTel context
-      await runWithContextAsync(context, async () => {
-        logger.info("Received critical RabbitMQ event", {
-          eventType: event.eventType,
-          eventId: event.eventId,
-          routingKey: msg.fields.routingKey,
-          correlationId,
-          userId,
-        });
-
-        // Handle channel deleted event
-        await this.handleChannelDeleted(event);
-
-        // Acknowledge message
-        if (this.channel) {
-          this.channel.ack(msg);
-        }
-
-        logger.info("Successfully processed critical event", {
-          eventType: event.eventType,
-          eventId: event.eventId,
-          correlationId,
-        });
-      });
-    } catch (error) {
-      logger.error("Error processing critical RabbitMQ message", {
-        error,
-        routingKey: msg.fields.routingKey,
-        eventId: parsedEvent?.eventId,
-      });
-
-      // Use waiting room and parking lot pattern
-      await this.handleFailedCriticalMessage(msg, error);
-    }
-  }
-
-  /**
-   * Handle failed critical message processing with retry logic
-   * Uses DLX configuration for automatic routing:
-   * - Critical queue DLX → Waiting room (on NACK)
-   * - Waiting room DLX → Critical queue (on TTL expiry)
-   * - Parking lot for messages that exceed max retries
-   */
-  private async handleFailedCriticalMessage(
-    msg: amqp.ConsumeMessage,
-    error: unknown
-  ): Promise<void> {
+  private async setupEventConsumers(): Promise<void> {
     if (!this.channel) {
-      return;
+      throw new Error("Channel not initialized");
     }
 
-    try {
-      // Check x-death header to determine retry count
-      const xDeath = msg.properties.headers?.["x-death"] as
-        | Array<{ count: number; queue: string; reason: string }>
-        | undefined;
+    // === NON-CRITICAL CONSUMER (ephemeral, no retry) ===
+    // For real-time events that can be missed: message.created, member.joined, etc.
+    this.nonCriticalConsumer = new RabbitMQEventConsumerNoDLX(
+      this.channel,
+      this.exchange,
+      {
+        queueNamePrefix: "bff_service",
+        routingKey: [
+          "message.created",
+          "workspace.member.joined",
+          "workspace.member.left",
+          "channel.member.joined",
+          "channel.member.left",
+          "channel.created",
+        ],
+        durable: false,
+        autoDelete: true,
+      },
+      (event) => this.routeEvent(event)
+    );
 
-      // Count retries based on how many times message came back from waiting room
-      let retryCount = 0;
-      if (xDeath) {
-        const waitingRoomDeath = xDeath.find(
-          (d) => d.queue === this.waitingRoomQueueName
-        );
-        retryCount = waitingRoomDeath?.count || 0;
-      }
+    // === CRITICAL CONSUMERS (durable, with retry pattern) ===
 
-      logger.info("Critical message failure - checking retry count", {
-        retryCount,
+    // Channel deleted consumer
+    this.channelDeletedConsumer = new RabbitMQEventConsumer(
+      this.channel,
+      this.exchange,
+      {
+        queueNamePrefix: "bff_service_channel_deleted",
+        routingKey: "channel.deleted",
+        durable: true,
+        autoDelete: false,
         maxRetries: this.maxRetries,
-        willRetry: retryCount < this.maxRetries,
-        xDeathInfo: xDeath?.map((d) => ({
-          queue: d.queue,
-          count: d.count,
-          reason: d.reason,
-        })),
-      });
+        waitingRoomTTL: this.waitingRoomTTL,
+      },
+      (event) => this.handleChannelDeleted(event)
+    );
 
-      if (retryCount < this.maxRetries) {
-        // NACK the message - it will automatically go to waiting room via DLX
-        logger.info(
-          "NACK'ing critical message - will be retried via waiting room",
-          {
-            retryCount,
-            nextRetry: retryCount + 1,
-            waitingRoomTTL: `${this.waitingRoomTTL}ms`,
-          }
-        );
+    // Workspace deleted consumer
+    this.workspaceDeletedConsumer = new RabbitMQEventConsumer(
+      this.channel,
+      this.exchange,
+      {
+        queueNamePrefix: "bff_service_workspace_deleted",
+        routingKey: "workspace.deleted",
+        durable: true,
+        autoDelete: false,
+        maxRetries: this.maxRetries,
+        waitingRoomTTL: this.waitingRoomTTL,
+      },
+      (event) => this.handleWorkspaceDeleted(event)
+    );
 
-        this.channel.nack(msg, false, false);
-      } else {
-        // Max retries exceeded - send to parking lot
-        logger.error(
-          "Max retries exceeded for critical message - sending to parking lot",
-          {
-            retryCount,
-            maxRetries: this.maxRetries,
-            parkingLot: this.parkingLotQueueName,
-            error:
-              error instanceof Error
-                ? { message: error.message, stack: error.stack }
-                : String(error),
-          }
-        );
+    // Setup queues and start consuming
+    await this.nonCriticalConsumer.setupQueues();
+    await this.nonCriticalConsumer.startConsuming();
 
-        // Add failure information to message headers
-        const updatedProperties = {
-          ...msg.properties,
-          headers: {
-            ...msg.properties.headers,
-            "x-failure-reason":
-              error instanceof Error ? error.message : String(error),
-            "x-failure-timestamp": new Date().toISOString(),
-            "x-original-queue": this.criticalQueueName,
-            "x-total-retries": retryCount,
-          },
-        };
+    await this.channelDeletedConsumer.setupQueues();
+    await this.channelDeletedConsumer.startConsuming();
 
-        // Send to parking lot for manual inspection
-        this.channel.sendToQueue(
-          this.parkingLotQueueName,
-          msg.content,
-          updatedProperties
-        );
+    await this.workspaceDeletedConsumer.setupQueues();
+    await this.workspaceDeletedConsumer.startConsuming();
 
-        // ACK the original message since we've handled it
-        this.channel.ack(msg);
-      }
-    } catch (retryError) {
-      logger.error(
-        "Error handling failed critical message - nacking without requeue",
-        {
-          retryError,
-          originalError: error,
-        }
-      );
+    // Log queue names for debugging
+    const channelQueues = this.channelDeletedConsumer.getQueueNames();
+    const workspaceQueues = this.workspaceDeletedConsumer.getQueueNames();
 
-      this.channel.nack(msg, false, false);
-    }
+    logger.info("Event consumers initialized", {
+      nonCritical: this.nonCriticalConsumer.getMainQueueName(),
+      channelDeleted: channelQueues,
+      workspaceDeleted: workspaceQueues,
+    });
   }
 
   /**
    * Route event to appropriate Socket.IO broadcast
-   * Handles both 'type' and 'eventType' property names for compatibility
    */
   private async routeEvent(event: RabbitMQEvent): Promise<void> {
     // Support both 'type' and 'eventType' for compatibility
@@ -435,7 +205,6 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       eventType,
       hasType: !!(event as any).type,
       hasEventType: !!(event as any).eventType,
-      eventKeys: Object.keys(event),
     });
 
     switch (eventType) {
@@ -462,9 +231,6 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       case "channel.created":
         await this.handleChannelCreated(event);
         break;
-
-      // Note: channel.deleted is handled by handleCriticalMessage() via critical queue
-      // with retry pattern - not routed here
 
       default:
         logger.warn("Unknown event type", { type: eventType });
@@ -654,7 +420,6 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
     const socketCount = socketsInRoom.length;
 
     // Broadcast channel deleted event to all clients in the channel room
-    // Clients should handle this by showing a notification and redirecting to general channel
     this.io.to(roomName).emit("channel:deleted", {
       channelId,
       workspaceId,
@@ -672,7 +437,6 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
     });
 
     // Remove all sockets from the channel room
-    // This effectively "deletes" the room since rooms are cleaned up when empty
     for (const socket of socketsInRoom) {
       socket.leave(roomName);
     }
@@ -682,6 +446,78 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       workspaceId,
       room: roomName,
       socketsRemoved: socketCount,
+    });
+  }
+
+  /**
+   * Handle workspace.deleted event
+   * Broadcasts deletion notification to all clients in the workspace room,
+   * removes all sockets from workspace and channel rooms, then deletes the rooms
+   */
+  private async handleWorkspaceDeleted(
+    event: WorkspaceDeletedEvent
+  ): Promise<void> {
+    const { workspaceId, workspaceName, deletedBy, channelIds } = event.data;
+
+    // Workspace room name
+    const workspaceRoomName = `workspace:${workspaceId}`;
+
+    // Get all sockets in the workspace room before broadcasting
+    const socketsInWorkspaceRoom = await this.io
+      .in(workspaceRoomName)
+      .fetchSockets();
+    const workspaceSocketCount = socketsInWorkspaceRoom.length;
+
+    // Broadcast workspace deleted event to all clients in the workspace room
+    // Clients should handle this by redirecting to another workspace or workspace selection
+    this.io.to(workspaceRoomName).emit("workspace:deleted", {
+      workspaceId,
+      workspaceName,
+      deletedBy,
+      channelIds,
+    });
+
+    logger.info("Broadcasted workspace:deleted event", {
+      workspaceId,
+      workspaceName,
+      deletedBy,
+      room: workspaceRoomName,
+      socketCount: workspaceSocketCount,
+      channelCount: channelIds.length,
+    });
+
+    // Remove all sockets from all channel rooms in this workspace
+    let totalChannelSocketsRemoved = 0;
+    for (const channelId of channelIds) {
+      const channelRoomName = `workspace:${workspaceId}:channel:${channelId}`;
+      const socketsInChannelRoom = await this.io
+        .in(channelRoomName)
+        .fetchSockets();
+
+      for (const socket of socketsInChannelRoom) {
+        socket.leave(channelRoomName);
+      }
+
+      totalChannelSocketsRemoved += socketsInChannelRoom.length;
+    }
+
+    logger.info("Removed all sockets from channel rooms", {
+      workspaceId,
+      channelCount: channelIds.length,
+      socketsRemoved: totalChannelSocketsRemoved,
+    });
+
+    // Remove all sockets from the workspace room
+    for (const socket of socketsInWorkspaceRoom) {
+      socket.leave(workspaceRoomName);
+    }
+
+    logger.info("Removed all sockets from deleted workspace room", {
+      workspaceId,
+      workspaceName,
+      room: workspaceRoomName,
+      socketsRemoved: workspaceSocketCount,
+      totalChannelSocketsRemoved,
     });
   }
 

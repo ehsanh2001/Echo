@@ -154,35 +154,63 @@ export interface ChannelMemberLeftEvent {
 }
 
 /**
+ * Common event metadata structure for outbox pattern events
+ */
+export interface OutboxEventMetadata {
+  correlationId?: string;
+  causationId?: string;
+  userId?: string;
+  traceId?: string;
+}
+
+/**
+ * Base interface for outbox pattern events
+ */
+export interface BaseOutboxEvent {
+  eventId: string;
+  eventType: string;
+  aggregateType: string;
+  aggregateId: string;
+  timestamp: string;
+  version: string;
+  metadata: OutboxEventMetadata;
+}
+
+/**
  * Channel deleted event (from workspace-channel service via outbox pattern)
  * Emitted when a channel is permanently deleted
  * Note: This uses different structure (eventType, data) than other events (type, payload)
  * because it comes from the transactional outbox pattern
  */
-export interface ChannelDeletedEvent {
-  eventId: string;
+export interface ChannelDeletedEvent extends BaseOutboxEvent {
   eventType: "channel.deleted";
   aggregateType: "channel";
-  aggregateId: string;
-  timestamp: string;
-  version: string;
   data: {
     channelId: string;
     workspaceId: string;
     channelName: string;
     deletedBy: string;
   };
-  metadata: {
-    correlationId?: string;
-    causationId?: string;
-    userId?: string;
-    traceId?: string;
+}
+
+/**
+ * Workspace deleted event (from workspace-channel service via outbox pattern)
+ * Emitted when a workspace is permanently deleted
+ */
+export interface WorkspaceDeletedEvent extends BaseOutboxEvent {
+  eventType: "workspace.deleted";
+  aggregateType: "workspace";
+  data: {
+    workspaceId: string;
+    workspaceName: string;
+    deletedBy: string;
+    channelIds: string[];
   };
 }
 
 /**
  * Union type of events consumed from the non-critical queue
- * Note: ChannelDeletedEvent is handled separately via the critical queue
+ * Note: ChannelDeletedEvent and WorkspaceDeletedEvent are handled separately via the critical queue
  */
 export type RabbitMQEvent =
   | MessageCreatedEvent

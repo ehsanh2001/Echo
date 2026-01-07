@@ -240,6 +240,30 @@ workspaceRoutes.get(
 );
 
 /**
+ * DELETE /api/workspaces/:id
+ * Delete a workspace (owner only)
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Workspace deleted successfully",
+ *   "data": {
+ *     "workspaceId": "uuid",
+ *     "workspaceName": "my-workspace"
+ *   },
+ *   "timestamp": "2025-10-27T..."
+ * }
+ *
+ * Error Responses:
+ * - 403: Not workspace owner
+ * - 404: Workspace not found
+ */
+workspaceRoutes.delete("/:id", jwtAuth, WorkspaceController.deleteWorkspace);
+
+/**
  * GET /api/workspaces/:id
  * Get workspace details
  *

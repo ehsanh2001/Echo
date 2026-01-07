@@ -262,6 +262,37 @@ export class WorkspaceController {
   };
 
   /**
+   * DELETE /api/workspaces/:id
+   * Forward delete workspace to workspace-channel service
+   *
+   * Only workspace owners can delete a workspace.
+   * Deletes the workspace and all associated data (channels, messages, members, etc.).
+   * Triggers workspace.deleted event via RabbitMQ for real-time notifications.
+   */
+  static deleteWorkspace = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const authHeader = req.headers.authorization;
+
+      const response = await httpClient.delete(
+        `${WorkspaceController.WS_CH_SERVICE_URL}/api/ws-ch/workspaces/${id}`,
+        {
+          headers: {
+            Authorization: authHeader,
+          },
+        }
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      WorkspaceController.handleError(error, res, "Delete workspace");
+    }
+  };
+
+  /**
    * Handle errors from workspace-channel service
    * Maps axios errors to appropriate HTTP responses
    */
