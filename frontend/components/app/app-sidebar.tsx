@@ -13,6 +13,7 @@ import {
   UserPlus,
   Settings,
   Lock,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModal";
 import { InviteMembersModal } from "@/components/workspace/InviteMembersModal";
+import { DeleteWorkspaceDialog } from "@/components/workspace/DeleteWorkspaceDialog";
 import { ChannelContextMenu } from "@/components/channel/ChannelContextMenu";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
@@ -71,6 +73,12 @@ export function AppSidebar({
     useState(false);
   const [showInviteMembersModal, setShowInviteMembersModal] = useState(false);
   const [selectedWorkspaceForInvite, setSelectedWorkspaceForInvite] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [showDeleteWorkspaceDialog, setShowDeleteWorkspaceDialog] =
+    useState(false);
+  const [selectedWorkspaceForDelete, setSelectedWorkspaceForDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -375,6 +383,26 @@ export function AppSidebar({
                                   <Settings className="mr-2 h-4 w-4" />
                                   Workspace Settings
                                 </DropdownMenuItem>
+                                {workspace.userRole === WorkspaceRole.OWNER && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      variant="destructive"
+                                      onClick={() => {
+                                        setSelectedWorkspaceForDelete({
+                                          id: workspace.id,
+                                          name:
+                                            workspace.displayName ||
+                                            workspace.name,
+                                        });
+                                        setShowDeleteWorkspaceDialog(true);
+                                      }}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete Workspace
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -562,6 +590,22 @@ export function AppSidebar({
           onOpenChange={setShowInviteMembersModal}
           workspaceId={selectedWorkspaceForInvite.id}
           workspaceName={selectedWorkspaceForInvite.name}
+        />
+      )}
+
+      {/* Delete Workspace Dialog - Opens when Delete Workspace is clicked from workspace menu */}
+      {selectedWorkspaceForDelete && (
+        <DeleteWorkspaceDialog
+          open={showDeleteWorkspaceDialog}
+          onOpenChange={setShowDeleteWorkspaceDialog}
+          workspaceId={selectedWorkspaceForDelete.id}
+          workspaceName={selectedWorkspaceForDelete.name}
+          onSuccess={() => {
+            // The socket event handler will handle redirection
+            // Just close the dialog here
+            setShowDeleteWorkspaceDialog(false);
+            setSelectedWorkspaceForDelete(null);
+          }}
         />
       )}
     </TooltipProvider>

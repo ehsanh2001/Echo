@@ -7,13 +7,12 @@
  * - Removing all workspace members cache
  * - Removing all message caches for all channels in the workspace
  * - Leaving the socket room for the deleted workspace and all channels
- * - If user is viewing deleted workspace, redirect to first available workspace or workspace selection
+ * - If user is viewing deleted workspace, switch to first available workspace or clear selection
  * - Showing a toast notification
  */
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getSocket } from "@/lib/socket/socketClient";
 import {
@@ -46,7 +45,14 @@ function createWorkspaceDeletedHandler(
   selectedWorkspaceId: string | null,
   selectedChannelId: string | null,
   clearWorkspaceState: () => void,
-  router: ReturnType<typeof useRouter>
+  setSelectedWorkspace: (
+    workspaceId: string | null,
+    displayName?: string | null
+  ) => void,
+  setSelectedChannel: (
+    channelId: string | null,
+    displayName?: string | null
+  ) => void
 ) {
   return (data: WorkspaceDeletedEventPayload) => {
     logDev("[Socket] Received workspace:deleted", {
@@ -91,59 +97,68 @@ function createWorkspaceDeletedHandler(
       channelCount: data.channelIds.length,
     });
 
-    // Check if user was viewing the deleted workspace
+    // Check if user was viewing the deleted workspace or is the deleter
     const wasViewingDeletedWorkspace = selectedWorkspaceId === data.workspaceId;
+    const isDeleter = data.deletedBy === currentUserId;
 
+    // If user was viewing the deleted workspace (including the deleter), switch/clear state
     if (wasViewingDeletedWorkspace) {
-      // Find the first available workspace to redirect to
+      // Get available workspaces AFTER cache update (deleted workspace already removed)
       const cacheKey = ["workspaces", "memberships", "with-channels"];
       const cachedData =
         queryClient.getQueryData<GetUserMembershipsResponse>(cacheKey);
 
-      const availableWorkspaces = cachedData?.data?.workspaces?.filter(
-        (w) => w.id !== data.workspaceId
-      );
+      const availableWorkspaces = cachedData?.data?.workspaces || [];
 
-      if (availableWorkspaces && availableWorkspaces.length > 0) {
-        // Redirect to the first available workspace's general channel
+      if (availableWorkspaces.length > 0) {
+        // Switch to the first available workspace's general channel
         const firstWorkspace = availableWorkspaces[0];
         const generalChannel = firstWorkspace.channels?.find(
           (c) => c.name === "general"
         );
 
+        // Update Zustand state to switch workspace and channel
+        setSelectedWorkspace(
+          firstWorkspace.id,
+          firstWorkspace.displayName || firstWorkspace.name
+        );
+
         if (generalChannel) {
-          router.push(
-            `/app/${firstWorkspace.id}/channels/${generalChannel.id}`
+          setSelectedChannel(
+            generalChannel.id,
+            generalChannel.displayName || generalChannel.name
           );
-          logDev("[Socket] Redirected to first available workspace", {
+          logDev("[Socket] Switched to first available workspace", {
             workspaceId: firstWorkspace.id,
             channelId: generalChannel.id,
           });
         } else {
-          // Fallback: redirect to workspace page
-          router.push(`/app/${firstWorkspace.id}`);
+          // No general channel, just clear channel selection
+          setSelectedChannel(null);
         }
 
-        toast.info(`Workspace "${data.workspaceName}" has been deleted`, {
-          description: `Redirected to "${firstWorkspace.displayName || firstWorkspace.name}"`,
-        });
+        // Only show toast if not the deleter (they already know)
+        if (!isDeleter) {
+          toast.info(`Workspace "${data.workspaceName}" has been deleted`, {
+            description: `Switched to "${firstWorkspace.displayName || firstWorkspace.name}"`,
+          });
+        }
       } else {
-        // No other workspaces available - redirect to workspace selection
+        // No other workspaces available - clear all state
         clearWorkspaceState();
-        router.push("/app");
-        logDev("[Socket] No other workspaces available, redirected to /app");
+        logDev("[Socket] No other workspaces available, cleared state");
 
-        toast.info(`Workspace "${data.workspaceName}" has been deleted`, {
-          description: "Please create or join a workspace to continue",
-        });
+        // Only show toast if not the deleter (they already know)
+        if (!isDeleter) {
+          toast.info(`Workspace "${data.workspaceName}" has been deleted`, {
+            description: "Please create or join a workspace to continue",
+          });
+        }
       }
-    } else {
-      // Show toast notification for deleted workspace
-      // Don't show if the current user deleted the workspace (they already know)
-      const isDeleter = data.deletedBy === currentUserId;
-      if (!isDeleter) {
-        toast.info(`Workspace "${data.workspaceName}" has been deleted`);
-      }
+    } else if (!isDeleter) {
+      // User was NOT viewing the deleted workspace and is NOT the deleter
+      // Just show a notification
+      toast.info(`Workspace "${data.workspaceName}" has been deleted`);
     }
   };
 }
@@ -166,10 +181,14 @@ function createWorkspaceDeletedHandler(
  */
 export function useWorkspaceSocket() {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const currentUser = useCurrentUser();
-  const { selectedWorkspaceId, selectedChannelId, clearWorkspaceState } =
-    useWorkspaceStore();
+  const {
+    selectedWorkspaceId,
+    selectedChannelId,
+    clearWorkspaceState,
+    setSelectedWorkspace,
+    setSelectedChannel,
+  } = useWorkspaceStore();
 
   useEffect(() => {
     const socket = getSocket();
@@ -181,7 +200,8 @@ export function useWorkspaceSocket() {
       selectedWorkspaceId,
       selectedChannelId,
       clearWorkspaceState,
-      router
+      setSelectedWorkspace,
+      setSelectedChannel
     );
 
     // Register event listener
@@ -196,10 +216,11 @@ export function useWorkspaceSocket() {
     };
   }, [
     queryClient,
-    router,
     currentUser?.id,
     selectedWorkspaceId,
     selectedChannelId,
     clearWorkspaceState,
+    setSelectedWorkspace,
+    setSelectedChannel,
   ]);
 }
