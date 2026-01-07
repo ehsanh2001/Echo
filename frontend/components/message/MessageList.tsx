@@ -16,7 +16,10 @@ import {
   useMessageHistory,
   useMessageList,
 } from "@/lib/hooks/useMessageQueries";
-import { useLastReadMessageNo } from "@/lib/hooks/useUnreadCounts";
+import {
+  useLastReadMessageNo,
+  useMarkAsRead,
+} from "@/lib/hooks/useUnreadCounts";
 import type { MessageWithAuthorResponse } from "@/types/message";
 
 interface MessageListProps {
@@ -72,6 +75,8 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   // Track the message count to detect new messages while scrolled up
   const [lastSeenMessageCount, setLastSeenMessageCount] = useState(0);
+  // Track when user is at bottom (state to trigger mark-as-read effect)
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   // Fetch message history with infinite scroll
   const {
@@ -89,6 +94,13 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
 
   // Get last read message number for "New messages" separator
   const lastReadMessageNo = useLastReadMessageNo(workspaceId, channelId);
+
+  // Hook to mark channel as read
+  const { markAsRead } = useMarkAsRead();
+
+  // Get the latest message for marking as read
+  const latestMessage =
+    messages.length > 0 ? messages[messages.length - 1] : null;
 
   // Find the first unread message index (for showing "New messages" separator)
   const firstUnreadMessageIndex = useMemo(() => {
@@ -204,6 +216,7 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
       const isNearBottom = distanceFromBottom < SCROLL_THRESHOLD;
 
       isNearBottomRef.current = isNearBottom;
+      setIsAtBottom(isNearBottom);
 
       // Update last seen message count when near bottom
       if (isNearBottom) {
@@ -233,6 +246,40 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
       setShowJumpToLatest(true);
     }
   }, [messages.length, lastSeenMessageCount]);
+
+  /**
+   * Auto-mark channel as read when user views messages at bottom
+   * Triggered when:
+   * - Messages finish loading and user is at bottom
+   * - User scrolls to bottom (isAtBottom state changes)
+   * - Latest message changes (new messages arrive while at bottom)
+   */
+  useEffect(() => {
+    // Only mark as read if:
+    // 1. We have a latest message
+    // 2. User is at bottom (viewing the latest messages)
+    // 3. There are actually unread messages (latestMessage.messageNo > lastReadMessageNo)
+    if (
+      latestMessage &&
+      isAtBottom &&
+      latestMessage.messageNo > lastReadMessageNo
+    ) {
+      markAsRead({
+        workspaceId,
+        channelId,
+        messageNo: latestMessage.messageNo,
+        messageId: latestMessage.id,
+      });
+    }
+  }, [
+    latestMessage?.messageNo,
+    latestMessage?.id,
+    lastReadMessageNo,
+    isAtBottom,
+    workspaceId,
+    channelId,
+    markAsRead,
+  ]);
 
   /**
    * Intersection Observer for infinite scroll
