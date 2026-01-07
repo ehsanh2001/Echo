@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { WorkspaceController } from "../controllers/WorkspaceController";
+import { ReadReceiptController } from "../controllers/ReadReceiptController";
 import { jwtAuth } from "../middleware/auth";
 import channelRoutes from "./channelRoutes";
 
@@ -293,6 +294,46 @@ workspaceRoutes.delete("/:id", jwtAuth, WorkspaceController.deleteWorkspace);
  * }
  */
 workspaceRoutes.get("/:id", jwtAuth, WorkspaceController.getWorkspaceDetails);
+
+/**
+ * GET /api/workspaces/:workspaceId/unread-counts
+ * Get unread counts for all channels in a workspace
+ *
+ * Headers:
+ *   Authorization: Bearer <access-token>
+ *
+ * Query Parameters:
+ *   - channelIds: Comma-separated list of channel IDs (required)
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "workspaceId": "workspace-id",
+ *     "channels": [
+ *       {
+ *         "channelId": "channel-1",
+ *         "unreadCount": 5,
+ *         "lastMessageNo": 155,
+ *         "lastReadMessageNo": 150
+ *       }
+ *     ],
+ *     "totalUnread": 15
+ *   },
+ *   "message": "Unread counts retrieved",
+ *   "timestamp": "2025-01-07T..."
+ * }
+ *
+ * Error Responses:
+ * - 400: Bad request (missing channelIds)
+ * - 401: Unauthorized (invalid/missing token)
+ * - 500: Internal server error
+ */
+workspaceRoutes.get(
+  "/:workspaceId/unread-counts",
+  jwtAuth,
+  ReadReceiptController.getWorkspaceUnreadCounts
+);
 
 // Mount channel routes under /:workspaceId/channels
 // This creates nested routes like /api/workspaces/:workspaceId/channels

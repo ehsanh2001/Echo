@@ -27,6 +27,7 @@ import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { socketAuth, AuthenticatedSocket } from "./middleware/auth";
 import bffRoutes from "./routes";
 import morgan from "morgan";
+import { setSocketIO } from "./utils/socketIO";
 
 const app = express();
 const httpServer = createServer(app);
@@ -40,6 +41,9 @@ const io = new SocketIOServer(httpServer, {
   pingTimeout: config.socketIO.pingTimeout,
   pingInterval: config.socketIO.pingInterval,
 });
+
+// Make Socket.IO instance globally accessible for controllers/services
+setSocketIO(io);
 
 // WebSocket connections gauge for metrics
 const wsConnectionsGauge = createWebSocketConnectionsGauge();

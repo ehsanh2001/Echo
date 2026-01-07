@@ -27,6 +27,20 @@ export interface WorkspaceDeletedPayload {
 }
 
 /**
+ * Read receipt updated event payload
+ * Emitted when a user's read position is updated in a channel
+ * Sent only to the user who updated their read position
+ */
+export interface ReadReceiptUpdatedPayload {
+  workspaceId: string;
+  channelId: string;
+  userId: string;
+  lastReadMessageNo: number;
+  lastReadMessageId: string | null;
+  lastReadAt: string; // ISO-8601
+}
+
+/**
  * Server to Client Events
  * Events emitted from the server to connected clients
  */
@@ -36,6 +50,9 @@ export interface ServerToClientEvents {
 
   // Workspace events
   "workspace:deleted": (payload: WorkspaceDeletedPayload) => void;
+
+  // Read receipt events
+  "read-receipt:updated": (payload: ReadReceiptUpdatedPayload) => void;
 
   // Message events (to be added as needed)
   // "message:created": (payload: MessageCreatedPayload) => void;

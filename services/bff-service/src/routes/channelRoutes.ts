@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ChannelController } from "../controllers/ChannelController";
 import { jwtAuth } from "../middleware/auth";
 import messageRoutes from "./messageRoutes";
+import readReceiptRoutes from "./readReceiptRoutes";
 
 /**
  * Channel routes
@@ -118,5 +119,9 @@ channelRoutes.delete("/:channelId", jwtAuth, ChannelController.deleteChannel);
 // Mount message routes under /:channelId/messages
 // This creates nested routes like /api/workspaces/:workspaceId/channels/:channelId/messages
 channelRoutes.use("/:channelId/messages", messageRoutes);
+
+// Mount read receipt routes under /:channelId
+// This creates nested routes like /api/workspaces/:workspaceId/channels/:channelId/read-receipt
+channelRoutes.use("/:channelId", readReceiptRoutes);
 
 export default channelRoutes;
