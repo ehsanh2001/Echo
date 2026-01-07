@@ -402,4 +402,103 @@ export class MessageRepository implements IMessageRepository {
       );
     }
   }
+
+  /**
+   * Get the last message number for a channel
+   *
+   * Retrieves the current lastMessageNo from the channel_sequences table.
+   * Returns 0 if no messages have been sent to the channel.
+   */
+  async getChannelLastMessageNo(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number> {
+    try {
+      const sequence = await this.prisma.channelSequence.findUnique({
+        where: {
+          workspaceId_channelId: {
+            workspaceId,
+            channelId,
+          },
+        },
+        select: {
+          lastMessageNo: true,
+        },
+      });
+
+      // Return 0 if no sequence exists (no messages yet)
+      return sequence ? Number(sequence.lastMessageNo) : 0;
+    } catch (error) {
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      throw MessageServiceError.databaseWithLogging(
+        "Failed to get channel last message number",
+        "getChannelLastMessageNo",
+        {
+          workspaceId,
+          channelId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
+
+  /**
+   * Get the last message numbers for multiple channels
+   *
+   * Batch retrieves lastMessageNo for multiple channels in a single query.
+   */
+  async getChannelsLastMessageNos(
+    workspaceId: string,
+    channelIds: string[]
+  ): Promise<Map<string, number>> {
+    try {
+      if (channelIds.length === 0) {
+        return new Map();
+      }
+
+      const sequences = await this.prisma.channelSequence.findMany({
+        where: {
+          workspaceId,
+          channelId: {
+            in: channelIds,
+          },
+        },
+        select: {
+          channelId: true,
+          lastMessageNo: true,
+        },
+      });
+
+      const result = new Map<string, number>();
+
+      // Initialize all channels with 0
+      for (const channelId of channelIds) {
+        result.set(channelId, 0);
+      }
+
+      // Update with actual values
+      for (const seq of sequences) {
+        result.set(seq.channelId, Number(seq.lastMessageNo));
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof MessageServiceError) {
+        throw error;
+      }
+
+      throw MessageServiceError.databaseWithLogging(
+        "Failed to get channels last message numbers",
+        "getChannelsLastMessageNos",
+        {
+          workspaceId,
+          channelCount: channelIds.length,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
 }

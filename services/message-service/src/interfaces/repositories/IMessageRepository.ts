@@ -130,4 +130,54 @@ export interface IMessageRepository {
    * ```
    */
   deleteByWorkspaceId(workspaceId: string): Promise<number>;
+
+  /**
+   * Get the last message number for a channel
+   *
+   * Retrieves the current lastMessageNo from the channel_sequences table.
+   * Returns 0 if no messages have been sent to the channel.
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @returns The last message number (0 if no messages)
+   * @throws MessageServiceError if query fails
+   *
+   * @example
+   * ```typescript
+   * const lastNo = await messageRepository.getChannelLastMessageNo(
+   *   'workspace-uuid',
+   *   'channel-uuid'
+   * );
+   * console.log(`Channel has ${lastNo} messages`);
+   * ```
+   */
+  getChannelLastMessageNo(
+    workspaceId: string,
+    channelId: string
+  ): Promise<number>;
+
+  /**
+   * Get the last message numbers for multiple channels
+   *
+   * Batch retrieves lastMessageNo for multiple channels in a single query.
+   * Useful for calculating unread counts efficiently.
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelIds - Array of channel UUIDs
+   * @returns Map of channelId to lastMessageNo
+   * @throws MessageServiceError if query fails
+   *
+   * @example
+   * ```typescript
+   * const lastNos = await messageRepository.getChannelsLastMessageNos(
+   *   'workspace-uuid',
+   *   ['channel-1', 'channel-2']
+   * );
+   * // Returns Map { 'channel-1' => 150, 'channel-2' => 75 }
+   * ```
+   */
+  getChannelsLastMessageNos(
+    workspaceId: string,
+    channelIds: string[]
+  ): Promise<Map<string, number>>;
 }

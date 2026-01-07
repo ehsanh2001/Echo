@@ -289,3 +289,44 @@ export interface PaginationOptions {
   limit: number;
   direction: PaginationDirection | null;
 }
+
+// ===== READ RECEIPT TYPES =====
+
+/**
+ * Read receipt response structure
+ */
+export interface ReadReceiptResponse {
+  workspaceId: string;
+  channelId: string;
+  userId: string;
+  lastReadMessageNo: number;
+  lastReadMessageId: string | null;
+  lastReadAt: string; // ISO-8601
+}
+
+/**
+ * Channel unread info for a single channel
+ */
+export interface ChannelUnreadInfo {
+  channelId: string;
+  unreadCount: number;
+  lastMessageNo: number;
+  lastReadMessageNo: number;
+}
+
+/**
+ * Workspace unread counts response
+ */
+export interface WorkspaceUnreadCountsResponse {
+  workspaceId: string;
+  channels: ChannelUnreadInfo[];
+  totalUnread: number;
+}
+
+/**
+ * Request body for marking messages as read
+ */
+export interface MarkAsReadRequest {
+  messageNo: number;
+  messageId?: string;
+}

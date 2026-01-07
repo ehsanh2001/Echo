@@ -17,6 +17,7 @@ import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { IHealthService } from "./interfaces/services/IHealthService";
 import { messageRoutes } from "./routes/messageRoutes";
+import { readReceiptRoutes } from "./routes/readReceiptRoutes";
 import morgan from "morgan";
 
 const prisma = new PrismaClient();
@@ -81,6 +82,7 @@ app.get("/health/ready", async (req, res) => {
 
 // API routes
 app.use("/api/messages", messageRoutes);
+app.use("/api/messages", readReceiptRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {

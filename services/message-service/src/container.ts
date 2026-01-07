@@ -4,10 +4,14 @@ import { PrismaClient } from "@prisma/client";
 import logger from "./utils/logger";
 import { IMessageRepository } from "./interfaces/repositories/IMessageRepository";
 import { MessageRepository } from "./repositories/MessageRepository";
+import { IReadReceiptRepository } from "./interfaces/repositories/IReadReceiptRepository";
+import { ReadReceiptRepository } from "./repositories/ReadReceiptRepository";
 import { ICacheService } from "./interfaces/services/ICacheService";
 import { CacheService } from "./services/CacheService";
 import { IMessageService } from "./interfaces/services/IMessageService";
 import { MessageService } from "./services/MessageService";
+import { IReadReceiptService } from "./interfaces/services/IReadReceiptService";
+import { ReadReceiptService } from "./services/ReadReceiptService";
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { RabbitMQService } from "./services/RabbitMQService";
 import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
@@ -19,6 +23,7 @@ import { UserServiceClient } from "./services/UserServiceClient";
 import { IWorkspaceChannelServiceClient } from "./interfaces/external/IWorkspaceChannelServiceClient";
 import { WorkspaceChannelServiceClient } from "./services/WorkspaceChannelServiceClient";
 import { MessageController } from "./controllers/MessageController";
+import { ReadReceiptController } from "./controllers/ReadReceiptController";
 
 /**
  * Dependency Injection Container Configuration
@@ -39,6 +44,12 @@ container.registerSingleton<IMessageRepository>(
   MessageRepository
 );
 
+// Register ReadReceiptRepository as IReadReceiptRepository implementation
+container.registerSingleton<IReadReceiptRepository>(
+  "IReadReceiptRepository",
+  ReadReceiptRepository
+);
+
 // ===== SERVICES =====
 
 // Register HealthService as IHealthService implementation (must be registered first for other services to inject)
@@ -49,6 +60,12 @@ container.registerSingleton<ICacheService>("ICacheService", CacheService);
 
 // Register MessageService as IMessageService implementation
 container.registerSingleton<IMessageService>("IMessageService", MessageService);
+
+// Register ReadReceiptService as IReadReceiptService implementation
+container.registerSingleton<IReadReceiptService>(
+  "IReadReceiptService",
+  ReadReceiptService
+);
 
 // Register RabbitMQService as IRabbitMQService implementation and initialize
 const rabbitMQService = new RabbitMQService();
@@ -84,6 +101,9 @@ container.registerSingleton<IWorkspaceChannelServiceClient>(
 
 // Register MessageController
 container.registerSingleton<MessageController>(MessageController);
+
+// Register ReadReceiptController
+container.registerSingleton<ReadReceiptController>(ReadReceiptController);
 
 // ===== WORKERS =====
 
