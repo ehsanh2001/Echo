@@ -6,8 +6,9 @@ import {
   useRef,
   useCallback,
   useMemo,
+  useState,
 } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowDown } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import { Message } from "./Message";
 import { NewMessagesSeparator } from "./NewMessagesSeparator";
@@ -60,7 +61,17 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
   const previousScrollHeightRef = useRef<number>(0);
+  const hasScrolledToUnreadRef = useRef<boolean>(false);
+  const isNearBottomRef = useRef<boolean>(true);
+
+  // Track if user is scrolled away from unread separator
+  const [showJumpToUnread, setShowJumpToUnread] = useState(false);
+  // Track if user is scrolled away from bottom (for "Jump to Latest" button)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  // Track the message count to detect new messages while scrolled up
+  const [lastSeenMessageCount, setLastSeenMessageCount] = useState(0);
 
   // Fetch message history with infinite scroll
   const {
@@ -103,14 +114,125 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   }, []);
 
   /**
-   * Initial scroll to bottom when messages first load
+   * Scroll to first unread message
+   */
+  const scrollToFirstUnread = useCallback((smooth = false) => {
+    firstUnreadRef.current?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "start",
+    });
+  }, []);
+
+  /**
+   * Initial scroll when messages first load
+   * - If there are unread messages, scroll to the first unread
+   * - Otherwise, scroll to the bottom
    * Use useLayoutEffect to run synchronously after DOM mutations but before paint
    */
   useLayoutEffect(() => {
-    if (messages.length > 0 && !isLoading) {
-      scrollToBottom(false);
+    if (messages.length > 0 && !isLoading && !hasScrolledToUnreadRef.current) {
+      // Mark that we've done the initial scroll
+      hasScrolledToUnreadRef.current = true;
+
+      // Use requestAnimationFrame to ensure refs are attached
+      requestAnimationFrame(() => {
+        if (firstUnreadMessageIndex > 0 && firstUnreadRef.current) {
+          // Scroll to first unread message
+          scrollToFirstUnread(false);
+        } else {
+          // No unread messages - scroll to bottom
+          scrollToBottom(false);
+        }
+      });
     }
-  }, [messages.length > 0 && !isLoading, scrollToBottom]); // Only on first load
+  }, [
+    messages.length > 0 && !isLoading,
+    firstUnreadMessageIndex,
+    scrollToFirstUnread,
+    scrollToBottom,
+  ]);
+
+  // Reset scroll tracking when channel changes
+  useEffect(() => {
+    hasScrolledToUnreadRef.current = false;
+    setShowJumpToUnread(false);
+  }, [channelId]);
+
+  /**
+   * Track scroll position to show/hide "Jump to unread" button
+   */
+  useEffect(() => {
+    if (!messagesContainerRef.current || firstUnreadMessageIndex < 0) {
+      setShowJumpToUnread(false);
+      return;
+    }
+
+    const container = messagesContainerRef.current;
+
+    const handleScroll = () => {
+      if (!firstUnreadRef.current || !container) return;
+
+      // Check if the first unread message is above the visible area
+      const unreadRect = firstUnreadRef.current.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      // Show button if unread separator is above the visible viewport
+      const isAboveViewport = unreadRect.bottom < containerRect.top;
+      setShowJumpToUnread(isAboveViewport);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    // Initial check
+    handleScroll();
+
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [firstUnreadMessageIndex]);
+
+  /**
+   * Track scroll position to show/hide "Jump to Latest" button
+   * Shows when user scrolls up from bottom and new messages arrive
+   */
+  useEffect(() => {
+    if (!messagesContainerRef.current) return;
+
+    const container = messagesContainerRef.current;
+    const SCROLL_THRESHOLD = 100; // px from bottom
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const isNearBottom = distanceFromBottom < SCROLL_THRESHOLD;
+
+      isNearBottomRef.current = isNearBottom;
+
+      // Update last seen message count when near bottom
+      if (isNearBottom) {
+        setLastSeenMessageCount(messages.length);
+        setShowJumpToLatest(false);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    // Initial check
+    handleScroll();
+
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [messages.length]);
+
+  /**
+   * Show "Jump to Latest" when new messages arrive while scrolled up
+   */
+  useEffect(() => {
+    // Only show if we have messages, not near bottom, and new messages arrived
+    if (
+      messages.length > 0 &&
+      !isNearBottomRef.current &&
+      messages.length > lastSeenMessageCount &&
+      lastSeenMessageCount > 0
+    ) {
+      setShowJumpToLatest(true);
+    }
+  }, [messages.length, lastSeenMessageCount]);
 
   /**
    * Intersection Observer for infinite scroll
@@ -241,7 +363,13 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
         const showNewMessagesSeparator = index === firstUnreadMessageIndex;
 
         return (
-          <div key={message.id} id={`message-${message.id}`} className="mb-4">
+          <div
+            key={message.id}
+            id={`message-${message.id}`}
+            className="mb-4"
+            // Attach ref to the first unread message for scroll-to-unread
+            ref={showNewMessagesSeparator ? firstUnreadRef : undefined}
+          >
             {showDateSeparator && <DateSeparator date={currentDate} />}
             {showNewMessagesSeparator && <NewMessagesSeparator />}
             <Message message={message} />
@@ -251,6 +379,34 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
 
       {/* Scroll anchor for auto-scroll to bottom */}
       <div ref={messagesEndRef} />
+
+      {/* Jump to Unread Button - shows when scrolled away from unread separator */}
+      {showJumpToUnread && !showJumpToLatest && (
+        <button
+          onClick={() => scrollToFirstUnread(true)}
+          className="fixed bottom-24 right-8 z-50 flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-full shadow-lg hover:bg-destructive/90 transition-colors"
+          aria-label="Jump to unread messages"
+        >
+          <ArrowDown className="h-4 w-4" />
+          <span className="text-sm font-medium">Jump to unread</span>
+        </button>
+      )}
+
+      {/* Jump to Latest Button - shows when scrolled up and new messages arrived */}
+      {showJumpToLatest && (
+        <button
+          onClick={() => {
+            scrollToBottom(true);
+            setShowJumpToLatest(false);
+            setLastSeenMessageCount(messages.length);
+          }}
+          className="fixed bottom-24 right-8 z-50 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+          aria-label="Jump to latest messages"
+        >
+          <ArrowDown className="h-4 w-4" />
+          <span className="text-sm font-medium">New messages</span>
+        </button>
+      )}
     </div>
   );
 }
