@@ -33,6 +33,7 @@ import { CreateWorkspaceModal } from "@/components/workspace/CreateWorkspaceModa
 import { InviteMembersModal } from "@/components/workspace/InviteMembersModal";
 import { DeleteWorkspaceDialog } from "@/components/workspace/DeleteWorkspaceDialog";
 import { ChannelContextMenu } from "@/components/channel/ChannelContextMenu";
+import { UnreadBadge } from "@/components/app/UnreadBadge";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   useWorkspaceMemberships,
@@ -42,6 +43,11 @@ import {
 } from "@/lib/hooks/useWorkspaces";
 import { memberKeys } from "@/lib/hooks/useMembers";
 import { messageKeys } from "@/lib/hooks/useMessageQueries";
+import {
+  useUnreadCounts,
+  useChannelUnreadCount,
+  useWorkspaceUnreadCount,
+} from "@/lib/hooks/useUnreadCounts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChannelType, WorkspaceRole } from "@/types/workspace";
 
@@ -118,6 +124,10 @@ export function AppSidebar({
         workspaceId: selectedWorkspace.id,
         workspaceName: selectedWorkspace.displayName || selectedWorkspace.name,
       })) || [];
+
+  // Fetch unread counts for all channels in the selected workspace
+  const channelIds = channels.map((c) => c.id);
+  useUnreadCounts(selectedWorkspaceId, channelIds);
 
   // Handle workspace selection with channel restoration/auto-selection
   const handleSelectWorkspace = (workspaceId: string, displayName: string) => {
@@ -343,6 +353,9 @@ export function AppSidebar({
                               <span className="truncate flex-1 text-left">
                                 {workspace.displayName || workspace.name}
                               </span>
+                              <WorkspaceUnreadBadgeWrapper
+                                workspaceId={workspace.id}
+                              />
                             </button>
 
                             {/* Workspace Settings Menu */}
@@ -524,6 +537,10 @@ export function AppSidebar({
                               <span className="truncate flex-1 text-left">
                                 {channel.name}
                               </span>
+                              <ChannelUnreadBadgeWrapper
+                                workspaceId={channel.workspaceId}
+                                channelId={channel.id}
+                              />
                             </button>
 
                             {/* Channel Context Menu */}
@@ -610,4 +627,28 @@ export function AppSidebar({
       )}
     </TooltipProvider>
   );
+}
+
+/**
+ * Helper component to render unread badge for a channel
+ * Uses the useChannelUnreadCount hook to get count from store
+ */
+function ChannelUnreadBadgeWrapper({
+  workspaceId,
+  channelId,
+}: {
+  workspaceId: string;
+  channelId: string;
+}) {
+  const unreadCount = useChannelUnreadCount(workspaceId, channelId);
+  return <UnreadBadge count={unreadCount} size="sm" />;
+}
+
+/**
+ * Helper component to render unread badge for a workspace
+ * Uses the useWorkspaceUnreadCount hook to get total count from store
+ */
+function WorkspaceUnreadBadgeWrapper({ workspaceId }: { workspaceId: string }) {
+  const totalUnread = useWorkspaceUnreadCount(workspaceId);
+  return <UnreadBadge count={totalUnread} size="sm" />;
 }

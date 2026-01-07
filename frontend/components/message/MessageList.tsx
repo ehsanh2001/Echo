@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Loader2 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import { Message } from "./Message";
+import { NewMessagesSeparator } from "./NewMessagesSeparator";
 import {
   useMessageHistory,
   useMessageList,
 } from "@/lib/hooks/useMessageQueries";
+import { useLastReadMessageNo } from "@/lib/hooks/useUnreadCounts";
 import type { MessageWithAuthorResponse } from "@/types/message";
 
 interface MessageListProps {
@@ -67,6 +75,23 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
 
   // Get flattened message list in chronological order (oldest to newest)
   const messages = useMessageList(data);
+
+  // Get last read message number for "New messages" separator
+  const lastReadMessageNo = useLastReadMessageNo(workspaceId, channelId);
+
+  // Find the first unread message index (for showing "New messages" separator)
+  const firstUnreadMessageIndex = useMemo(() => {
+    if (lastReadMessageNo <= 0 || messages.length === 0) {
+      return -1; // No separator needed
+    }
+
+    // Find the first message with messageNo > lastReadMessageNo
+    const index = messages.findIndex(
+      (msg) => msg.messageNo > lastReadMessageNo
+    );
+
+    return index;
+  }, [messages, lastReadMessageNo]);
 
   /**
    * Scroll to bottom (for initial load or new messages)
@@ -206,17 +231,19 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
         </div>
       )}
 
-      {/* Messages with Date Separators */}
+      {/* Messages with Date Separators and New Messages Separator */}
       {messages.map((message, index) => {
         const currentDate = new Date(message.createdAt);
         const previousDate =
           index > 0 ? new Date(messages[index - 1].createdAt) : null;
         const showDateSeparator =
           !previousDate || !isSameDay(currentDate, previousDate);
+        const showNewMessagesSeparator = index === firstUnreadMessageIndex;
 
         return (
           <div key={message.id} id={`message-${message.id}`} className="mb-4">
             {showDateSeparator && <DateSeparator date={currentDate} />}
+            {showNewMessagesSeparator && <NewMessagesSeparator />}
             <Message message={message} />
           </div>
         );
