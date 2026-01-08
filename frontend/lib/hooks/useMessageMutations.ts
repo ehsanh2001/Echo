@@ -28,11 +28,11 @@ interface SendMessageContext {
 /**
  * Hook to send a message to a channel with optimistic updates
  *
- * Features:
- * - Optimistic UI updates (message appears immediately)
+ * Simplified approach:
+ * - Always do optimistic updates (we always have the latest messages)
+ * - Socket handler replaces optimistic message with confirmed message
  * - Automatic retry with exponential backoff (max 30s)
  * - Error handling with toast notifications
- * - Local storage persistence for failed messages (future)
  *
  * @param workspaceId - The workspace ID
  * @param channelId - The channel ID
@@ -103,17 +103,20 @@ export function useSendMessage(workspaceId: string, channelId: string) {
       >(messageKeys.channel(workspaceId, channelId));
 
       // Optimistically update the cache
+      // With simplified pagination, we always have the latest messages
       queryClient.setQueryData<InfiniteData<MessageHistoryResponse>>(
         messageKeys.channel(workspaceId, channelId),
         (old) => {
           if (!old || !old.pages.length) return old;
 
           const newPages = [...old.pages];
-          const lastPageIndex = newPages.length - 1;
-          const lastPage = newPages[lastPageIndex];
+          // With simplified pagination, pages are in chronological order:
+          // [oldest..., initial] - so last page is the newest
+          const lastIndex = newPages.length - 1;
+          const lastPage = newPages[lastIndex];
 
-          // Add optimistic message to the end of the last page (newest messages)
-          newPages[lastPageIndex] = {
+          // Add optimistic message to the end of the newest page
+          newPages[lastIndex] = {
             ...lastPage,
             messages: [...lastPage.messages, optimisticMessage as any],
           };
@@ -125,13 +128,16 @@ export function useSendMessage(workspaceId: string, channelId: string) {
         }
       );
 
-      return { optimisticMessage, correlationId, previousMessages };
+      return {
+        optimisticMessage,
+        correlationId,
+        previousMessages,
+      };
     },
 
     onSuccess: (response, variables, context) => {
       // Message sent successfully to backend
-      // Socket.IO will handle updating the cache when message:created event arrives
-      // No need to invalidate queries here - socket listener will replace optimistic message
+      // Socket handler will replace the optimistic message with the confirmed one
       if (process.env.NODE_ENV === "development") {
         console.log("Message sent successfully:", response.data.id);
       }
@@ -154,16 +160,6 @@ export function useSendMessage(workspaceId: string, channelId: string) {
 
       toast.error(errorMessage);
       console.error("Error sending message:", error);
-    },
-
-    onSettled: (data, error, variables, context) => {
-      // No need to invalidate - socket will handle updates
-      // Only invalidate on error if rollback didn't happen
-      if (error && !context?.previousMessages) {
-        queryClient.invalidateQueries({
-          queryKey: messageKeys.channel(workspaceId, channelId),
-        });
-      }
     },
   });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   useInfiniteQuery,
   type UseInfiniteQueryResult,
@@ -33,71 +34,79 @@ interface UseMessageHistoryOptions {
 }
 
 /**
- * Hook to fetch message history with infinite scroll support
+ * Page parameter for pagination (only loading older messages)
+ * - undefined: Initial load (backend returns ALL unread or last N messages)
+ * - { cursor, direction }: Load older messages
+ */
+interface PageParam {
+  cursor: number;
+  direction: PaginationDirection;
+}
+
+/**
+ * Hook to fetch message history with simplified infinite scroll
  *
- * Fetches messages in reverse chronological order (newest first).
- * Supports loading older messages on scroll with cursor-based pagination.
+ * Simplified pagination approach:
+ * - Initial load: Backend returns ALL unread messages OR last N messages
+ *   - We always have the latest messages after initial load (no "gap")
+ *   - firstUnreadIndex tells us where to show "New messages" separator
+ * - Subsequent loads: Only load OLDER messages via fetchPreviousPage
+ *
+ * Page structure:
+ * - fetchPreviousPage prepends older pages to START of array
+ * - Result: [oldest_pages..., initial_page] (chronological order)
+ * - Each page's messages are in ASC order (oldest to newest)
  *
  * @param workspaceId - Workspace UUID
  * @param channelId - Channel UUID
  * @param options - Query options
  *
- * @returns React Query infinite query result with message pages
- *
- * @example
- * ```typescript
- * const {
- *   data,
- *   fetchNextPage,
- *   hasNextPage,
- *   isFetchingNextPage,
- *   isLoading,
- * } = useMessageHistory(workspaceId, channelId);
- *
- * // Access all messages (flattened)
- * const allMessages = data?.pages.flatMap(page => page.messages) ?? [];
- *
- * // Load more older messages
- * if (hasNextPage) {
- *   fetchNextPage();
- * }
- * ```
+ * @returns React Query infinite query result with messages, firstUnreadIndex, and startedFromUnread
  */
 export function useMessageHistory(
   workspaceId: string,
   channelId: string,
   options: UseMessageHistoryOptions = {}
-): UseInfiniteQueryResult<
-  InfiniteData<MessageHistoryResponse, number | undefined>,
-  Error
-> {
+) {
   const { limit, enabled = true } = options;
 
-  return useInfiniteQuery({
+  const query = useInfiniteQuery<
+    MessageHistoryResponse,
+    Error,
+    InfiniteData<MessageHistoryResponse, PageParam | undefined>,
+    ReturnType<typeof messageKeys.channel>,
+    PageParam | undefined
+  >({
     queryKey: messageKeys.channel(workspaceId, channelId),
 
-    queryFn: async ({ pageParam }: { pageParam: number | undefined }) => {
+    queryFn: async ({ pageParam }) => {
       const response = await getMessageHistory(workspaceId, channelId, {
-        cursor: pageParam,
+        cursor: pageParam?.cursor,
         limit,
-        direction: PaginationDirection.BEFORE, // Always load older messages
+        direction: pageParam?.direction,
       });
 
       return response.data;
     },
 
-    // Initial page starts with no cursor (fetches latest messages)
-    initialPageParam: undefined as number | undefined,
+    // Initial page has no cursor - backend returns ALL unread or last N
+    initialPageParam: undefined,
 
-    // Get the cursor for the next page (older messages)
-    // prevCursor points to older messages in our pagination semantics
-    getNextPageParam: (lastPage) => {
-      return lastPage.prevCursor ?? undefined;
+    // No getNextPageParam - we always have the latest messages
+    // nextCursor from backend is always null
+    getNextPageParam: () => undefined,
+
+    // Get cursor for PREVIOUS page (OLDER messages - scroll up)
+    // prevCursor points to messages older than current page
+    getPreviousPageParam: (firstPage) => {
+      if (firstPage.prevCursor === null) {
+        return undefined; // No more older messages
+      }
+      return {
+        cursor: firstPage.prevCursor,
+        direction: PaginationDirection.BEFORE,
+      };
     },
-
-    // Since we're paginating backwards in time, there's no "previous page"
-    // in the infinite scroll sense (we always start from latest)
-    getPreviousPageParam: () => undefined,
 
     // Enable/disable based on whether we have valid IDs
     enabled: enabled && !!workspaceId && !!channelId,
@@ -114,46 +123,71 @@ export function useMessageHistory(
     // Don't retry on error (let user retry manually)
     retry: 1,
   });
+
+  // Extract startedFromUnread from the initial page
+  // With simplified approach, initial page is the LAST one in the array
+  // (older pages are prepended via fetchPreviousPage)
+  const startedFromUnread = useMemo(() => {
+    if (!query.data?.pages.length) {
+      return false;
+    }
+    // Initial page is the last one (older pages prepend to start)
+    const initialPage = query.data.pages[query.data.pages.length - 1];
+    return initialPage.startedFromUnread;
+  }, [query.data?.pages]);
+
+  // Extract firstUnreadIndex from the initial page
+  // This tells us where to show the "New messages" separator
+  const firstUnreadIndex = useMemo(() => {
+    if (!query.data?.pages.length) {
+      return -1;
+    }
+    // Initial page is the last one
+    const initialPage = query.data.pages[query.data.pages.length - 1];
+    return initialPage.firstUnreadIndex;
+  }, [query.data?.pages]);
+
+  return {
+    ...query,
+    startedFromUnread,
+    firstUnreadIndex,
+  };
 }
 
 /**
  * Helper hook to get all messages from infinite query result
- * Flattens pages and reverses order for display (oldest to newest)
+ * Flattens pages into chronological order (oldest to newest)
+ *
+ * With simplified pagination:
+ * - fetchPreviousPage (older) prepends to the START of pages array
+ * - Pages are in chronological order: [oldest_pages..., initial_page]
+ * - Each page contains messages in ASC order (oldest to newest within page)
+ * - Simply flatten them without any reversal
  *
  * @param data - InfiniteData from useMessageHistory
  * @returns Flattened array of messages in chronological order
- *
- * @example
- * ```typescript
- * const query = useMessageHistory(workspaceId, channelId);
- * const messages = useMessageList(query.data);
- *
- * // messages[0] is the oldest
- * // messages[messages.length - 1] is the newest
- * ```
  */
 export function useMessageList(
-  data: InfiniteData<MessageHistoryResponse, number | undefined> | undefined
+  data: InfiniteData<MessageHistoryResponse, PageParam | undefined> | undefined
 ): MessageWithAuthorResponse[] {
-  if (!data) {
-    return [];
-  }
+  return useMemo(() => {
+    if (!data || !data.pages.length) {
+      return [];
+    }
 
-  // Each page has messages in ASC order (oldest to newest within page)
-  // But pages themselves are in DESC order (newest page first)
-  // So we need to reverse the pages, not the messages within
-  const reversedPages = [...data.pages].reverse();
-  const messagesInOrder = reversedPages.flatMap((page) => page.messages);
-
-  return messagesInOrder;
+    // Pages are already in chronological order:
+    // [oldest_pages..., initial_page]
+    // Each page's messages are in ASC order (oldest to newest)
+    // Simply flatten them
+    return data.pages.flatMap((page) => page.messages);
+  }, [data]);
 }
 
 /**
- * Helper hook to check if there are more messages to load
- *
- * @param hasNextPage - hasNextPage from useMessageHistory
- * @returns Boolean indicating if more messages can be loaded
+ * Helper hook to check if there are more older messages to load
  */
-export function useHasMoreMessages(hasNextPage: boolean | undefined): boolean {
-  return hasNextPage ?? false;
+export function useHasMoreOlderMessages(
+  hasPreviousPage: boolean | undefined
+): boolean {
+  return hasPreviousPage ?? false;
 }

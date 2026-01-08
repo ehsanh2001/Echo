@@ -6,6 +6,7 @@ import {
   MessageCreatedEvent,
 } from "../interfaces/services/IRabbitMQService";
 import { IMessageRepository } from "../interfaces/repositories/IMessageRepository";
+import { IReadReceiptRepository } from "../interfaces/repositories/IReadReceiptRepository";
 import { IUserServiceClient } from "../interfaces/external/IUserServiceClient";
 import { IWorkspaceChannelServiceClient } from "../interfaces/external/IWorkspaceChannelServiceClient";
 import {
@@ -26,6 +27,8 @@ import { MessageServiceError } from "../utils/errors";
 export class MessageService implements IMessageService {
   constructor(
     @inject("IMessageRepository") private messageRepository: IMessageRepository,
+    @inject("IReadReceiptRepository")
+    private readReceiptRepository: IReadReceiptRepository,
     @inject("IUserServiceClient") private userServiceClient: IUserServiceClient,
     @inject("IWorkspaceChannelServiceClient")
     private workspaceChannelServiceClient: IWorkspaceChannelServiceClient,
@@ -359,14 +362,22 @@ export class MessageService implements IMessageService {
   /**
    * Get message history for a channel with cursor-based pagination
    *
+   * Simplified pagination approach:
+   * - Initial load (no cursor): Returns ALL unread messages OR last N messages
+   *   - Always includes the latest messages (no "gap" to newest)
+   *   - startedFromUnread flag indicates if there's an unread separator to show
+   *   - firstUnreadIndex indicates where to place the "New messages" separator
+   * - Subsequent loads (cursor provided): Only loads OLDER messages (BEFORE direction)
+   *   - nextCursor is always null (we always have the latest)
+   *   - prevCursor points to older messages
+   *
    * Business Flow:
    * 1. Verify channel membership (fail fast if unauthorized)
-   * 2. Validate and normalize pagination parameters
-   * 3. Fetch messages from repository (request limit + 1 to detect hasMore)
-   * 4. Determine if more messages exist and extract actual page
-   * 5. Enrich messages with author information (with fallback on failure)
-   * 6. Calculate pagination cursors (nextCursor, prevCursor)
-   * 7. Return paginated response
+   * 2. Determine if initial load or pagination
+   * 3. Fetch appropriate messages
+   * 4. Enrich messages with author information (with fallback on failure)
+   * 5. Calculate pagination cursor (only prevCursor for older messages)
+   * 6. Return paginated response
    *
    * Resilience: If user-service is unavailable when enriching author information,
    * messages will include fallback author data ("Unknown User") rather than failing.
@@ -375,7 +386,7 @@ export class MessageService implements IMessageService {
    * @param workspaceId - Workspace UUID
    * @param channelId - Channel UUID
    * @param userId - Requesting user's UUID (verified for channel membership)
-   * @param params - Pagination parameters (cursor, limit, direction)
+   * @param params - Pagination parameters (cursor, limit)
    * @returns Paginated message history with author information and navigation cursors
    * @throws MessageServiceError if user is not a channel member or validation fails
    */
@@ -390,82 +401,260 @@ export class MessageService implements IMessageService {
       channelId,
       cursor: params.cursor,
       limit: params.limit,
-      direction: params.direction,
+      isInitialLoad: params.cursor === undefined,
     });
 
     // Step 1: Verify channel membership
     await this.verifyChannelMembership(workspaceId, channelId, userId);
 
-    // Step 2: Normalize pagination parameters (apply defaults)
-    const { cursor, limit, direction } = this.normalizePaginationParams(params);
+    // Step 2: Determine limit
+    const limit = params.limit || config.pagination.defaultLimit;
 
-    // Step 3: Fetch messages based on direction (request limit + 1 to detect hasMore)
-    const messages = await this.messageRepository.getMessagesWithCursor(
-      workspaceId,
-      channelId,
-      cursor,
-      limit + 1,
-      direction
-    );
+    // Step 3: Fetch messages based on load type
+    let messages: MessageResponse[];
+    let startedFromUnread = false;
+    let hasOlderMessages = false;
+    let firstUnreadIndex = -1;
 
-    // Step 4: Determine if there are more messages and extract actual page
-    const hasMore = messages.length > limit;
-    let pageMessages: MessageResponse[];
-    if (direction === PaginationDirection.BEFORE) {
-      pageMessages = hasMore ? messages.slice(1) : messages;
+    if (this.isInitialLoad(params)) {
+      // Initial load - get ALL unread or last N
+      const result = await this.getInitialLoadMessages(
+        workspaceId,
+        channelId,
+        userId,
+        limit
+      );
+      messages = result.messages;
+      startedFromUnread = result.startedFromUnread;
+      hasOlderMessages = result.hasOlderMessages;
+      firstUnreadIndex = result.firstUnreadIndex;
     } else {
-      pageMessages = hasMore ? messages.slice(0, limit) : messages;
+      // Pagination - load older messages
+      const result = await this.getPaginatedMessages(
+        workspaceId,
+        channelId,
+        params.cursor!,
+        limit
+      );
+      messages = result.messages;
+      hasOlderMessages = result.hasOlderMessages;
     }
-    // Step 5: Enrich messages with author information
-    const messagesWithAuthors =
-      await this.enrichMessagesWithAuthors(pageMessages);
 
-    // Step 6: Calculate pagination cursors
-    const { nextCursor, prevCursor } = this.calculatePaginationCursors(
-      messagesWithAuthors,
-      direction,
-      hasMore
-    );
+    // Step 4: Enrich messages with author information
+    const messagesWithAuthors = await this.enrichMessagesWithAuthors(messages);
 
-    // Step 7: Return paginated response
+    // Step 5: Calculate pagination cursors
+    // With simplified approach:
+    // - nextCursor is ALWAYS null (we always have the latest messages)
+    // - prevCursor points to older messages (if any exist)
+    const firstMessage = messagesWithAuthors[0];
+    const prevCursor =
+      hasOlderMessages && firstMessage ? firstMessage.messageNo : null;
+
+    // Step 6: Return paginated response
     return {
       messages: messagesWithAuthors,
-      nextCursor,
+      nextCursor: null, // Always null - we always have the latest
       prevCursor,
+      startedFromUnread,
+      firstUnreadIndex,
     };
   }
 
   /**
-   * Validate and normalize pagination parameters
+   * Check if this is an initial load (subsequent loads only support BEFORE direction)
+   *
+   * Simplified pagination:
+   * - Initial load (no cursor): Get ALL unread messages OR last N messages
+   * - Subsequent loads (with cursor): Only BEFORE direction (load older messages)
+   *
+   * @param params - Pagination parameters
+   * @returns Whether this is an initial load
    */
-  private normalizePaginationParams(params: MessageHistoryQueryParams): {
-    cursor: number;
-    limit: number;
-    direction: PaginationDirection;
-  } {
-    const { cursor, limit, direction } = params;
+  private isInitialLoad(params: MessageHistoryQueryParams): boolean {
+    return params.cursor === undefined;
+  }
 
-    // Note: Validation is already done in the controller layer
-    // This method only applies defaults for business logic
+  /**
+   * Handle initial load - returns ALL unread messages or last N messages
+   *
+   * Simplified approach:
+   * - If user has unread messages: Fetch ALL unread messages + ensure minimum total
+   * - If no unread: Fetch last N messages
+   *
+   * This eliminates "gaps" - we always have the latest messages after initial load.
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param userId - User UUID (for read receipt lookup)
+   * @param limit - Minimum number of messages to return
+   * @returns Initial messages with metadata
+   */
+  private async getInitialLoadMessages(
+    workspaceId: string,
+    channelId: string,
+    userId: string,
+    limit: number
+  ): Promise<{
+    messages: MessageResponse[];
+    startedFromUnread: boolean;
+    hasOlderMessages: boolean;
+    firstUnreadIndex: number;
+  }> {
+    // Get read receipt and latest message number in parallel
+    const [readReceipt, latestMessageNo] = await Promise.all([
+      this.readReceiptRepository.getReadReceipt(workspaceId, channelId, userId),
+      this.messageRepository.getChannelLastMessageNo(workspaceId, channelId),
+    ]);
 
-    // Default direction is BEFORE (loading older messages)
-    const normalizedDirection = direction || PaginationDirection.BEFORE;
+    const lastReadMessageNo = readReceipt?.lastReadMessageNo ?? 0;
+    const hasUnreadMessages =
+      lastReadMessageNo > 0 && lastReadMessageNo < latestMessageNo;
 
-    // Default limit
-    const normalizedLimit = limit || config.pagination.defaultLimit;
+    if (hasUnreadMessages) {
+      logger.info("Initial load: Fetching unread messages", {
+        workspaceId,
+        channelId,
+        userId,
+        lastReadMessageNo,
+        latestMessageNo,
+        estimatedUnread: latestMessageNo - lastReadMessageNo,
+        maxLimit: config.pagination.initialLoadMaxLimit,
+      });
 
-    // Default cursor: 0 for AFTER (start from beginning), Number.MAX_SAFE_INTEGER for BEFORE (start from end)
-    const normalizedCursor =
-      cursor !== undefined
-        ? cursor
-        : normalizedDirection === PaginationDirection.AFTER
-          ? 0
-          : Number.MAX_SAFE_INTEGER;
+      // Fetch unread messages with safety limit
+      // If there are more unread messages than the limit, we return the LATEST messages
+      // This ensures the user sees the most recent messages first
+      const unreadMessages = await this.messageRepository.getMessagesWithCursor(
+        workspaceId,
+        channelId,
+        lastReadMessageNo,
+        config.pagination.initialLoadMaxLimit, // Safety limit to prevent fetching millions
+        PaginationDirection.AFTER
+      );
+
+      // If we have fewer than 'limit' messages, fetch older messages to fill up
+      let olderMessages: MessageResponse[] = [];
+      let hasOlderMessages = false;
+
+      if (unreadMessages.length < limit) {
+        const neededOlder = limit - unreadMessages.length + 1; // +1 to check hasMore
+        olderMessages = await this.messageRepository.getMessagesWithCursor(
+          workspaceId,
+          channelId,
+          lastReadMessageNo + 1, // Start from oldest unread (or just after last read)
+          neededOlder,
+          PaginationDirection.BEFORE
+        );
+        hasOlderMessages = olderMessages.length > limit - unreadMessages.length;
+        // Trim to exact count if we got extra
+        if (hasOlderMessages) {
+          olderMessages = olderMessages.slice(1); // Remove oldest (was for hasMore check)
+        }
+      } else {
+        // Have enough unread, just check if there are older messages
+        hasOlderMessages = lastReadMessageNo > 0;
+      }
+
+      // Combine: [older..., unread...]
+      const allMessages = [...olderMessages, ...unreadMessages];
+      const firstUnreadIndex = olderMessages.length;
+
+      logger.info("Initial load complete: Unread messages fetched", {
+        workspaceId,
+        channelId,
+        unreadCount: unreadMessages.length,
+        olderCount: olderMessages.length,
+        totalCount: allMessages.length,
+        firstUnreadIndex,
+        hasOlderMessages,
+      });
+
+      return {
+        messages: allMessages,
+        startedFromUnread: true,
+        hasOlderMessages,
+        firstUnreadIndex,
+      };
+    }
+
+    // No unread messages - load latest messages
+    logger.info("Initial load: No unread, fetching latest messages", {
+      workspaceId,
+      channelId,
+      userId,
+      lastReadMessageNo,
+      latestMessageNo,
+      limit,
+    });
+
+    // Fetch last N messages (+ 1 to check hasMore)
+    const messages = await this.messageRepository.getMessagesWithCursor(
+      workspaceId,
+      channelId,
+      Number.MAX_SAFE_INTEGER,
+      limit + 1,
+      PaginationDirection.BEFORE
+    );
+
+    const hasOlderMessages = messages.length > limit;
+    const pageMessages = hasOlderMessages ? messages.slice(1) : messages;
+
+    logger.info("Initial load complete: Latest messages fetched", {
+      workspaceId,
+      channelId,
+      messageCount: pageMessages.length,
+      hasOlderMessages,
+    });
 
     return {
-      cursor: normalizedCursor,
-      limit: normalizedLimit,
-      direction: normalizedDirection,
+      messages: pageMessages,
+      startedFromUnread: false,
+      hasOlderMessages,
+      firstUnreadIndex: -1, // No unread separator needed
+    };
+  }
+
+  /**
+   * Handle pagination (load older messages)
+   *
+   * @param workspaceId - Workspace UUID
+   * @param channelId - Channel UUID
+   * @param cursor - Cursor to paginate from
+   * @param limit - Number of messages to fetch
+   * @returns Paginated messages
+   */
+  private async getPaginatedMessages(
+    workspaceId: string,
+    channelId: string,
+    cursor: number,
+    limit: number
+  ): Promise<{
+    messages: MessageResponse[];
+    hasOlderMessages: boolean;
+  }> {
+    logger.info("Loading older messages", {
+      workspaceId,
+      channelId,
+      cursor,
+      limit,
+    });
+
+    // Always use BEFORE direction (only load older messages)
+    const messages = await this.messageRepository.getMessagesWithCursor(
+      workspaceId,
+      channelId,
+      cursor,
+      limit + 1, // +1 to check hasMore
+      PaginationDirection.BEFORE
+    );
+
+    const hasOlderMessages = messages.length > limit;
+    const pageMessages = hasOlderMessages ? messages.slice(1) : messages;
+
+    return {
+      messages: pageMessages,
+      hasOlderMessages,
     };
   }
 
@@ -511,47 +700,6 @@ export class MessageService implements IMessageService {
       ...message,
       author: userMap.get(message.userId)!,
     }));
-  }
-
-  /**
-   * Calculate pagination cursors based on current page
-   *
-   * Cursor semantics (consistent regardless of fetch direction):
-   * - prevCursor: Always points to older messages (lower messageNo)
-   * - nextCursor: Always points to newer messages (higher messageNo)
-   *
-   * Note: Repository always returns messages in ASC order (oldest to newest).
-   */
-  private calculatePaginationCursors(
-    messages: MessageWithAuthorResponse[],
-    direction: PaginationDirection,
-    hasMore: boolean
-  ): { nextCursor: number | null; prevCursor: number | null } {
-    if (messages.length === 0) {
-      return { nextCursor: null, prevCursor: null };
-    }
-
-    // Messages are always in ASC order: [oldest, ..., newest]
-    const firstMessage = messages[0]!; // Oldest message in page
-    const lastMessage = messages[messages.length - 1]!; // Newest message in page
-
-    if (direction === PaginationDirection.BEFORE) {
-      // Fetched older messages (< cursor), returned in ASC order: [950, 951, ..., 998, 999]
-      // firstMessage.messageNo = 950 (oldest in this page)
-      // lastMessage.messageNo = 999 (newest in this page)
-      return {
-        nextCursor: lastMessage.messageNo, // Load newer messages (> 999)
-        prevCursor: hasMore ? firstMessage.messageNo : null, // Load older messages (< 950)
-      };
-    } else {
-      // Fetched newer messages (> cursor), returned in ASC order: [1001, 1002, ..., 1049, 1050]
-      // firstMessage.messageNo = 1001 (oldest in this page)
-      // lastMessage.messageNo = 1050 (newest in this page)
-      return {
-        nextCursor: hasMore ? lastMessage.messageNo : null, // Load newer messages (> 1050)
-        prevCursor: firstMessage.messageNo, // Load older messages (< 1001)
-      };
-    }
   }
 
   /**

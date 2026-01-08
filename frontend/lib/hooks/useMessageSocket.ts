@@ -2,12 +2,18 @@
  * useMessageSocket Hook
  * Listens to Socket.IO message events and updates React Query cache
  *
+ * Simplified approach (no gaps):
+ * - With the new pagination, we ALWAYS have the latest messages after initial load
+ * - New messages from socket are ALWAYS appended to cache
+ *
  * Handles two types of messages:
  * 1. Own messages (with clientMessageCorrelationId) - replaces optimistic message
- * 2. Messages from other users - adds to cache if channel is loaded
+ * 2. Messages from other users - always appends to cache
  *
- * Also updates unread counts in Zustand store when messages arrive
- * for channels that are not currently active.
+ * Badge increment logic:
+ * - Increments when message is from another user AND:
+ *   - Not in the active channel, OR
+ *   - In the channel but not scrolled to bottom
  */
 
 import { useEffect, useCallback } from "react";
@@ -93,21 +99,23 @@ function messageExists(
 }
 
 /**
- * Appends a new message to the last page
+ * Appends a new message to the last page (chronologically newest page)
+ * With simplified pagination, pages are in chronological order:
+ * [oldest..., initial] so the last page contains the newest messages
  */
 function appendNewMessage(
   pages: MessageHistoryResponse[],
   message: MessageWithAuthorResponse
 ): MessageHistoryResponse[] {
-  logDev("[Socket] Adding new message from another user");
+  logDev("[Socket] Adding new message to newest page (last in array)");
 
   const newPages = [...pages];
-  const lastPageIndex = newPages.length - 1;
-  const lastPage = newPages[lastPageIndex];
+  const lastIndex = newPages.length - 1;
+  const newestPage = newPages[lastIndex];
 
-  newPages[lastPageIndex] = {
-    ...lastPage,
-    messages: [...lastPage.messages, message],
+  newPages[lastIndex] = {
+    ...newestPage,
+    messages: [...newestPage.messages, message],
   };
 
   return newPages;
@@ -115,7 +123,9 @@ function appendNewMessage(
 
 /**
  * Updates the cache with a new or confirmed message
- * Handles three cases: replace optimistic, check duplicates, append new
+ * Simplified: Always appends new messages (no gap checking needed)
+ *
+ * @returns Updated cache or undefined if message shouldn't be added
  */
 function updateCacheWithMessage(
   old: InfiniteData<MessageHistoryResponse> | undefined,
@@ -145,15 +155,14 @@ function updateCacheWithMessage(
     return old;
   }
 
-  // New message from another user - append to last page
+  // Simplified: Always append new messages (we always have latest after initial load)
   const updatedPages = appendNewMessage(old.pages, message);
   return { ...old, pages: updatedPages };
 }
 
 /**
  * Handles incoming message:created events
- * Updates React Query cache if channel is loaded
- * Also increments unread count for non-active channels
+ * Updates React Query cache and increments unread count based on viewing state
  */
 function createMessageHandler(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -162,6 +171,7 @@ function createMessageHandler(
     workspaceId: string | null;
     channelId: string | null;
   },
+  getIsAtBottom: () => boolean,
   currentUserId: string | null
 ) {
   return function handleMessageCreated(message: MessageWithAuthorResponse) {
@@ -181,7 +191,7 @@ function createMessageHandler(
       queryClient.getQueryData<InfiniteData<MessageHistoryResponse>>(cacheKey);
 
     if (cache) {
-      // Update the cache
+      // Update the cache (always appends for messages from others)
       queryClient.setQueryData<InfiniteData<MessageHistoryResponse>>(
         cacheKey,
         (old) => updateCacheWithMessage(old, message)
@@ -191,22 +201,35 @@ function createMessageHandler(
     }
 
     // Handle unread count increment
-    // Don't increment for:
-    // 1. Own messages (we're the sender)
-    // 2. Messages in the currently active channel
     const { workspaceId: activeWorkspaceId, channelId: activeChannelId } =
       getActiveChannel();
+    const isAtBottom = getIsAtBottom();
     const isOwnMessage = message.userId === currentUserId;
     const isActiveChannel =
       message.workspaceId === activeWorkspaceId &&
       message.channelId === activeChannelId;
 
-    if (!isOwnMessage && !isActiveChannel) {
-      logDev("[Socket] Incrementing unread count for non-active channel", {
+    // Never increment for own messages
+    if (isOwnMessage) {
+      logDev("[Socket] Own message, not incrementing unread");
+      return;
+    }
+
+    // Determine if we should increment the badge
+    // Increment if:
+    // 1. Not in the active channel, OR
+    // 2. In the channel but not scrolled to bottom
+    const shouldIncrementBadge = !isActiveChannel || !isAtBottom;
+
+    if (shouldIncrementBadge) {
+      logDev("[Socket] Incrementing unread count", {
         workspaceId: message.workspaceId,
         channelId: message.channelId,
+        reason: !isActiveChannel ? "not active channel" : "not at bottom",
       });
       incrementUnread(message.workspaceId, message.channelId);
+    } else {
+      logDev("[Socket] Not incrementing unread - user is viewing at bottom");
     }
   };
 }
@@ -216,7 +239,10 @@ function createMessageHandler(
  *
  * Should be called once at the app level (in main app page).
  * Listens to all message:created events and updates the appropriate channel cache.
- * Also increments unread counts for messages in non-active channels.
+ *
+ * Simplified badge increment logic:
+ * - Whether user is in the active channel
+ * - Whether user is scrolled to the bottom
  *
  * @param currentUserId - The ID of the current authenticated user
  *
@@ -238,6 +264,9 @@ export function useMessageSocket(currentUserId: string | null) {
   const selectedChannelId = useWorkspaceStore(
     (state) => state.selectedChannelId
   );
+  const isAtBottomOfMessages = useWorkspaceStore(
+    (state) => state.isAtBottomOfMessages
+  );
 
   // Memoize the getActiveChannel function to avoid recreating handler
   const getActiveChannel = useCallback(
@@ -248,12 +277,19 @@ export function useMessageSocket(currentUserId: string | null) {
     [selectedWorkspaceId, selectedChannelId]
   );
 
+  // Memoize the getIsAtBottom function
+  const getIsAtBottom = useCallback(
+    () => isAtBottomOfMessages,
+    [isAtBottomOfMessages]
+  );
+
   useEffect(() => {
     const socket = getSocket();
     const handleMessageCreated = createMessageHandler(
       queryClient,
       incrementUnread,
       getActiveChannel,
+      getIsAtBottom,
       currentUserId
     );
 
@@ -266,5 +302,11 @@ export function useMessageSocket(currentUserId: string | null) {
       socket.off("message:created", handleMessageCreated);
       logDev("[Socket] Message listener removed");
     };
-  }, [queryClient, incrementUnread, getActiveChannel, currentUserId]);
+  }, [
+    queryClient,
+    incrementUnread,
+    getActiveChannel,
+    getIsAtBottom,
+    currentUserId,
+  ]);
 }

@@ -144,5 +144,9 @@ export const config = {
     ),
     minLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MIN_LIMIT", "1")),
     maxLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MAX_LIMIT", "100")),
+    // Maximum messages to return on initial load (safety limit for unread messages)
+    initialLoadMaxLimit: parseInt(
+      getOptionalEnv("MESSAGE_INITIAL_LOAD_MAX_LIMIT", "200")
+    ),
   },
 } as const;

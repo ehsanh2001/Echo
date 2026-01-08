@@ -274,11 +274,19 @@ export interface MessageHistoryQueryParams {
 
 /**
  * Message history response structure
+ *
+ * Simplified pagination:
+ * - Initial load returns ALL unread messages (or last N if no unread)
+ * - nextCursor is always null (we always have the latest messages)
+ * - prevCursor points to older messages if they exist
+ * - firstUnreadIndex indicates where to place "New messages" separator
  */
 export interface MessageHistoryResponse {
   messages: MessageWithAuthorResponse[];
-  nextCursor: number | null; // Cursor for next page (forward in time)
-  prevCursor: number | null; // Cursor for previous page (backward in time)
+  nextCursor: number | null; // Always null - we always have latest messages
+  prevCursor: number | null; // Cursor for loading older messages
+  startedFromUnread: boolean; // True if user has unread messages
+  firstUnreadIndex: number; // Index of first unread message (-1 if no unread)
 }
 
 /**

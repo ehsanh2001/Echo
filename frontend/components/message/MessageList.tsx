@@ -5,7 +5,6 @@ import {
   useLayoutEffect,
   useRef,
   useCallback,
-  useMemo,
   useState,
 } from "react";
 import { Loader2, ArrowDown } from "lucide-react";
@@ -20,6 +19,8 @@ import {
   useLastReadMessageNo,
   useMarkAsRead,
 } from "@/lib/hooks/useUnreadCounts";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useUserStore } from "@/lib/stores/user-store";
 import type { MessageWithAuthorResponse } from "@/types/message";
 
 interface MessageListProps {
@@ -52,47 +53,71 @@ function DateSeparator({ date }: { date: Date }) {
 }
 
 /**
- * MessageList component with infinite scroll
+ * MessageList component with simplified infinite scroll
  *
- * Features:
- * - Loads latest messages on mount
- * - Infinite scroll to load older messages
- * - Auto-scrolls to bottom on initial load
- * - Virtualized for performance (simple implementation)
+ * Simplified approach:
+ * - Initial load returns ALL unread messages (or last N if no unread)
+ * - We ALWAYS have the latest messages (no gaps)
+ * - Only infinite scroll to load OLDER messages (scroll up)
+ * - firstUnreadIndex from backend tells us where to show "New messages" separator
  */
 export function MessageList({ workspaceId, channelId }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
-  const previousScrollHeightRef = useRef<number>(0);
   const hasScrolledToUnreadRef = useRef<boolean>(false);
   const isNearBottomRef = useRef<boolean>(true);
+
+  // Track previous values for scroll restoration
+  const previousMessageCountRef = useRef<number>(0);
+  const previousPageCountRef = useRef<number>(0);
+  // Track the last message ID to detect new messages from socket (for own message detection)
+  const lastMessageIdRef = useRef<string | null>(null);
+  // Track the last message ID seen at the bottom (for "Jump to Latest" button)
+  const lastSeenMessageIdRef = useRef<string | null>(null);
+  // Capture scroll position BEFORE render - this runs synchronously during render
+  const scrollSnapshotRef = useRef<{
+    scrollTop: number;
+    scrollHeight: number;
+  } | null>(null);
 
   // Track if user is scrolled away from unread separator
   const [showJumpToUnread, setShowJumpToUnread] = useState(false);
   // Track if user is scrolled away from bottom (for "Jump to Latest" button)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  // Track the message count to detect new messages while scrolled up
-  const [lastSeenMessageCount, setLastSeenMessageCount] = useState(0);
   // Track when user is at bottom (state to trigger mark-as-read effect)
   const [isAtBottom, setIsAtBottom] = useState(true);
 
-  // Fetch message history with infinite scroll
+  // Get current user to check if messages are from self
+  const currentUser = useUserStore((state) => state.user);
+
+  // Fetch message history with simplified infinite scroll
   const {
     data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
     isLoading,
     isError,
     error,
+    startedFromUnread,
+    firstUnreadIndex,
   } = useMessageHistory(workspaceId, channelId);
 
   // Get flattened message list in chronological order (oldest to newest)
   const messages = useMessageList(data);
 
-  // Get last read message number for "New messages" separator
+  // CRITICAL: Capture scroll position DURING render, BEFORE React updates the DOM
+  // This runs synchronously before useLayoutEffect, ensuring we have the pre-update position
+  if (messagesContainerRef.current) {
+    scrollSnapshotRef.current = {
+      scrollTop: messagesContainerRef.current.scrollTop,
+      scrollHeight: messagesContainerRef.current.scrollHeight,
+    };
+  }
+
+  // Get last read message number for "New messages" separator (fallback calculation)
   const lastReadMessageNo = useLastReadMessageNo(workspaceId, channelId);
 
   // Hook to mark channel as read
@@ -102,19 +127,26 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   const latestMessage =
     messages.length > 0 ? messages[messages.length - 1] : null;
 
-  // Find the first unread message index (for showing "New messages" separator)
-  const firstUnreadMessageIndex = useMemo(() => {
-    if (lastReadMessageNo <= 0 || messages.length === 0) {
+  // Calculate the actual first unread message index for display
+  // The backend provides firstUnreadIndex relative to the initial page
+  // After loading older pages, we need to adjust for the total message count
+  const actualFirstUnreadIndex = (() => {
+    if (!startedFromUnread || firstUnreadIndex < 0) {
       return -1; // No separator needed
     }
-
-    // Find the first message with messageNo > lastReadMessageNo
-    const index = messages.findIndex(
-      (msg) => msg.messageNo > lastReadMessageNo
-    );
-
-    return index;
-  }, [messages, lastReadMessageNo]);
+    // Pages are [oldest..., initial], so messages from older pages are prepended
+    // We need to count how many messages were loaded before the initial page
+    // Initial page is the last one in the array
+    if (!data?.pages.length) {
+      return -1;
+    }
+    // Count messages from all pages except the last (initial) one
+    let olderMessagesCount = 0;
+    for (let i = 0; i < data.pages.length - 1; i++) {
+      olderMessagesCount += data.pages[i].messages.length;
+    }
+    return olderMessagesCount + firstUnreadIndex;
+  })();
 
   /**
    * Scroll to bottom (for initial load or new messages)
@@ -148,7 +180,8 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
 
       // Use requestAnimationFrame to ensure refs are attached
       requestAnimationFrame(() => {
-        if (firstUnreadMessageIndex > 0 && firstUnreadRef.current) {
+        // actualFirstUnreadIndex >= 0 means we have unread messages
+        if (actualFirstUnreadIndex >= 0 && firstUnreadRef.current) {
           // Scroll to first unread message
           scrollToFirstUnread(false);
         } else {
@@ -159,7 +192,7 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
     }
   }, [
     messages.length > 0 && !isLoading,
-    firstUnreadMessageIndex,
+    actualFirstUnreadIndex,
     scrollToFirstUnread,
     scrollToBottom,
   ]);
@@ -168,13 +201,28 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   useEffect(() => {
     hasScrolledToUnreadRef.current = false;
     setShowJumpToUnread(false);
+    setShowJumpToLatest(false);
+    lastSeenMessageIdRef.current = null;
   }, [channelId]);
+
+  // Get store action for syncing "is at bottom" state
+  const setIsAtBottomOfMessages = useWorkspaceStore(
+    (state) => state.setIsAtBottomOfMessages
+  );
+
+  /**
+   * Sync "is at bottom of messages" state with workspace store
+   * This is used by socket handler to decide on badge increment
+   */
+  useEffect(() => {
+    setIsAtBottomOfMessages(isAtBottom);
+  }, [isAtBottom, setIsAtBottomOfMessages]);
 
   /**
    * Track scroll position to show/hide "Jump to unread" button
    */
   useEffect(() => {
-    if (!messagesContainerRef.current || firstUnreadMessageIndex < 0) {
+    if (!messagesContainerRef.current || actualFirstUnreadIndex < 0) {
       setShowJumpToUnread(false);
       return;
     }
@@ -198,7 +246,7 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
     handleScroll();
 
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [firstUnreadMessageIndex]);
+  }, [actualFirstUnreadIndex]);
 
   /**
    * Track scroll position to show/hide "Jump to Latest" button
@@ -218,9 +266,10 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
       isNearBottomRef.current = isNearBottom;
       setIsAtBottom(isNearBottom);
 
-      // Update last seen message count when near bottom
-      if (isNearBottom) {
-        setLastSeenMessageCount(messages.length);
+      // Update last seen message ID when near bottom
+      if (isNearBottom && messages.length > 0) {
+        const latestId = messages[messages.length - 1].id;
+        lastSeenMessageIdRef.current = latestId;
         setShowJumpToLatest(false);
       }
     };
@@ -230,22 +279,34 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
     handleScroll();
 
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [messages.length]);
+  }, [messages]);
 
   /**
-   * Show "Jump to Latest" when new messages arrive while scrolled up
+   * Show "Jump to Latest" when new messages arrive via SOCKET while scrolled up
+   * Uses message ID comparison to reliably detect new socket messages
+   * Pagination loads OLDER messages (with smaller IDs/earlier dates), not newer ones
    */
   useEffect(() => {
-    // Only show if we have messages, not near bottom, and new messages arrived
-    if (
-      messages.length > 0 &&
-      !isNearBottomRef.current &&
-      messages.length > lastSeenMessageCount &&
-      lastSeenMessageCount > 0
-    ) {
+    if (messages.length === 0) return;
+
+    const currentLatestId = messages[messages.length - 1].id;
+    const lastSeenId = lastSeenMessageIdRef.current;
+
+    // If we haven't seen any message yet, initialize
+    if (!lastSeenId) {
+      if (isNearBottomRef.current) {
+        lastSeenMessageIdRef.current = currentLatestId;
+      }
+      return;
+    }
+
+    // If the latest message ID changed and user is not near bottom,
+    // it means a NEW message arrived (socket), not old messages (pagination)
+    // Pagination adds messages at the START, not the END, so latest ID stays same
+    if (currentLatestId !== lastSeenId && !isNearBottomRef.current) {
       setShowJumpToLatest(true);
     }
-  }, [messages.length, lastSeenMessageCount]);
+  }, [messages]);
 
   /**
    * Auto-mark channel as read when user views messages at bottom
@@ -282,25 +343,28 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
   ]);
 
   /**
-   * Intersection Observer for infinite scroll
+   * Intersection Observer for infinite scroll (older messages)
    * Loads more messages when user scrolls near the top
    */
   useEffect(() => {
-    if (!loadMoreTriggerRef.current || !hasNextPage || isFetchingNextPage) {
+    if (
+      !loadMoreTriggerRef.current ||
+      !hasPreviousPage ||
+      isFetchingPreviousPage
+    ) {
       return;
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          // Save current scroll position before fetching
-          if (messagesContainerRef.current) {
-            previousScrollHeightRef.current =
-              messagesContainerRef.current.scrollHeight;
-          }
-
-          fetchNextPage();
+        if (
+          entry.isIntersecting &&
+          hasPreviousPage &&
+          !isFetchingPreviousPage
+        ) {
+          // Scroll position is captured during render - just trigger fetch
+          fetchPreviousPage();
         }
       },
       {
@@ -313,25 +377,75 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
     observer.observe(loadMoreTriggerRef.current);
 
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage]);
 
   /**
-   * Maintain scroll position when loading older messages
+   * Unified scroll position preservation for both:
+   * 1. New messages arriving via socket (appended to end)
+   * 2. Older messages loaded via pagination (prepended to start)
+   *
+   * Strategy:
+   * - Before any change: Save scrollTop and scrollHeight
+   * - After change: Calculate diff and restore position
+   * - Exception: User's own new messages should scroll to bottom
+   *
+   * This uses useLayoutEffect to run synchronously after DOM updates but before paint,
+   * ensuring smooth visual experience without flicker.
    */
-  useEffect(() => {
-    if (isFetchingNextPage || !messagesContainerRef.current) {
-      return;
-    }
-
-    // After new messages are loaded, adjust scroll to maintain position
+  useLayoutEffect(() => {
     const container = messagesContainerRef.current;
-    const newScrollHeight = container.scrollHeight;
-    const scrollHeightDiff = newScrollHeight - previousScrollHeightRef.current;
+    const snapshot = scrollSnapshotRef.current;
+    if (!container || messages.length === 0 || !snapshot) return;
 
-    if (scrollHeightDiff > 0) {
-      container.scrollTop = container.scrollTop + scrollHeightDiff;
+    const currentMessageCount = messages.length;
+    const currentPageCount = data?.pages?.length ?? 0;
+    const previousMessageCount = previousMessageCountRef.current;
+    const previousPageCount = previousPageCountRef.current;
+
+    // Detect what kind of change happened
+    const isNewSocketMessage =
+      currentMessageCount > previousMessageCount &&
+      currentPageCount === previousPageCount &&
+      previousMessageCount > 0;
+
+    const isNewPageLoaded =
+      currentPageCount > previousPageCount && previousPageCount > 0;
+
+    // Handle scroll preservation
+    if (isNewSocketMessage || isNewPageLoaded) {
+      const newScrollHeight = container.scrollHeight;
+      const scrollHeightDiff = newScrollHeight - snapshot.scrollHeight;
+
+      if (scrollHeightDiff > 0) {
+        if (isNewSocketMessage) {
+          // Messages APPENDED at the bottom
+          const latestMessage = messages[messages.length - 1];
+          const isOwnMessage = latestMessage?.userId === currentUser?.id;
+
+          if (isOwnMessage) {
+            // User sent their own message - scroll to bottom
+            scrollToBottom(true);
+          } else {
+            // Message from another user - keep scrollTop the SAME
+            // (content added below doesn't affect what user is viewing)
+            container.scrollTop = snapshot.scrollTop;
+          }
+        } else if (isNewPageLoaded) {
+          // Messages PREPENDED at the top - add the diff to maintain position
+          container.scrollTop = snapshot.scrollTop + scrollHeightDiff;
+        }
+      }
     }
-  }, [messages.length, isFetchingNextPage]);
+
+    // Update the last message ID (used elsewhere)
+    if (messages.length > 0) {
+      lastMessageIdRef.current = messages[messages.length - 1].id;
+    }
+
+    // Save current state for next comparison
+    previousMessageCountRef.current = currentMessageCount;
+    previousPageCountRef.current = currentPageCount;
+  }, [messages, data?.pages?.length, currentUser?.id, scrollToBottom]);
 
   /**
    * Loading state
@@ -384,10 +498,10 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
       ref={messagesContainerRef}
       className="flex-1 overflow-y-auto p-5 min-h-0"
     >
-      {/* Load More Trigger (for infinite scroll) */}
-      {hasNextPage && (
+      {/* Load More Trigger (for infinite scroll - older messages) */}
+      {hasPreviousPage && (
         <div ref={loadMoreTriggerRef} className="flex justify-center py-2">
-          {isFetchingNextPage ? (
+          {isFetchingPreviousPage ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Loading older messages...</span>
@@ -407,7 +521,7 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
           index > 0 ? new Date(messages[index - 1].createdAt) : null;
         const showDateSeparator =
           !previousDate || !isSameDay(currentDate, previousDate);
-        const showNewMessagesSeparator = index === firstUnreadMessageIndex;
+        const showNewMessagesSeparator = index === actualFirstUnreadIndex;
 
         return (
           <div
@@ -445,7 +559,10 @@ export function MessageList({ workspaceId, channelId }: MessageListProps) {
           onClick={() => {
             scrollToBottom(true);
             setShowJumpToLatest(false);
-            setLastSeenMessageCount(messages.length);
+            // Update last seen ID to current latest
+            if (messages.length > 0) {
+              lastSeenMessageIdRef.current = messages[messages.length - 1].id;
+            }
           }}
           className="fixed bottom-24 right-8 z-50 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors"
           aria-label="Jump to latest messages"

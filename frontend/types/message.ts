@@ -133,28 +133,39 @@ export enum MessageContentType {
 
 /**
  * Pagination direction for message history
+ * Note: Only BEFORE direction is used for pagination (loading older messages)
+ * Initial load handles unread messages specially without explicit direction
  */
 export enum PaginationDirection {
   BEFORE = "before", // Load older messages
-  AFTER = "after", // Load newer messages
+  AFTER = "after", // Kept for backward compatibility, but not used in pagination
 }
 
 /**
  * Query parameters for fetching message history
+ * Simplified: cursor is only used for loading older messages (BEFORE direction)
  */
 export interface MessageHistoryParams {
-  cursor?: number; // Optional messageNo to paginate from
+  cursor?: number; // Optional messageNo to paginate from (for loading older)
   limit?: number; // Number of messages to fetch (default from backend)
-  direction?: PaginationDirection; // Pagination direction (default: BEFORE)
+  direction?: PaginationDirection; // Kept for backward compatibility
 }
 
 /**
  * Message history response with pagination cursors
+ *
+ * Simplified pagination:
+ * - Initial load returns ALL unread messages (or last N if no unread)
+ * - nextCursor is always null (we always have the latest messages)
+ * - prevCursor points to older messages if they exist
+ * - firstUnreadIndex indicates where to place "New messages" separator
  */
 export interface MessageHistoryResponse {
   messages: MessageWithAuthorResponse[];
-  nextCursor: number | null; // Cursor for loading newer messages
+  nextCursor: number | null; // Always null - we always have latest
   prevCursor: number | null; // Cursor for loading older messages
+  startedFromUnread: boolean; // True if user has unread messages
+  firstUnreadIndex: number; // Index of first unread message (-1 if no unread)
 }
 
 /**

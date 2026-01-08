@@ -12,8 +12,8 @@ const CONFIG = {
   PASSWORD: "Password123",
   WORKSPACE_ID: "688321e5-9c67-49fa-aaf9-c643d7183154",
   CHANNEL_ID: "36dceb8b-a96e-4512-9979-a8bb13fdea0a",
-  N: 400,
-  START_COUNTER: 1,
+  N: 200,
+  START_COUNTER: 241,
   MESSAGE_CONTENT: "Test message",
 };
 

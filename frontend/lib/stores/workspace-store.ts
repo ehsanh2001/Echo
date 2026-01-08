@@ -45,6 +45,12 @@ interface WorkspaceState {
   /** Stored channel selection per workspace (remembers last selected channel for each workspace) */
   channelSelectionPerWorkspace: Record<string, ChannelSelection>;
 
+  /**
+   * Whether the user is scrolled to the bottom of the message list.
+   * Used by socket handler to determine badge updates.
+   */
+  isAtBottomOfMessages: boolean;
+
   // Actions
   setSelectedWorkspace: (
     workspaceId: string | null,
@@ -63,6 +69,8 @@ interface WorkspaceState {
   setShowWorkspaceMembers: (show: boolean) => void;
   toggleMembersView: () => void;
   setMainPanelView: (view: MainPanelView) => void;
+  /** Update whether user is at bottom of message list */
+  setIsAtBottomOfMessages: (isAtBottom: boolean) => void;
 }
 
 /**
@@ -111,6 +119,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         showWorkspaceMembers: false,
         mainPanelView: "messages" as MainPanelView,
         channelSelectionPerWorkspace: {},
+        isAtBottomOfMessages: true,
 
         // Actions
         setSelectedWorkspace: (workspaceId, displayName) =>
@@ -172,6 +181,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           })),
 
         setMainPanelView: (view) => set({ mainPanelView: view }),
+
+        setIsAtBottomOfMessages: (isAtBottom) =>
+          set({ isAtBottomOfMessages: isAtBottom }),
       }),
       {
         name: "workspace-ui-state", // LocalStorage key
