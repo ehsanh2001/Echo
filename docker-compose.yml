@@ -95,11 +95,16 @@ services:
       # Redis points to redis container
       - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
 
+      # RabbitMQ points to rabbitmq container
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
+
       # OpenTelemetry configuration
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       otel-collector:
         condition: service_healthy
