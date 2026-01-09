@@ -113,45 +113,48 @@ export function MemberSelector({
 
   return (
     <div className="space-y-3">
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, username, or email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
       {/* Selected count */}
       <div className="text-sm text-muted-foreground">
         {selectedMemberIds.length} member
         {selectedMemberIds.length !== 1 ? "s" : ""} selected
       </div>
 
-      {/* Member List */}
-      <div className="max-h-64 overflow-y-auto border rounded-lg">
-        {isLoading ? (
-          <div className="p-4 text-center text-muted-foreground">
-            Loading members...
-          </div>
-        ) : displayedMembers.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
-            {searchQuery
-              ? "No members found matching your search"
-              : "No members available"}
-          </div>
-        ) : (
-          displayedMembers.map((member) => (
-            <MemberRow
-              key={member.userId}
-              member={member}
-              isSelected={selectedMemberIds.includes(member.userId)}
-              onToggle={() => toggleMember(member.userId)}
-            />
-          ))
-        )}
+      {/* Search and Member List - Single bordered container */}
+      <div className="border rounded-lg p-2 overflow-hidden">
+        {/* Search Input */}
+        <div className="relative border-b bg-background">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, username, or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+        </div>
+
+        {/* Member List */}
+        <div className="max-h-64 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-muted-foreground">
+              Loading members...
+            </div>
+          ) : displayedMembers.length === 0 ? (
+            <div className="p-4 text-center text-muted-foreground">
+              {searchQuery
+                ? "No members found matching your search"
+                : "No members available"}
+            </div>
+          ) : (
+            displayedMembers.map((member) => (
+              <MemberRow
+                key={member.userId}
+                member={member}
+                isSelected={selectedMemberIds.includes(member.userId)}
+                onToggle={() => toggleMember(member.userId)}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
