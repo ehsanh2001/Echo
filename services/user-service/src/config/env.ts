@@ -115,6 +115,23 @@ export const config = {
     windowMs: parseInt(getOptionalEnv("RATE_LIMIT_WINDOW", "900000")), // 15 minutes
     max: parseInt(getOptionalEnv("RATE_LIMIT_MAX", "100")),
   },
+
+  // Password Reset Configuration
+  passwordReset: {
+    tokenExpiryMinutes: parseInt(
+      getOptionalEnv("PASSWORD_RESET_TOKEN_EXPIRY_MINUTES", "15")
+    ),
+    requestLimit: parseInt(getOptionalEnv("PASSWORD_RESET_REQUEST_LIMIT", "5")),
+    rateLimitWindowMinutes: parseInt(
+      getOptionalEnv("PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES", "60")
+    ),
+  },
+
+  // RabbitMQ Configuration
+  rabbitmq: {
+    url: getRequiredEnv("RABBITMQ_URL"),
+    exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "echo.events"),
+  },
 } as const;
 
 /**

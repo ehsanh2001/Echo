@@ -28,3 +28,16 @@ model User {
 
   @@map("users")
 }
+
+model PasswordResetToken {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  tokenHash    String   @map("token_hash")
+  expiresAt    DateTime @map("expires_at")
+  firstReqTime DateTime @map("first_req_time")
+  reqCount     Int      @default(1) @map("req_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("password_reset_tokens")
+}
