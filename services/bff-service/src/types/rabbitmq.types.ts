@@ -209,6 +209,20 @@ export interface WorkspaceDeletedEvent extends BaseOutboxEvent {
 }
 
 /**
+ * Password reset completed event (from user-service via outbox pattern)
+ * Emitted when a user successfully resets their password
+ * Used to notify all active sessions to log out
+ */
+export interface PasswordResetCompletedEvent extends BaseOutboxEvent {
+  eventType: "user.password.reset";
+  aggregateType: "user";
+  data: {
+    userId: string;
+    email: string;
+  };
+}
+
+/**
  * Union type of events consumed from the non-critical queue
  * Note: ChannelDeletedEvent and WorkspaceDeletedEvent are handled separately via the critical queue
  */

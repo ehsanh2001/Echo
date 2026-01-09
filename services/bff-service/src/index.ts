@@ -284,7 +284,9 @@ async function startServer() {
     logger.info("✅ Socket.IO Redis adapter configured for horizontal scaling");
 
     // Initialize RabbitMQ consumer to broadcast events to Socket.IO clients
-    rabbitmqConsumer = new RabbitMQConsumer(io);
+    // Resolve from DI container and pass Socket.IO server
+    rabbitmqConsumer = container.resolve(RabbitMQConsumer);
+    rabbitmqConsumer.setSocketServer(io);
     await rabbitmqConsumer.initialize();
 
     httpServer.listen(config.port, () => {

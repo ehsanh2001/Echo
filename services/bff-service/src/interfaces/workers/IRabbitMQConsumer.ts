@@ -1,8 +1,17 @@
+import { Server as SocketIOServer } from "socket.io";
+
 /**
  * Interface for RabbitMQ Consumer Service
  * Handles consuming events from multiple exchanges and broadcasting to Socket.IO
  */
 export interface IRabbitMQConsumer {
+  /**
+   * Set the Socket.IO server instance
+   * Must be called before initialize()
+   * @param io - The Socket.IO server instance
+   */
+  setSocketServer(io: SocketIOServer): void;
+
   /**
    * Initialize RabbitMQ connection and start consuming
    * Sets up exchanges, queues, and bindings

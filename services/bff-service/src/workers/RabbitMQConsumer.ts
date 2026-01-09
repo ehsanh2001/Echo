@@ -1,11 +1,18 @@
-import { injectable } from "tsyringe";
+import { injectable, inject } from "tsyringe";
 import amqp from "amqplib";
 import { Server as SocketIOServer } from "socket.io";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import {
+  INonCriticalEventHandler,
+  IChannelDeletedEventHandler,
+  IWorkspaceDeletedEventHandler,
+  IPasswordResetEventHandler,
+} from "../interfaces/handlers";
+import {
   RabbitMQEvent,
   ChannelDeletedEvent,
   WorkspaceDeletedEvent,
+  PasswordResetCompletedEvent,
 } from "../types/rabbitmq.types";
 import { config } from "../config/env";
 import logger from "../utils/logger";
@@ -25,11 +32,13 @@ import { RabbitMQEventConsumerNoDLX } from "./RabbitMQEventConsumerNoDLX";
  * - Multiple event consumer management
  * - Work queue pattern for horizontal scaling
  * - Graceful shutdown
+ * - Handler injection via DI for better testability
  */
 @injectable()
 export class RabbitMQConsumer implements IRabbitMQConsumer {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
+  private io: SocketIOServer | null = null;
   private readonly exchange = config.rabbitmq.exchange;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
@@ -43,13 +52,41 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
     null;
   private workspaceDeletedConsumer: RabbitMQEventConsumer<WorkspaceDeletedEvent> | null =
     null;
+  private passwordResetConsumer: RabbitMQEventConsumer<PasswordResetCompletedEvent> | null =
+    null;
 
-  constructor(private readonly io: SocketIOServer) {}
+  constructor(
+    @inject("INonCriticalEventHandler")
+    private readonly nonCriticalEventHandler: INonCriticalEventHandler,
+    @inject("IChannelDeletedEventHandler")
+    private readonly channelDeletedEventHandler: IChannelDeletedEventHandler,
+    @inject("IWorkspaceDeletedEventHandler")
+    private readonly workspaceDeletedEventHandler: IWorkspaceDeletedEventHandler,
+    @inject("IPasswordResetEventHandler")
+    private readonly passwordResetEventHandler: IPasswordResetEventHandler
+  ) {}
+
+  /**
+   * Set the Socket.IO server instance
+   * Must be called before initialize()
+   */
+  setSocketServer(io: SocketIOServer): void {
+    this.io = io;
+    // Pass Socket.IO server to all handlers
+    this.nonCriticalEventHandler.setSocketServer(io);
+    this.channelDeletedEventHandler.setSocketServer(io);
+    this.workspaceDeletedEventHandler.setSocketServer(io);
+    this.passwordResetEventHandler.setSocketServer(io);
+  }
 
   /**
    * Initialize RabbitMQ consumer
    */
   async initialize(): Promise<void> {
+    if (!this.io) {
+      throw new Error("Socket.IO server not set. Call setSocketServer first.");
+    }
+
     if (this.isConnected()) {
       logger.warn("RabbitMQ consumer already connected");
       return;
@@ -138,7 +175,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         durable: false,
         autoDelete: true,
       },
-      (event) => this.routeEvent(event)
+      (event) => this.nonCriticalEventHandler.handleEvent(event)
     );
 
     // === CRITICAL CONSUMERS (durable, with retry pattern) ===
@@ -155,7 +192,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         maxRetries: this.maxRetries,
         waitingRoomTTL: this.waitingRoomTTL,
       },
-      (event) => this.handleChannelDeleted(event)
+      (event) => this.channelDeletedEventHandler.handleChannelDeleted(event)
     );
 
     // Workspace deleted consumer
@@ -170,7 +207,22 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         maxRetries: this.maxRetries,
         waitingRoomTTL: this.waitingRoomTTL,
       },
-      (event) => this.handleWorkspaceDeleted(event)
+      (event) => this.workspaceDeletedEventHandler.handleWorkspaceDeleted(event)
+    );
+
+    // Password reset consumer - notifies user's active sessions to log out
+    this.passwordResetConsumer = new RabbitMQEventConsumer(
+      this.channel,
+      this.exchange,
+      {
+        queueNamePrefix: "bff_service_password_reset",
+        routingKey: "user.password.reset",
+        durable: true,
+        autoDelete: false,
+        maxRetries: this.maxRetries,
+        waitingRoomTTL: this.waitingRoomTTL,
+      },
+      (event) => this.passwordResetEventHandler.handlePasswordReset(event)
     );
 
     // Setup queues and start consuming
@@ -183,341 +235,19 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
     await this.workspaceDeletedConsumer.setupQueues();
     await this.workspaceDeletedConsumer.startConsuming();
 
+    await this.passwordResetConsumer.setupQueues();
+    await this.passwordResetConsumer.startConsuming();
+
     // Log queue names for debugging
     const channelQueues = this.channelDeletedConsumer.getQueueNames();
     const workspaceQueues = this.workspaceDeletedConsumer.getQueueNames();
+    const passwordResetQueues = this.passwordResetConsumer.getQueueNames();
 
     logger.info("Event consumers initialized", {
       nonCritical: this.nonCriticalConsumer.getMainQueueName(),
       channelDeleted: channelQueues,
       workspaceDeleted: workspaceQueues,
-    });
-  }
-
-  /**
-   * Route event to appropriate Socket.IO broadcast
-   */
-  private async routeEvent(event: RabbitMQEvent): Promise<void> {
-    // Support both 'type' and 'eventType' for compatibility
-    const eventType = (event as any).type || (event as any).eventType;
-
-    logger.info("Routing event", {
-      eventType,
-      hasType: !!(event as any).type,
-      hasEventType: !!(event as any).eventType,
-    });
-
-    switch (eventType) {
-      case "message.created":
-        await this.handleMessageCreated(event as any);
-        break;
-
-      case "workspace.member.joined":
-        await this.handleWorkspaceMemberJoined(event);
-        break;
-
-      case "workspace.member.left":
-        await this.handleWorkspaceMemberLeft(event);
-        break;
-
-      case "channel.member.joined":
-        await this.handleChannelMemberJoined(event);
-        break;
-
-      case "channel.member.left":
-        await this.handleChannelMemberLeft(event);
-        break;
-
-      case "channel.created":
-        await this.handleChannelCreated(event);
-        break;
-
-      default:
-        logger.warn("Unknown event type", { type: eventType });
-    }
-  }
-
-  /**
-   * Handle message.created event
-   * Broadcast to all clients in the channel room
-   */
-  private async handleMessageCreated(
-    event: RabbitMQEvent & { type: "message.created" }
-  ): Promise<void> {
-    const { workspaceId, channelId } = event.payload;
-
-    // Broadcast to channel room
-    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
-
-    this.io.to(roomName).emit("message:created", event.payload);
-
-    logger.info("Broadcasted message.created", {
-      workspaceId,
-      channelId,
-      messageId: event.payload.id,
-      room: roomName,
-    });
-  }
-
-  /**
-   * Handle workspace.member.joined event
-   * Broadcast to all clients in the workspace room
-   */
-  private async handleWorkspaceMemberJoined(
-    event: RabbitMQEvent
-  ): Promise<void> {
-    // Support both 'payload' and 'data' for compatibility
-    const eventData = (event as any).payload || (event as any).data;
-    const { workspaceId, userId, user } = eventData;
-
-    // Broadcast to workspace room
-    const roomName = `workspace:${workspaceId}`;
-
-    this.io.to(roomName).emit("workspace:member:joined", {
-      workspaceId,
-      userId,
-      user,
-    });
-
-    logger.info("Broadcasted workspace.member.joined", {
-      workspaceId,
-      userId,
-      room: roomName,
-    });
-  }
-
-  /**
-   * Handle workspace.member.left event
-   * Broadcast to all clients in the workspace room
-   */
-  private async handleWorkspaceMemberLeft(event: RabbitMQEvent): Promise<void> {
-    // Support both 'payload' and 'data' for compatibility
-    const eventData = (event as any).payload || (event as any).data;
-    const { workspaceId, userId } = eventData;
-
-    // Broadcast to workspace room
-    const roomName = `workspace:${workspaceId}`;
-
-    this.io.to(roomName).emit("workspace:member:left", {
-      workspaceId,
-      userId,
-    });
-
-    logger.info("Broadcasted workspace.member.left", {
-      workspaceId,
-      userId,
-      room: roomName,
-    });
-  }
-
-  /**
-   * Handle channel.member.joined event
-   * Broadcast to all clients in the channel room
-   */
-  private async handleChannelMemberJoined(event: RabbitMQEvent): Promise<void> {
-    // Support both 'payload' and 'data' for compatibility
-    const eventData = (event as any).payload || (event as any).data;
-    const { workspaceId, channelId, userId, user } = eventData;
-
-    // Broadcast to channel room
-    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
-
-    this.io.to(roomName).emit("channel:member:joined", {
-      workspaceId,
-      channelId,
-      userId,
-      user,
-    });
-
-    logger.info("Broadcasted channel.member.joined", {
-      workspaceId,
-      channelId,
-      userId,
-      room: roomName,
-    });
-  }
-
-  /**
-   * Handle channel.member.left event
-   * Broadcast to all clients in the channel room
-   */
-  private async handleChannelMemberLeft(event: RabbitMQEvent): Promise<void> {
-    // Support both 'payload' and 'data' for compatibility
-    const eventData = (event as any).payload || (event as any).data;
-    const { workspaceId, channelId, userId } = eventData;
-
-    // Broadcast to channel room
-    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
-
-    this.io.to(roomName).emit("channel:member:left", {
-      workspaceId,
-      channelId,
-      userId,
-    });
-
-    logger.info("Broadcasted channel.member.left", {
-      workspaceId,
-      channelId,
-      userId,
-      room: roomName,
-    });
-  }
-
-  /**
-   * Handle channel.created event
-   * Routes to workspace room for public channels or individual user rooms for private channels
-   */
-  private async handleChannelCreated(event: RabbitMQEvent): Promise<void> {
-    // Support both 'payload' and 'data' for compatibility
-    const eventData = (event as any).payload || (event as any).data;
-    const { workspaceId, isPrivate, members } = eventData;
-
-    if (isPrivate) {
-      // Private channel: emit only to specific user rooms
-      // This ensures only invited members receive the event
-      for (const member of members) {
-        const userRoom = `user:${member.userId}`;
-        this.io.to(userRoom).emit("channel:created", eventData);
-      }
-
-      logger.info("Broadcasted private channel.created to user rooms", {
-        workspaceId,
-        channelId: eventData.channelId,
-        memberCount: members.length,
-        isPrivate: true,
-      });
-    } else {
-      // Public channel: broadcast to workspace room
-      // All workspace members will receive the event
-      const roomName = `workspace:${workspaceId}`;
-      this.io.to(roomName).emit("channel:created", eventData);
-
-      logger.info("Broadcasted public channel.created to workspace room", {
-        workspaceId,
-        channelId: eventData.channelId,
-        room: roomName,
-        memberCount: members.length,
-        isPrivate: false,
-      });
-    }
-  }
-
-  /**
-   * Handle channel.deleted event
-   * Broadcasts deletion notification to all clients in the channel room,
-   * then removes all sockets from the room
-   */
-  private async handleChannelDeleted(
-    event: ChannelDeletedEvent
-  ): Promise<void> {
-    const { channelId, workspaceId, channelName, deletedBy } = event.data;
-
-    // Channel room name
-    const roomName = `workspace:${workspaceId}:channel:${channelId}`;
-
-    // Get all sockets in the room before broadcasting
-    const socketsInRoom = await this.io.in(roomName).fetchSockets();
-    const socketCount = socketsInRoom.length;
-
-    // Broadcast channel deleted event to all clients in the channel room
-    this.io.to(roomName).emit("channel:deleted", {
-      channelId,
-      workspaceId,
-      channelName,
-      deletedBy,
-    });
-
-    logger.info("Broadcasted channel:deleted event", {
-      channelId,
-      workspaceId,
-      channelName,
-      deletedBy,
-      room: roomName,
-      socketCount,
-    });
-
-    // Remove all sockets from the channel room
-    for (const socket of socketsInRoom) {
-      socket.leave(roomName);
-    }
-
-    logger.info("Removed all sockets from deleted channel room", {
-      channelId,
-      workspaceId,
-      room: roomName,
-      socketsRemoved: socketCount,
-    });
-  }
-
-  /**
-   * Handle workspace.deleted event
-   * Broadcasts deletion notification to all clients in the workspace room,
-   * removes all sockets from workspace and channel rooms, then deletes the rooms
-   */
-  private async handleWorkspaceDeleted(
-    event: WorkspaceDeletedEvent
-  ): Promise<void> {
-    const { workspaceId, workspaceName, deletedBy, channelIds } = event.data;
-
-    // Workspace room name
-    const workspaceRoomName = `workspace:${workspaceId}`;
-
-    // Get all sockets in the workspace room before broadcasting
-    const socketsInWorkspaceRoom = await this.io
-      .in(workspaceRoomName)
-      .fetchSockets();
-    const workspaceSocketCount = socketsInWorkspaceRoom.length;
-
-    // Broadcast workspace deleted event to all clients in the workspace room
-    // Clients should handle this by redirecting to another workspace or workspace selection
-    this.io.to(workspaceRoomName).emit("workspace:deleted", {
-      workspaceId,
-      workspaceName,
-      deletedBy,
-      channelIds,
-    });
-
-    logger.info("Broadcasted workspace:deleted event", {
-      workspaceId,
-      workspaceName,
-      deletedBy,
-      room: workspaceRoomName,
-      socketCount: workspaceSocketCount,
-      channelCount: channelIds.length,
-    });
-
-    // Remove all sockets from all channel rooms in this workspace
-    let totalChannelSocketsRemoved = 0;
-    for (const channelId of channelIds) {
-      const channelRoomName = `workspace:${workspaceId}:channel:${channelId}`;
-      const socketsInChannelRoom = await this.io
-        .in(channelRoomName)
-        .fetchSockets();
-
-      for (const socket of socketsInChannelRoom) {
-        socket.leave(channelRoomName);
-      }
-
-      totalChannelSocketsRemoved += socketsInChannelRoom.length;
-    }
-
-    logger.info("Removed all sockets from channel rooms", {
-      workspaceId,
-      channelCount: channelIds.length,
-      socketsRemoved: totalChannelSocketsRemoved,
-    });
-
-    // Remove all sockets from the workspace room
-    for (const socket of socketsInWorkspaceRoom) {
-      socket.leave(workspaceRoomName);
-    }
-
-    logger.info("Removed all sockets from deleted workspace room", {
-      workspaceId,
-      workspaceName,
-      room: workspaceRoomName,
-      socketsRemoved: workspaceSocketCount,
-      totalChannelSocketsRemoved,
+      passwordReset: passwordResetQueues,
     });
   }
 
