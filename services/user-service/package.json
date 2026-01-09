@@ -24,6 +24,7 @@
     "@echo/telemetry": "file:../shared/telemetry",
     "@prisma/client": "^6.16.2",
     "@types/bcryptjs": "^3.0.0",
+    "amqplib": "^0.10.8",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -39,6 +40,7 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
