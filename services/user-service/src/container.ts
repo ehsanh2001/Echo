@@ -8,6 +8,8 @@ import { IUserService } from "./interfaces/services/IUserService";
 import { UserService } from "./services/userService";
 import { IAuthService } from "./interfaces/services/IAuthService";
 import { AuthService } from "./services/authService";
+import { IPasswordResetService } from "./interfaces/services/IPasswordResetService";
+import { PasswordResetService } from "./services/PasswordResetService";
 import { IRabbitMQService } from "./interfaces/services/IRabbitMQService";
 import { RabbitMQService } from "./services/RabbitMQService";
 
@@ -28,6 +30,10 @@ container.registerSingleton<IPasswordResetRepository>(
 // Register services
 container.registerSingleton<IUserService>("IUserService", UserService);
 container.registerSingleton<IAuthService>("IAuthService", AuthService);
+container.registerSingleton<IPasswordResetService>(
+  "IPasswordResetService",
+  PasswordResetService
+);
 container.registerSingleton<IRabbitMQService>(
   "IRabbitMQService",
   RabbitMQService

@@ -49,6 +49,29 @@ export class PasswordResetRepository implements IPasswordResetRepository {
   }
 
   /**
+   * Finds a password reset token by tokenId
+   *
+   * @param tokenId - Token ID to search for
+   * @returns Promise resolving to token if found, null otherwise
+   */
+  async findByTokenId(tokenId: string): Promise<PasswordResetToken | null> {
+    try {
+      logger.debug("Finding password reset token by tokenId");
+
+      return await prisma.passwordResetToken.findUnique({
+        where: { tokenId },
+      });
+    } catch (error) {
+      logger.error("Error finding password reset token by tokenId", { error });
+      throw new Error(
+        `Failed to find password reset token: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  /**
    * Creates a new password reset token
    *
    * @param data - Token data for creation
@@ -65,6 +88,7 @@ export class PasswordResetRepository implements IPasswordResetRepository {
       return await prisma.passwordResetToken.create({
         data: {
           email: data.email,
+          tokenId: data.tokenId,
           tokenHash: data.tokenHash,
           expiresAt: data.expiresAt,
           firstReqTime: data.firstReqTime,

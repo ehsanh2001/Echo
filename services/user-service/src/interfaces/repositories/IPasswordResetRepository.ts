@@ -21,6 +21,14 @@ export interface IPasswordResetRepository {
   findByEmail(email: string): Promise<PasswordResetToken | null>;
 
   /**
+   * Finds a password reset token by tokenId
+   *
+   * @param tokenId - Token ID to search for
+   * @returns Promise resolving to token if found, null otherwise
+   */
+  findByTokenId(tokenId: string): Promise<PasswordResetToken | null>;
+
+  /**
    * Creates a new password reset token in the database
    *
    * @param data - Token data for creation

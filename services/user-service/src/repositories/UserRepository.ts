@@ -227,4 +227,30 @@ export class UserRepository implements IUserRepository {
       );
     }
   }
+
+  /**
+   * Updates a user's password hash
+   *
+   * Used for password reset and password change operations.
+   *
+   * @param userId - Unique user identifier
+   * @param passwordHash - New bcrypt hashed password
+   * @returns Promise that resolves when update is complete
+   */
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    try {
+      logger.debug("Updating password for user", { userId });
+      await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      });
+    } catch (error) {
+      logger.error("Error updating password", { error });
+      throw new Error(
+        `Failed to update password: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
 }

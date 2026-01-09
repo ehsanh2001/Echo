@@ -3,6 +3,7 @@ import { container } from "../container";
 import logger from "../utils/logger";
 import { IUserService } from "../interfaces/services/IUserService";
 import { IAuthService } from "../interfaces/services/IAuthService";
+import { IPasswordResetService } from "../interfaces/services/IPasswordResetService";
 import { LoginRequest } from "../types/auth.types";
 import { RegisterRequest } from "../types/user.types";
 import { UserServiceError } from "../types/error.types";
@@ -11,6 +12,8 @@ import { AuthenticatedRequest } from "../middleware/jwtAuth";
 export class UserController {
   private static userService = container.resolve<IUserService>("IUserService");
   private static authService = container.resolve<IAuthService>("IAuthService");
+  private static passwordResetService =
+    container.resolve<IPasswordResetService>("IPasswordResetService");
   /**
    * POST /auth/register
    */
@@ -228,6 +231,138 @@ export class UserController {
       });
     } catch (error) {
       UserController.handleError(error, res, "Get users by IDs");
+    }
+  };
+
+  /**
+   * POST /auth/forgot-password
+   * Public endpoint - no authentication required
+   */
+  static forgotPassword = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { email } = req.body;
+
+      if (!email || typeof email !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "Email is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      // Basic email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid email format",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      await UserController.passwordResetService.requestPasswordReset(email);
+
+      // Always return success to prevent email enumeration
+      res.json({
+        success: true,
+        message:
+          "If an account exists with this email, we've sent a password reset link",
+      });
+    } catch (error) {
+      // Log but still return success to prevent enumeration
+      logger.error("Forgot password error", { error });
+      res.json({
+        success: true,
+        message:
+          "If an account exists with this email, we've sent a password reset link",
+      });
+    }
+  };
+
+  /**
+   * POST /auth/validate-reset-token
+   * Public endpoint - no authentication required
+   */
+  static validateResetToken = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { token } = req.body;
+
+      if (!token || typeof token !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "Token is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const result =
+        await UserController.passwordResetService.validateToken(token);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      UserController.handleError(error, res, "Validate reset token");
+    }
+  };
+
+  /**
+   * POST /auth/reset-password
+   * Public endpoint - no authentication required
+   */
+  static resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || typeof token !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "Token is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      if (!newPassword || typeof newPassword !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "New password is required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      // Password strength validation
+      if (newPassword.length < 8) {
+        res.status(400).json({
+          success: false,
+          message: "Password must be at least 8 characters long",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      await UserController.passwordResetService.resetPassword(
+        token,
+        newPassword
+      );
+
+      res.json({
+        success: true,
+        message: "Password has been reset successfully",
+      });
+    } catch (error) {
+      UserController.handleError(error, res, "Reset password");
     }
   };
 

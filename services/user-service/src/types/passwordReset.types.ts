@@ -11,6 +11,7 @@
 export type PasswordResetToken = {
   id: string;
   email: string;
+  tokenId: string;
   tokenHash: string;
   expiresAt: Date;
   firstReqTime: Date;
@@ -24,6 +25,7 @@ export type PasswordResetToken = {
  */
 export type CreatePasswordResetTokenData = {
   email: string;
+  tokenId: string;
   tokenHash: string;
   expiresAt: Date;
   firstReqTime: Date;
@@ -34,6 +36,7 @@ export type CreatePasswordResetTokenData = {
  * Data for updating an existing password reset token
  */
 export type UpdatePasswordResetTokenData = {
+  tokenId?: string;
   tokenHash?: string;
   expiresAt?: Date;
   firstReqTime?: Date;

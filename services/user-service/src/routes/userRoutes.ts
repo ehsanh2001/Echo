@@ -11,6 +11,11 @@ router.post("/auth/refresh", jwtRefreshAuth, UserController.refresh);
 // Type flow: Request → [jwtAuth] → AuthenticatedRequest → [UserController.logout]
 router.post("/auth/logout", jwtAuth, UserController.logout); // Protected with JWT auth
 
+// Password reset routes (public - no auth required)
+router.post("/auth/forgot-password", UserController.forgotPassword);
+router.post("/auth/validate-reset-token", UserController.validateResetToken);
+router.post("/auth/reset-password", UserController.resetPassword);
+
 // Public routes
 router.get("/:id", UserController.getPublicProfile); // Public profile lookup
 router.get("/searchbyemail/:email", UserController.getPublicProfileByEmail); // Search by email for invitations

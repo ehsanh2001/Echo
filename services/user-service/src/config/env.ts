@@ -132,6 +132,11 @@ export const config = {
     url: getRequiredEnv("RABBITMQ_URL"),
     exchange: getOptionalEnv("RABBITMQ_EXCHANGE", "echo.events"),
   },
+
+  // Frontend Configuration
+  frontend: {
+    url: getRequiredEnv("FRONTEND_URL"),
+  },
 } as const;
 
 /**

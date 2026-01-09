@@ -82,4 +82,15 @@ export interface IUserRepository {
    * @returns Promise resolving to array of found users
    */
   findByIds(userIds: string[]): Promise<User[]>;
+
+  /**
+   * Updates a user's password hash
+   *
+   * Used for password reset and password change operations.
+   *
+   * @param userId - Unique user identifier
+   * @param passwordHash - New bcrypt hashed password
+   * @returns Promise that resolves when update is complete
+   */
+  updatePassword(userId: string, passwordHash: string): Promise<void>;
 }
