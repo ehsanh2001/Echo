@@ -64,7 +64,32 @@ export interface WorkspaceInviteCreatedEvent extends BaseEventPayload<
 }
 
 /**
+ * Password reset requested event data
+ * Contains information needed to send a password reset email
+ */
+export interface PasswordResetRequestedEventData {
+  email: string;
+  resetToken: string;
+  resetUrl: string;
+  expiresAt: string; // ISO 8601
+}
+
+/**
+ * Password reset requested event payload
+ * Published when a user requests a password reset
+ * Routing key: user.password.reset.requested
+ */
+export interface PasswordResetRequestedEvent extends BaseEventPayload<
+  "user.password.reset.requested",
+  PasswordResetRequestedEventData
+> {
+  aggregateType: "user";
+}
+
+/**
  * Union type of all events this service consumes
  * Add more event types as the service grows
  */
-export type NotificationEvent = WorkspaceInviteCreatedEvent;
+export type NotificationEvent =
+  | WorkspaceInviteCreatedEvent
+  | PasswordResetRequestedEvent;

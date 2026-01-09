@@ -4,6 +4,8 @@ import { IRabbitMQConsumer } from "./interfaces/workers/IRabbitMQConsumer";
 import { RabbitMQConsumer } from "./workers/RabbitMQConsumer";
 import { IInviteEventHandler } from "./interfaces/handlers/IInviteEventHandler";
 import { InviteEventHandler } from "./handlers/InviteEventHandler";
+import { IPasswordResetEventHandler } from "./interfaces/handlers/IPasswordResetEventHandler";
+import { PasswordResetEventHandler } from "./handlers/PasswordResetEventHandler";
 import { IEmailService } from "./interfaces/services/IEmailService";
 import { EmailService } from "./services/EmailService";
 import { SmtpEmailService } from "./services/SmtpEmailService";
@@ -50,6 +52,12 @@ container.registerSingleton<IUserServiceClient>(
 container.registerSingleton<IInviteEventHandler>(
   "IInviteEventHandler",
   InviteEventHandler
+);
+
+// Register PasswordResetEventHandler as IPasswordResetEventHandler implementation
+container.registerSingleton<IPasswordResetEventHandler>(
+  "IPasswordResetEventHandler",
+  PasswordResetEventHandler
 );
 
 // ===== WORKERS =====

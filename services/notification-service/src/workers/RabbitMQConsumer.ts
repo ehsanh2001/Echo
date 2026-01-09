@@ -4,9 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 import { runWithContextAsync } from "@echo/telemetry";
 import { IRabbitMQConsumer } from "../interfaces/workers/IRabbitMQConsumer";
 import { IInviteEventHandler } from "../interfaces/handlers/IInviteEventHandler";
+import { IPasswordResetEventHandler } from "../interfaces/handlers/IPasswordResetEventHandler";
 import {
   NotificationEvent,
   WorkspaceInviteCreatedEvent,
+  PasswordResetRequestedEvent,
 } from "../types/events";
 import { config } from "../config/env";
 import logger from "../utils/logger";
@@ -34,6 +36,7 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
   private readonly queueName = config.rabbitmq.queue;
+  private readonly deadLetterQueueName = `${config.rabbitmq.queue}_dlq`;
   private readonly exchange = config.rabbitmq.exchange;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
@@ -41,7 +44,9 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
 
   constructor(
     @inject("IInviteEventHandler")
-    private readonly inviteEventHandler: IInviteEventHandler
+    private readonly inviteEventHandler: IInviteEventHandler,
+    @inject("IPasswordResetEventHandler")
+    private readonly passwordResetEventHandler: IPasswordResetEventHandler
   ) {}
 
   /**
@@ -96,18 +101,34 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         durable: true,
       });
 
-      // Declare queue for this service
+      // Declare dead letter queue for failed messages
+      await ch.assertQueue(this.deadLetterQueueName, {
+        exclusive: false,
+        durable: true,
+        autoDelete: false,
+      });
+
+      // Declare main queue with dead letter exchange pointing to DLQ
       await ch.assertQueue(this.queueName, {
         exclusive: false, // Multiple instances can consume
         durable: true, // Persist queue across broker restarts
         autoDelete: false, // Keep queue when service disconnects
+        arguments: {
+          "x-dead-letter-exchange": "",
+          "x-dead-letter-routing-key": this.deadLetterQueueName,
+        },
       });
 
-      // Bind queue to exchange with routing keys for invite events
+      // Bind queue to exchange with routing keys for notification events
       await ch.bindQueue(
         this.queueName,
         this.exchange,
         "workspace.invite.created"
+      );
+      await ch.bindQueue(
+        this.queueName,
+        this.exchange,
+        "user.password.reset.requested"
       );
 
       // Future: Add more bindings as needed
@@ -122,10 +143,14 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
       // Reset reconnect attempts on successful connection
       this.reconnectAttempts = 0;
 
-      logger.info("✅ RabbitMQ consumer initialized", {
+      logger.info("✅ RabbitMQ consumer initialized with DLX pattern", {
         queue: this.queueName,
+        deadLetterQueue: this.deadLetterQueueName,
         exchange: this.exchange,
-        routingKeys: ["workspace.invite.created"],
+        routingKeys: [
+          "workspace.invite.created",
+          "user.password.reset.requested",
+        ],
       });
     } catch (error) {
       logger.error("Failed to initialize RabbitMQ consumer", { error });
@@ -199,10 +224,16 @@ export class RabbitMQConsumer implements IRabbitMQConsumer {
         );
         break;
 
+      case "user.password.reset.requested":
+        await this.passwordResetEventHandler.handlePasswordResetRequested(
+          event as PasswordResetRequestedEvent
+        );
+        break;
+
       default:
         logger.warn("Unknown event type received", {
-          eventType: (event as any).eventType,
-          eventId: event.eventId,
+          eventType: (event as unknown as { eventType: string }).eventType,
+          eventId: (event as unknown as { eventId: string }).eventId,
         });
     }
   }
