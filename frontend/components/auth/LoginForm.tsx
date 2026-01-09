@@ -149,15 +149,7 @@ function LoginFormContent() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Password</FormLabel>
-                    <Link
-                      href="/forgot-password"
-                      className="text-sm text-muted-foreground hover:text-[#6B8DD6] transition-colors"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
+                  <FormLabel>Password</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -208,6 +200,16 @@ function LoginFormContent() {
                 "Sign in"
               )}
             </Button>
+
+            {/* Forgot Password Link */}
+            <div className="text-center">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-muted-foreground hover:text-[#6B8DD6] transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </form>
         </Form>
 
