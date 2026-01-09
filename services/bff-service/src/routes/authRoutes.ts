@@ -108,4 +108,61 @@ authRoutes.post("/refresh", jwtRefreshAuth, AuthController.refresh);
  */
 authRoutes.post("/logout", jwtAuth, AuthController.logout);
 
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset email
+ *
+ * Body:
+ * {
+ *   "email": "user@example.com"
+ * }
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "If an account exists with this email, we've sent a password reset link"
+ * }
+ *
+ * Note: Always returns success for security (prevents email enumeration)
+ */
+authRoutes.post("/forgot-password", AuthController.forgotPassword);
+
+/**
+ * POST /api/auth/validate-reset-token
+ * Validate a password reset token
+ *
+ * Body:
+ * {
+ *   "token": "reset-token-from-email"
+ * }
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "valid": true,
+ *     "email": "u***@example.com"  // Masked email
+ *   }
+ * }
+ */
+authRoutes.post("/validate-reset-token", AuthController.validateResetToken);
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password using a valid token
+ *
+ * Body:
+ * {
+ *   "token": "reset-token-from-email",
+ *   "newPassword": "NewSecureP@ssw0rd"
+ * }
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Password reset successfully"
+ * }
+ */
+authRoutes.post("/reset-password", AuthController.resetPassword);
+
 export default authRoutes;

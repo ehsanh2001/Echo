@@ -186,6 +186,88 @@ export class AuthController {
   };
 
   /**
+   * POST /api/auth/forgot-password
+   * Forward forgot password request to user service
+   *
+   * @param req.body.email - User email
+   * @returns Response format from user-service:
+   * {
+   *   success: boolean;
+   *   message: string;
+   * }
+   */
+  static forgotPassword = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const response = await httpClient.post(
+        `${AuthController.USER_SERVICE_URL}/api/users/auth/forgot-password`,
+        req.body
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      AuthController.handleError(error, res, "Forgot password");
+    }
+  };
+
+  /**
+   * POST /api/auth/validate-reset-token
+   * Forward token validation request to user service
+   *
+   * @param req.body.token - Password reset token
+   * @returns Response format from user-service:
+   * {
+   *   success: boolean;
+   *   data?: {
+   *     valid: boolean;
+   *     email?: string;
+   *   };
+   * }
+   */
+  static validateResetToken = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const response = await httpClient.post(
+        `${AuthController.USER_SERVICE_URL}/api/users/auth/validate-reset-token`,
+        req.body
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      AuthController.handleError(error, res, "Validate reset token");
+    }
+  };
+
+  /**
+   * POST /api/auth/reset-password
+   * Forward password reset request to user service
+   *
+   * @param req.body.token - Password reset token
+   * @param req.body.newPassword - New password
+   * @returns Response format from user-service:
+   * {
+   *   success: boolean;
+   *   message: string;
+   * }
+   */
+  static resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const response = await httpClient.post(
+        `${AuthController.USER_SERVICE_URL}/api/users/auth/reset-password`,
+        req.body
+      );
+
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      AuthController.handleError(error, res, "Reset password");
+    }
+  };
+
+  /**
    * Handle errors from user service
    * Maps user service errors to appropriate HTTP responses
    */
