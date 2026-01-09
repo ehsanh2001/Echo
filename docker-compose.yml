@@ -252,7 +252,8 @@ services:
         - NEXT_PUBLIC_BFF_URL=http://localhost:8004
         - NEXT_PUBLIC_APP_NAME=Echo
         - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
-        - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://alloy:12347/collect
+        # Frontend runs in browser, must use localhost not Docker internal hostname
+        - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect
         - NEXT_PUBLIC_APP_VERSION=1.0.0
         - NEXT_PUBLIC_APP_ENVIRONMENT=${NODE_ENV:-development}
     container_name: echo-frontend
@@ -264,7 +265,8 @@ services:
       - NEXT_PUBLIC_BFF_URL=http://localhost:8004
       - NEXT_PUBLIC_APP_NAME=Echo
       - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
-      - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://alloy:12347/collect
+      # Frontend runs in browser, must use localhost not Docker internal hostname
+      - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect
       - NEXT_PUBLIC_APP_VERSION=1.0.0
       - NEXT_PUBLIC_APP_ENVIRONMENT=${NODE_ENV:-development}
     depends_on:
