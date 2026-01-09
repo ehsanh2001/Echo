@@ -104,6 +104,29 @@ export function getSocket(): TypedSocket {
         timestamp: new Date().toISOString(),
       });
     });
+
+    // Handle password reset event - force logout for security
+    socket.on("password:reset", (data) => {
+      console.warn("[Socket] Password reset detected, logging out", {
+        userId: data.userId,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Disconnect socket first
+      disconnectSocket();
+
+      // Clear all authentication tokens
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("token_expiration");
+
+      // Clear any other user-related data
+      localStorage.removeItem("pending_invite_token");
+
+      // Force redirect to login with a message
+      // Using window.location.href for a hard redirect to ensure clean state
+      window.location.href = "/login?reason=password_reset";
+    });
   }
 
   return socket;

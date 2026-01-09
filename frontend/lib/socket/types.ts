@@ -105,6 +105,13 @@ export interface ServerToClientEvents {
   "workspace:deleted": (data: WorkspaceDeletedEventPayload) => void;
 
   /**
+   * Password reset completed
+   * Emitted to user's room when their password has been reset
+   * Client should log out immediately for security
+   */
+  "password:reset": (data: PasswordResetEventPayload) => void;
+
+  /**
    * Read receipt updated
    * Emitted to user's room when their read position is updated
    * Used for syncing read state across tabs/devices
@@ -128,6 +135,15 @@ export interface ReadReceiptUpdatedPayload {
   lastReadMessageNo: number;
   lastReadMessageId: string | null;
   lastReadAt: string; // ISO-8601
+}
+
+/**
+ * Password reset event payload
+ * Emitted when user's password has been reset from another device/session
+ */
+export interface PasswordResetEventPayload {
+  userId: string;
+  message: string;
 }
 
 /**

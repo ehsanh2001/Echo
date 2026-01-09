@@ -125,3 +125,46 @@ export interface ValidationResult {
   score: number;
   errors: string[];
 }
+
+/**
+ * Forgot password request data
+ */
+export interface ForgotPasswordData {
+  email: string;
+}
+
+/**
+ * Forgot password API response
+ */
+export interface ForgotPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Validate reset token API response
+ */
+export interface ValidateResetTokenResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    valid: boolean;
+    email?: string;
+  };
+}
+
+/**
+ * Reset password request data
+ */
+export interface ResetPasswordData {
+  token: string;
+  newPassword: string;
+}
+
+/**
+ * Reset password API response
+ */
+export interface ResetPasswordResponse {
+  success: boolean;
+  message: string;
+}

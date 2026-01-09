@@ -45,6 +45,33 @@ export const loginSchema = z.object({
 });
 
 /**
+ * Forgot password form validation schema
+ *
+ * Validates email for password reset request.
+ */
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address"),
+});
+
+/**
+ * Reset password form validation schema
+ *
+ * Validates new password and confirmation.
+ */
+export const resetPasswordSchema = z
+  .object({
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
+/**
  * Type-safe registration form data
  *
  * Inferred from the registerSchema Zod schema.
@@ -57,6 +84,16 @@ export type RegisterFormData = z.infer<typeof registerSchema>;
  * Inferred from the loginSchema Zod schema.
  */
 export type LoginFormData = z.infer<typeof loginSchema>;
+
+/**
+ * Type-safe forgot password form data
+ */
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+
+/**
+ * Type-safe reset password form data
+ */
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 /**
  * Check password strength and requirements

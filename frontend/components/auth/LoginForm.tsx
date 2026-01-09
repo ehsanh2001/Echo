@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 
 // Icons
-import { Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Loader2, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 /**
  * Inner login form component that uses search params
@@ -37,6 +37,10 @@ function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
+  const reason = searchParams.get("reason");
+
+  // Check if user was redirected after password reset
+  const wasPasswordReset = reason === "password_reset";
 
   // React Query mutation for login
   const loginMutation = useLogin();
@@ -98,6 +102,16 @@ function LoginFormContent() {
         {/* Login Form with Validation */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Password Reset Alert - Shows when redirected after password reset */}
+            {wasPasswordReset && (
+              <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  Your password was reset. Please log in with your new password.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Error Alert - Shows when login fails */}
             {loginMutation.isError && (
               <Alert variant="destructive">
@@ -135,7 +149,15 @@ function LoginFormContent() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Password</FormLabel>
+                    <Link
+                      href="/forgot-password"
+                      className="text-sm text-muted-foreground hover:text-[#6B8DD6] transition-colors"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
                   <FormControl>
                     <div className="relative">
                       <Input
