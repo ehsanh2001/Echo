@@ -5,7 +5,7 @@ services:
     container_name: echo-redis
     ports:
       - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD:-dev-redis-password}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     env_file:
@@ -21,7 +21,7 @@ services:
           "-p",
           "6379",
           "-a",
-          "${REDIS_PASSWORD:-dev-redis-password}",
+          "${REDIS_PASSWORD}",
           "ping",
         ]
       interval: 5s
@@ -38,8 +38,8 @@ services:
       - "15672:15672" # Management UI port
       - "15692:15692" # Prometheus metrics port
     environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-dev-rabbitmq-password}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
@@ -85,20 +85,16 @@ services:
     ports:
       - "8001:8001"
     env_file:
-      - .env # Load shared variables
-      - ./services/user-service/.env # Load service-specific variables (overrides shared)
+      - .env
+      - .env.docker
+      - ./services/user-service/.env
     environment:
-      # Override specific variables for Docker environment
-      # Database points to host machine's PostgreSQL
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/users_db
-
-      # Redis points to redis container
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
-
-      # RabbitMQ points to rabbitmq container
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
-
-      # OpenTelemetry configuration
+      # Docker-specific database URL (host.docker.internal for PostgreSQL on host)
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${USERS_DB_NAME}
+      # Constructed URLs for Docker networking
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
+      # OpenTelemetry
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -109,7 +105,6 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    # Allow container to access host machine's PostgreSQL
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -122,26 +117,18 @@ services:
     ports:
       - "8002:8002"
     env_file:
-      - .env # Load shared variables
-      - ./services/workspace-channel-service/.env # Load service-specific variables (overrides shared)
+      - .env
+      - .env.docker
+      - ./services/workspace-channel-service/.env
     environment:
-      # Override specific variables for Docker environment
-      # Database points to host machine's PostgreSQL
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/workspace_channels_db
-
-      # Redis points to redis container
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
-
-      # RabbitMQ points to rabbitmq container
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
-
-      # Internal service URLs
+      # Docker-specific database URL
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${WORKSPACE_CHANNELS_DB_NAME}
+      # Constructed URLs for Docker networking
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
+      # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
-
-      # Frontend URL for invite links - override to ensure correct URL
-      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
-
-      # OpenTelemetry configuration
+      # OpenTelemetry
       - OTEL_SERVICE_NAME=workspace-channel-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -154,7 +141,6 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    # Allow container to access host machine's PostgreSQL
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -167,24 +153,19 @@ services:
     ports:
       - "8003:8003"
     env_file:
-      - .env # Load shared variables
-      - ./services/message-service/.env # Load service-specific variables (overrides shared)
+      - .env
+      - .env.docker
+      - ./services/message-service/.env
     environment:
-      # Override specific variables for Docker environment
-      # Database points to host machine's PostgreSQL
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/message_db
-
-      # Redis points to redis container
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
-
-      # RabbitMQ points to rabbitmq container
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
-
-      # Internal service URLs
+      # Docker-specific database URL
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${MESSAGE_DB_NAME}
+      # Constructed URLs for Docker networking
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
+      # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
       - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
-
-      # OpenTelemetry configuration
+      # OpenTelemetry
       - OTEL_SERVICE_NAME=message-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -199,11 +180,10 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    # Allow container to access host machine's PostgreSQL
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Notification Service - Handles email notifications via Resend
+  # Notification Service - Handles email notifications via Resend or SMTP
   notification-service:
     build:
       context: .
@@ -212,22 +192,19 @@ services:
     ports:
       - "8005:8005"
     env_file:
-      - .env # Load shared variables
-      - ./services/notification-service/.env # Load service-specific variables (overrides shared)
+      - .env
+      - .env.docker
+      - ./services/notification-service/.env
     environment:
-      # Override specific variables for Docker environment
-      # RabbitMQ points to rabbitmq container
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
-
-      # Internal service URLs
+      # Constructed URLs for Docker networking
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
+      # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
-
-      # SMTP Configuration (MailHog)
+      # SMTP via MailHog container
       - USE_SMTP=true
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
-
-      # OpenTelemetry configuration
+      # OpenTelemetry
       - OTEL_SERVICE_NAME=notification-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -247,28 +224,28 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Pass NEXT_PUBLIC_ variables as build arguments (required at build time)
-        - NEXT_PUBLIC_API_URL=http://localhost:8004
-        - NEXT_PUBLIC_BFF_URL=http://localhost:8004
-        - NEXT_PUBLIC_APP_NAME=Echo
-        - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
-        # Frontend runs in browser, must use localhost not Docker internal hostname
-        - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect
-        - NEXT_PUBLIC_APP_VERSION=1.0.0
-        - NEXT_PUBLIC_APP_ENVIRONMENT=${NODE_ENV:-development}
+        # Build-time variables (NEXT_PUBLIC_* must be available during build)
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL}
+        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
+        - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=${NEXT_PUBLIC_MAX_MESSAGE_LENGTH}
+        - NEXT_PUBLIC_FARO_COLLECTOR_URL=${NEXT_PUBLIC_FARO_COLLECTOR_URL}
+        - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
+        - NEXT_PUBLIC_APP_ENVIRONMENT=${NEXT_PUBLIC_APP_ENVIRONMENT}
     container_name: echo-frontend
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      # Runtime environment variables (these override build-time values if needed)
-      - NEXT_PUBLIC_API_URL=http://localhost:8004
-      - NEXT_PUBLIC_BFF_URL=http://localhost:8004
-      - NEXT_PUBLIC_APP_NAME=Echo
-      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
-      # Frontend runs in browser, must use localhost not Docker internal hostname
-      - NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect
-      - NEXT_PUBLIC_APP_VERSION=1.0.0
-      - NEXT_PUBLIC_APP_ENVIRONMENT=${NODE_ENV:-development}
+      # Runtime environment (can override build-time values if needed)
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
+      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=${NEXT_PUBLIC_MAX_MESSAGE_LENGTH}
+      - NEXT_PUBLIC_FARO_COLLECTOR_URL=${NEXT_PUBLIC_FARO_COLLECTOR_URL}
+      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
+      - NEXT_PUBLIC_APP_ENVIRONMENT=${NEXT_PUBLIC_APP_ENVIRONMENT}
     depends_on:
       - bff-service
       - alloy
@@ -297,25 +274,18 @@ services:
     ports:
       - "8004:8004"
     env_file:
-      - .env # Load shared variables
-      - ./services/bff-service/.env # Load service-specific variables (overrides shared)
+      - .env
+      - .env.docker
+      - ./services/bff-service/.env
     environment:
-      # Override specific variables for Docker environment
-      # Redis points to redis container (for Socket.IO adapter and caching)
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-dev-redis-password}@redis:6379
-
-      # RabbitMQ points to rabbitmq container (for consuming events)
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-dev-rabbitmq-password}@rabbitmq:5672
-
-      # JWT authentication (must match user-service)
-      - JWT_SECRET=${JWT_SECRET:-your-super-secure-jwt-secret-key-change-this-in-production}
-
-      # Internal service URLs (for future API proxying)
+      # Constructed URLs for Docker networking
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
+      # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
       - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
       - MESSAGE_SERVICE_URL=http://message-service:8003
-
-      # OpenTelemetry configuration
+      # OpenTelemetry
       - OTEL_SERVICE_NAME=bff-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
