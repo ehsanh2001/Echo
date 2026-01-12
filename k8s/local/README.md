@@ -100,7 +100,81 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5433/message_db" npx pris
 cd ../..
 ```
 
-### 4. Deploy Application to Minikube
+### 4. Build and Push Docker Images (Phase 2)
+
+Before deploying to Minikube, you need to build Docker images and push them to Docker Hub so that Minikube can pull them.
+
+#### Login to Docker Hub
+
+```bash
+# Login to Docker Hub with your credentials
+docker login -u ehosseinipbox
+
+# Enter your password when prompted
+```
+
+#### Build and Push All Services
+
+```bash
+# Navigate to k8s/local directory
+cd k8s/local
+
+# Option 1: Build and push all services at once
+./build-and-push.sh
+
+# Option 2: Build specific service(s)
+./build-and-push.sh frontend bff-service user-service
+
+# Option 3: Build only (don't push to Docker Hub)
+./build-and-push.sh --build-only
+
+# Option 4: Build specific service without pushing
+./build-and-push.sh --build-only user-service
+
+# Option 5: Push only (if images already built)
+./build-and-push.sh --push-only
+
+# Option 6: Use custom tag instead of 'latest'
+./build-and-push.sh --tag v1.0.0
+
+# Option 7: Build and push with custom tag
+./build-and-push.sh --tag v1.0.0 frontend bff-service
+```
+
+#### Available Services
+
+The script can build and push the following services:
+
+- `frontend` → ehosseinipbox/echo-frontend:latest
+- `bff-service` → ehosseinipbox/echo-bff:latest
+- `user-service` → ehosseinipbox/echo-user:latest
+- `workspace-channel-service` → ehosseinipbox/echo-workspace-channel:latest
+- `message-service` → ehosseinipbox/echo-message:latest
+- `notification-service` → ehosseinipbox/echo-notification:latest
+
+#### Script Options
+
+| Option         | Description                                   | Example                            |
+| -------------- | --------------------------------------------- | ---------------------------------- |
+| (no options)   | Build and push all services with `latest` tag | `./build-and-push.sh`              |
+| `--build-only` | Build images locally without pushing          | `./build-and-push.sh --build-only` |
+| `--push-only`  | Push already-built images without rebuilding  | `./build-and-push.sh --push-only`  |
+| `--tag <tag>`  | Use custom tag instead of `latest`            | `./build-and-push.sh --tag v1.0.0` |
+| `--help`       | Display usage information                     | `./build-and-push.sh --help`       |
+| `<service>...` | Build/push specific services only             | `./build-and-push.sh user-service` |
+
+#### Verify Images in Docker Hub
+
+After pushing, verify your images at:
+
+- https://hub.docker.com/r/ehosseinipbox/echo-frontend
+- https://hub.docker.com/r/ehosseinipbox/echo-bff
+- https://hub.docker.com/r/ehosseinipbox/echo-user
+- https://hub.docker.com/r/ehosseinipbox/echo-workspace-channel
+- https://hub.docker.com/r/ehosseinipbox/echo-message
+- https://hub.docker.com/r/ehosseinipbox/echo-notification
+
+### 5. Deploy Application to Minikube
 
 ```bash
 # Apply Kubernetes manifests (created in later phases)
@@ -270,17 +344,19 @@ minikube ssh "nc -zv host.minikube.internal 5672"
 
 ## Files in This Directory
 
-| File                     | Description                          |
-| ------------------------ | ------------------------------------ |
-| docker-compose.infra.yml | Infrastructure services for Minikube |
-| init-databases.sql       | PostgreSQL initialization script     |
-| .env.infra               | Default environment variables        |
-| README.md                | This file                            |
+| File                     | Description                                |
+| ------------------------ | ------------------------------------------ |
+| docker-compose.infra.yml | Infrastructure services for Minikube       |
+| init-databases.sql       | PostgreSQL initialization script           |
+| .env.infra               | Default environment variables              |
+| build-and-push.sh        | Build and push Docker images to Docker Hub |
+| README.md                | This file                                  |
 
 ## Next Steps
 
 After infrastructure is running:
 
-1. Deploy application services to Minikube (Phase 3)
-2. Configure Kubernetes Secrets (Phase 4)
-3. Set up Ingress for external access (Phase 5)
+1. Build and push images to Docker Hub (Phase 2): `./build-and-push.sh`
+2. Deploy application services to Minikube (Phase 3)
+3. Configure Kubernetes Secrets (Phase 4)
+4. Set up Ingress for external access (Phase 5)
