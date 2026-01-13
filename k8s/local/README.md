@@ -184,7 +184,31 @@ minikube addons enable ingress
 kubectl get pods -n ingress-nginx
 ```
 
-### 6. Deploy Application to Minikube (Phase 3)
+### 6. Generate Secrets (Phase 4)
+
+Generate the Kubernetes secrets file for sensitive configuration:
+
+```bash
+# Navigate to secrets directory
+cd k8s/local/secrets
+
+# Generate secrets (uses passwords from docker-compose.infra.yml)
+./generate-secrets.sh
+```
+
+This creates `echo-secrets.yaml` in the secrets directory. The file is gitignored and contains:
+
+- JWT_SECRET
+- Database URLs for all services
+- Redis and RabbitMQ connection URLs
+- RESEND_API_KEY (placeholder)
+
+> **Important:** The generated secrets use passwords that match `docker-compose.infra.yml`. If you change infrastructure passwords, you must update both files.
+>
+> **Note:** Non-sensitive SMTP configuration (host, port) is in the ConfigMap.
+> See [secrets/README.md](./secrets/README.md) for more details.
+
+### 7. Deploy Application to Minikube (Phase 3 + 4)
 
 Deploy all Echo services to the Minikube cluster using Kustomize:
 

@@ -8,7 +8,7 @@ namespace: echo
 
 resources:
   - ../base
-  - secrets.yaml
+  - secrets/echo-secrets.yaml
   - ingress.yaml
 
 # Patch ConfigMap for local development values

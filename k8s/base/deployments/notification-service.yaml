@@ -57,18 +57,21 @@ spec:
                 configMapKeyRef:
                   name: echo-config
                   key: EMAIL_FROM_NAME
-            # Email Provider Configuration (MailHog for local via host.minikube.internal)
+            # SMTP Configuration (from ConfigMap - not sensitive)
             - name: USE_SMTP
-              value: "true"
+              valueFrom:
+                configMapKeyRef:
+                  name: echo-config
+                  key: USE_SMTP
             - name: SMTP_HOST
               valueFrom:
-                secretKeyRef:
-                  name: echo-secrets
+                configMapKeyRef:
+                  name: echo-config
                   key: SMTP_HOST
             - name: SMTP_PORT
               valueFrom:
-                secretKeyRef:
-                  name: echo-secrets
+                configMapKeyRef:
+                  name: echo-config
                   key: SMTP_PORT
             # Secrets
             - name: RABBITMQ_URL

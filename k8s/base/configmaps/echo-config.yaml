@@ -59,6 +59,14 @@ data:
   EMAIL_FROM_NAME: "Echo Workspace"
 
   # =============================================================================
+  # SMTP Configuration (for local development using MailHog)
+  # Override in production overlay for real SMTP server
+  # =============================================================================
+  USE_SMTP: "true"
+  SMTP_HOST: "host.minikube.internal"
+  SMTP_PORT: "1025"
+
+  # =============================================================================
   # OpenTelemetry Configuration (for observability - Phase 6)
   # =============================================================================
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
