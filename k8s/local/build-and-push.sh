@@ -3,10 +3,15 @@
 # build-and-push.sh - Build and push all Docker images to Docker Hub
 # =============================================================================
 # Usage:
-#   ./build-and-push.sh              # Build and push all services
-#   ./build-and-push.sh --build-only # Build without pushing
-#   ./build-and-push.sh --push-only  # Push pre-built images (assumes latest tag)
-#   ./build-and-push.sh frontend     # Build and push specific service
+#   ./build-and-push.sh                        # Build and push all services
+#   ./build-and-push.sh --build-only           # Build without pushing
+#   ./build-and-push.sh --push-only            # Push pre-built images (assumes latest tag)
+#   ./build-and-push.sh frontend               # Build and push specific service
+#   ./build-and-push.sh --api-url http://api.echo.local frontend  # Custom API URL
+#
+# Frontend API URL Options:
+#   --api-url URL      Set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_BFF_URL
+#                      Default: http://api.echo.local (for Minikube)
 #
 # Prerequisites:
 #   - Docker installed and running
@@ -18,6 +23,9 @@ set -e
 # Configuration
 DOCKER_HUB_USERNAME="ehosseinipbox"
 TAG="latest"
+
+# Frontend build configuration (for Minikube local deployment)
+FRONTEND_API_URL="http://api.echo.local"
 
 # Service mappings: local_name -> docker_hub_repo_suffix
 declare -A SERVICES=(
@@ -62,7 +70,7 @@ ECHO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Flags
 BUILD=true
 PUSH=true
-SPECIFIC_SERVICE=""
+SPECIFIC_SERVICES=()
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -79,13 +87,19 @@ while [[ $# -gt 0 ]]; do
             TAG="$2"
             shift 2
             ;;
+        --api-url)
+            FRONTEND_API_URL="$2"
+            shift 2
+            ;;
         -h|--help)
-            echo "Usage: $0 [OPTIONS] [SERVICE]"
+            echo "Usage: $0 [OPTIONS] [SERVICE...]"
             echo ""
             echo "Options:"
             echo "  --build-only    Build images without pushing"
             echo "  --push-only     Push pre-built images (assumes they exist)"
             echo "  --tag TAG       Use specific tag (default: latest)"
+            echo "  --api-url URL   Frontend API URL (default: http://api.echo.local)"
+            echo "                  Sets NEXT_PUBLIC_API_URL and NEXT_PUBLIC_BFF_URL"
             echo "  -h, --help      Show this help message"
             echo ""
             echo "Services:"
@@ -93,14 +107,16 @@ while [[ $# -gt 0 ]]; do
             echo "  workspace-channel-service, message-service, notification-service"
             echo ""
             echo "Examples:"
-            echo "  $0                          # Build and push all services"
-            echo "  $0 frontend                 # Build and push frontend only"
-            echo "  $0 --build-only             # Build all without pushing"
-            echo "  $0 --tag v1.0.0 frontend    # Build frontend with v1.0.0 tag"
+            echo "  $0                                    # Build all for Minikube (api.echo.local)"
+            echo "  $0 frontend                           # Build frontend only"
+            echo "  $0 --build-only                       # Build all without pushing"
+            echo "  $0 --tag v1.0.0 frontend              # Build frontend with v1.0.0 tag"
+            echo "  $0 --api-url http://localhost:8004    # Build frontend for local dev"
+            echo "  $0 --api-url https://api.example.com  # Build for production domain"
             exit 0
             ;;
         *)
-            SPECIFIC_SERVICE="$1"
+            SPECIFIC_SERVICES+=("$1")
             shift
             ;;
     esac
@@ -116,6 +132,7 @@ echo "Docker Hub: ${DOCKER_HUB_USERNAME}"
 echo "Tag: ${TAG}"
 echo "Build: ${BUILD}"
 echo "Push: ${PUSH}"
+echo "Frontend API URL: ${FRONTEND_API_URL}"
 echo ""
 
 # Check Docker is running
@@ -162,9 +179,10 @@ build_and_push() {
         
         # Special handling for frontend (needs build args)
         if [ "$service" = "frontend" ]; then
+            echo "  API URL: ${FRONTEND_API_URL}"
             docker build \
-                --build-arg NEXT_PUBLIC_API_URL=http://localhost:8004 \
-                --build-arg NEXT_PUBLIC_BFF_URL=http://localhost:8004 \
+                --build-arg NEXT_PUBLIC_API_URL="${FRONTEND_API_URL}" \
+                --build-arg NEXT_PUBLIC_BFF_URL="${FRONTEND_API_URL}" \
                 --build-arg NEXT_PUBLIC_APP_NAME=Echo \
                 --build-arg NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000 \
                 --build-arg NEXT_PUBLIC_APP_VERSION=1.0.0 \
@@ -192,13 +210,16 @@ build_and_push() {
 }
 
 # Determine which services to build
-if [ -n "$SPECIFIC_SERVICE" ]; then
-    if [ -z "${SERVICES[$SPECIFIC_SERVICE]}" ]; then
-        echo -e "${RED}Error: Unknown service '${SPECIFIC_SERVICE}'${NC}"
-        echo "Available services: ${!SERVICES[*]}"
-        exit 1
-    fi
-    SERVICES_TO_BUILD=("$SPECIFIC_SERVICE")
+if [ ${#SPECIFIC_SERVICES[@]} -gt 0 ]; then
+    # Validate specified services
+    for svc in "${SPECIFIC_SERVICES[@]}"; do
+        if [ -z "${SERVICES[$svc]}" ]; then
+            echo -e "${RED}Error: Unknown service '${svc}'${NC}"
+            echo "Available services: ${!SERVICES[*]}"
+            exit 1
+        fi
+    done
+    SERVICES_TO_BUILD=("${SPECIFIC_SERVICES[@]}")
 else
     SERVICES_TO_BUILD=("user-service" "workspace-channel-service" "message-service" "notification-service" "bff-service" "frontend")
 fi

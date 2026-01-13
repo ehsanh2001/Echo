@@ -119,7 +119,7 @@ docker login -u ehosseinipbox
 # Navigate to k8s/local directory
 cd k8s/local
 
-# Option 1: Build and push all services at once
+# Option 1: Build and push all services for Minikube (default: api.echo.local)
 ./build-and-push.sh
 
 # Option 2: Build specific service(s)
@@ -137,9 +137,14 @@ cd k8s/local
 # Option 6: Use custom tag instead of 'latest'
 ./build-and-push.sh --tag v1.0.0
 
-# Option 7: Build and push with custom tag
-./build-and-push.sh --tag v1.0.0 frontend bff-service
+# Option 7: Build frontend with custom API URL (for different environments)
+./build-and-push.sh --api-url http://localhost:8004 frontend  # For local Docker dev
+./build-and-push.sh --api-url http://api.echo.local frontend  # For Minikube (default)
 ```
+
+> **Important:** The frontend's API URL is baked at build time (Next.js `NEXT_PUBLIC_*` variables).
+> When building for Minikube, use `http://api.echo.local` (the default).
+> If you change the ingress hostname, rebuild the frontend with the new URL.
 
 #### Available Services
 
@@ -154,14 +159,15 @@ The script can build and push the following services:
 
 #### Script Options
 
-| Option         | Description                                   | Example                            |
-| -------------- | --------------------------------------------- | ---------------------------------- |
-| (no options)   | Build and push all services with `latest` tag | `./build-and-push.sh`              |
-| `--build-only` | Build images locally without pushing          | `./build-and-push.sh --build-only` |
-| `--push-only`  | Push already-built images without rebuilding  | `./build-and-push.sh --push-only`  |
-| `--tag <tag>`  | Use custom tag instead of `latest`            | `./build-and-push.sh --tag v1.0.0` |
-| `--help`       | Display usage information                     | `./build-and-push.sh --help`       |
-| `<service>...` | Build/push specific services only             | `./build-and-push.sh user-service` |
+| Option         | Description                                   | Example                                        |
+| -------------- | --------------------------------------------- | ---------------------------------------------- |
+| (no options)   | Build and push all services with `latest` tag | `./build-and-push.sh`                          |
+| `--build-only` | Build images locally without pushing          | `./build-and-push.sh --build-only`             |
+| `--push-only`  | Push already-built images without rebuilding  | `./build-and-push.sh --push-only`              |
+| `--tag <tag>`  | Use custom tag instead of `latest`            | `./build-and-push.sh --tag v1.0.0`             |
+| `--api-url`    | Frontend API URL (default: api.echo.local)    | `./build-and-push.sh --api-url http://...`     |
+| `--help`       | Display usage information                     | `./build-and-push.sh --help`                   |
+| `<service>...` | Build/push specific services only             | `./build-and-push.sh user-service bff-service` |
 
 #### Verify Images in Docker Hub
 
@@ -248,7 +254,7 @@ kubectl logs -n echo -l app=user-service -f
 kubectl describe pod -n echo -l app=user-service
 ```
 
-### 7. Configure Local DNS
+### 7. Configure Local DNS (Phase 5)
 
 Add entries to your hosts file to access the application via hostname:
 
@@ -273,7 +279,42 @@ minikube tunnel
 127.0.0.1 echo.local api.echo.local
 ```
 
-### 8. Access the Application
+### 8. Verify Ingress & External Access (Phase 5)
+
+Verify the ingress is configured correctly and accessible:
+
+```bash
+# Check ingress status
+kubectl get ingress -n echo
+
+# Expected output:
+# NAME           CLASS   HOSTS                       ADDRESS        PORTS   AGE
+# echo-ingress   nginx   echo.local,api.echo.local   192.168.49.2   80      1m
+
+# Describe ingress for details
+kubectl describe ingress echo-ingress -n echo
+
+# Verify the ingress controller is running
+kubectl get pods -n ingress-nginx
+```
+
+#### Test Application Access
+
+```bash
+# Test frontend
+curl -v http://echo.local
+
+# Test BFF health endpoint
+curl -v http://api.echo.local/health
+
+# Test WebSocket handshake (Socket.IO)
+curl "http://api.echo.local/socket.io/?EIO=4&transport=polling"
+
+# Expected Socket.IO response (JSON):
+# {"sid":"...","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":60000}
+```
+
+### 9. Access the Application
 
 Once deployed and DNS configured:
 
@@ -445,16 +486,16 @@ minikube ssh "nc -zv host.minikube.internal 5672"
 
 ## Files in This Directory
 
-| File                     | Description                                          |
-| ------------------------ | ---------------------------------------------------- |
-| docker-compose.infra.yml | Infrastructure services for Minikube                 |
-| init-databases.sql       | PostgreSQL initialization script                     |
-| .env.infra               | Default environment variables for infrastructure     |
-| build-and-push.sh        | Build and push Docker images to Docker Hub           |
-| kustomization.yaml       | Kustomize overlay for local environment              |
-| secrets.yaml             | Kubernetes secrets (dev values - DO NOT USE IN PROD) |
-| ingress.yaml             | NGINX Ingress configuration for local access         |
-| README.md                | This file                                            |
+| File                     | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| docker-compose.infra.yml | Infrastructure services for Minikube               |
+| init-databases.sql       | PostgreSQL initialization script                   |
+| .env.infra               | Default environment variables for infrastructure   |
+| build-and-push.sh        | Build and push Docker images to Docker Hub         |
+| kustomization.yaml       | Kustomize overlay for local environment            |
+| secrets/                 | Generated secrets directory (gitignored)           |
+| ingress.yaml             | NGINX Ingress configuration with WebSocket support |
+| README.md                | This file                                          |
 
 ## Kubernetes Commands Reference
 
@@ -521,7 +562,8 @@ After application is deployed:
 1. ✅ Phase 1: Infrastructure for Minikube (completed)
 2. ✅ Phase 2: Build and push images to Docker Hub (completed)
 3. ✅ Phase 3: Deploy application to Minikube (completed)
-4. Phase 4: Configure Kubernetes Secrets properly (production-ready)
-5. Phase 5: Set up Ingress with TLS for production
+4. ✅ Phase 4: Configure Kubernetes Secrets (completed)
+5. ✅ Phase 5: Ingress & External Access (completed)
 6. Phase 6: Deploy observability stack (Grafana, Prometheus, Loki, Tempo)
 7. Phase 7: Set up CI/CD pipeline
+8. Phase 8: AWS Production Deployment
