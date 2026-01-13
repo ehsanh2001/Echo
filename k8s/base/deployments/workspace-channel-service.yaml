@@ -1,0 +1,103 @@
+# workspace-channel-service.yaml
+# Workspace and Channel Service (Workspaces, Channels, Memberships)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-channel-service
+  namespace: echo
+  labels:
+    app: workspace-channel-service
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workspace-channel-service
+  template:
+    metadata:
+      labels:
+        app: workspace-channel-service
+        tier: backend
+    spec:
+      containers:
+        - name: workspace-channel-service
+          image: ehosseinipbox/echo-workspace-channel:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8002
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8002"
+            - name: SERVICE_NAME
+              value: "workspace-channel-service"
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: echo-config
+                  key: NODE_ENV
+            - name: USER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: echo-config
+                  key: USER_SERVICE_URL
+            - name: FRONTEND_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: echo-config
+                  key: FRONTEND_BASE_URL
+            # Secrets
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: echo-secrets
+                  key: WC_SERVICE_DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: echo-secrets
+                  key: JWT_SECRET
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: echo-secrets
+                  key: REDIS_URL
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: echo-secrets
+                  key: RABBITMQ_URL
+            # OpenTelemetry
+            - name: OTEL_SERVICE_NAME
+              value: "workspace-channel-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: echo-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Health endpoint: /health
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      restartPolicy: Always

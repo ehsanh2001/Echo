@@ -1,0 +1,9 @@
+# namespace.yaml
+# Echo application namespace for Kubernetes deployment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: echo
+  labels:
+    app.kubernetes.io/name: echo
+    app.kubernetes.io/part-of: echo-platform

@@ -1,0 +1,28 @@
+# kustomization.yaml
+# Local (Minikube) overlay for Echo platform
+# This overlay customizes the base manifests for local development
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: echo
+
+resources:
+  - ../base
+  - secrets.yaml
+  - ingress.yaml
+
+# Patch ConfigMap for local development values
+patches:
+  - patch: |-
+      - op: replace
+        path: /data/NODE_ENV
+        value: development
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: debug
+      - op: replace
+        path: /data/FRONTEND_BASE_URL
+        value: http://echo.local
+    target:
+      kind: ConfigMap
+      name: echo-config

@@ -1,0 +1,17 @@
+# workspace-channel-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: workspace-channel-service
+  namespace: echo
+  labels:
+    app: workspace-channel-service
+spec:
+  type: ClusterIP
+  selector:
+    app: workspace-channel-service
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002
+      protocol: TCP

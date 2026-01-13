@@ -1,0 +1,17 @@
+# bff-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bff-service
+  namespace: echo
+  labels:
+    app: bff-service
+spec:
+  type: ClusterIP
+  selector:
+    app: bff-service
+  ports:
+    - name: http
+      port: 8004
+      targetPort: 8004
+      protocol: TCP

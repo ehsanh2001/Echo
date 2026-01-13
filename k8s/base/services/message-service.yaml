@@ -1,0 +1,17 @@
+# message-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: message-service
+  namespace: echo
+  labels:
+    app: message-service
+spec:
+  type: ClusterIP
+  selector:
+    app: message-service
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003
+      protocol: TCP

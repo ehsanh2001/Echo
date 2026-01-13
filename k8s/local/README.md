@@ -174,12 +174,89 @@ After pushing, verify your images at:
 - https://hub.docker.com/r/ehosseinipbox/echo-message
 - https://hub.docker.com/r/ehosseinipbox/echo-notification
 
-### 5. Deploy Application to Minikube
+### 5. Enable Minikube Ingress Addon
 
 ```bash
-# Apply Kubernetes manifests (created in later phases)
-kubectl apply -f k8s/local/
+# Enable NGINX Ingress Controller
+minikube addons enable ingress
+
+# Verify ingress controller is running
+kubectl get pods -n ingress-nginx
 ```
+
+### 6. Deploy Application to Minikube (Phase 3)
+
+Deploy all Echo services to the Minikube cluster using Kustomize:
+
+```bash
+# Navigate to echo directory
+cd echo
+
+# Preview what will be deployed (dry run)
+kubectl kustomize k8s/local
+
+# Apply all manifests (namespace, configmaps, secrets, deployments, services, ingress)
+kubectl apply -k k8s/local
+
+# Watch pods come up
+kubectl get pods -n echo -w
+
+# Check all resources
+kubectl get all -n echo
+```
+
+#### Verify Deployment
+
+```bash
+# Check all pods are running
+kubectl get pods -n echo
+
+# Check services
+kubectl get svc -n echo
+
+# Check ingress
+kubectl get ingress -n echo
+
+# View logs for a specific service
+kubectl logs -n echo -l app=user-service -f
+
+# Describe a pod for troubleshooting
+kubectl describe pod -n echo -l app=user-service
+```
+
+### 7. Configure Local DNS
+
+Add entries to your hosts file to access the application via hostname:
+
+**Windows:** Edit `C:\Windows\System32\drivers\etc\hosts`  
+**Linux/Mac:** Edit `/etc/hosts`
+
+```bash
+# Get Minikube IP
+minikube ip
+
+# Add to hosts file (replace <minikube-ip> with actual IP):
+<minikube-ip> echo.local api.echo.local
+```
+
+**Alternative: Use Minikube Tunnel**
+
+```bash
+# In a separate terminal, start tunnel (requires admin/sudo)
+minikube tunnel
+
+# Then add to hosts file:
+127.0.0.1 echo.local api.echo.local
+```
+
+### 8. Access the Application
+
+Once deployed and DNS configured:
+
+| Application | URL                   | Description               |
+| ----------- | --------------------- | ------------------------- |
+| Frontend    | http://echo.local     | Main application UI       |
+| BFF API     | http://api.echo.local | Backend API and WebSocket |
 
 ## Service Access
 
@@ -344,19 +421,83 @@ minikube ssh "nc -zv host.minikube.internal 5672"
 
 ## Files in This Directory
 
-| File                     | Description                                |
-| ------------------------ | ------------------------------------------ |
-| docker-compose.infra.yml | Infrastructure services for Minikube       |
-| init-databases.sql       | PostgreSQL initialization script           |
-| .env.infra               | Default environment variables              |
-| build-and-push.sh        | Build and push Docker images to Docker Hub |
-| README.md                | This file                                  |
+| File                     | Description                                          |
+| ------------------------ | ---------------------------------------------------- |
+| docker-compose.infra.yml | Infrastructure services for Minikube                 |
+| init-databases.sql       | PostgreSQL initialization script                     |
+| .env.infra               | Default environment variables for infrastructure     |
+| build-and-push.sh        | Build and push Docker images to Docker Hub           |
+| kustomization.yaml       | Kustomize overlay for local environment              |
+| secrets.yaml             | Kubernetes secrets (dev values - DO NOT USE IN PROD) |
+| ingress.yaml             | NGINX Ingress configuration for local access         |
+| README.md                | This file                                            |
+
+## Kubernetes Commands Reference
+
+### Deployment Management
+
+```bash
+# Apply/update all manifests
+kubectl apply -k k8s/local
+
+# Delete all resources
+kubectl delete -k k8s/local
+
+# Or delete entire namespace (removes everything)
+kubectl delete namespace echo
+
+# Restart a deployment (pulls new images)
+kubectl rollout restart deployment/user-service -n echo
+
+# Scale a deployment
+kubectl scale deployment/user-service -n echo --replicas=2
+
+# Check rollout status
+kubectl rollout status deployment/user-service -n echo
+```
+
+### Debugging
+
+```bash
+# Get pod logs
+kubectl logs -n echo -l app=bff-service -f
+
+# Get previous container logs (after crash)
+kubectl logs -n echo <pod-name> --previous
+
+# Exec into a pod
+kubectl exec -it -n echo <pod-name> -- sh
+
+# Port forward for direct access (bypass ingress)
+kubectl port-forward -n echo svc/user-service 8001:8001
+kubectl port-forward -n echo svc/bff-service 8004:8004
+kubectl port-forward -n echo svc/frontend 3000:3000
+
+# Test internal service connectivity
+kubectl run test-pod --image=busybox -n echo --rm -it --restart=Never -- \
+  wget -qO- http://user-service:8001/api/users/health
+```
+
+### Resource Monitoring
+
+```bash
+# Check resource usage
+kubectl top pods -n echo
+
+# Describe resources for details
+kubectl describe deployment/user-service -n echo
+kubectl describe pod -n echo -l app=user-service
+kubectl describe ingress -n echo
+```
 
 ## Next Steps
 
-After infrastructure is running:
+After application is deployed:
 
-1. Build and push images to Docker Hub (Phase 2): `./build-and-push.sh`
-2. Deploy application services to Minikube (Phase 3)
-3. Configure Kubernetes Secrets (Phase 4)
-4. Set up Ingress for external access (Phase 5)
+1. ✅ Phase 1: Infrastructure for Minikube (completed)
+2. ✅ Phase 2: Build and push images to Docker Hub (completed)
+3. ✅ Phase 3: Deploy application to Minikube (completed)
+4. Phase 4: Configure Kubernetes Secrets properly (production-ready)
+5. Phase 5: Set up Ingress with TLS for production
+6. Phase 6: Deploy observability stack (Grafana, Prometheus, Loki, Tempo)
+7. Phase 7: Set up CI/CD pipeline
