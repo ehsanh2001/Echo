@@ -1,0 +1,28 @@
+# kustomization.yaml
+# Main Kustomize configuration for Echo observability stack
+#
+# Includes:
+# - Prometheus (metrics collection)
+# - Loki (log aggregation)
+# - Tempo (distributed tracing)
+# - Grafana (visualization)
+# - OpenTelemetry Collector (trace collection)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: echo-observability
+
+resources:
+  - namespace.yaml
+  - pvcs/
+  - configmaps/
+  - secrets/
+  - deployments/
+  - services/
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: echo-observability
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false

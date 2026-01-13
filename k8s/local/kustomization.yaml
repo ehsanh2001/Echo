@@ -23,6 +23,9 @@ patches:
       - op: replace
         path: /data/FRONTEND_BASE_URL
         value: http://echo.local
+      - op: replace
+        path: /data/OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://otel-collector.echo-observability:4317
     target:
       kind: ConfigMap
       name: echo-config

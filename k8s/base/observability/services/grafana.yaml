@@ -1,0 +1,17 @@
+# grafana.yaml
+# Grafana service - exposes web UI for visualization
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: echo-observability
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

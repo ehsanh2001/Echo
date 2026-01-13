@@ -1,0 +1,17 @@
+# loki-pvc.yaml
+# Persistent storage for Loki log data
+# Retention: 7 days of logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: echo-observability
+  labels:
+    app: loki
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

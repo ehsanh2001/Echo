@@ -1,0 +1,17 @@
+# prometheus-pvc.yaml
+# Persistent storage for Prometheus metrics data
+# Retention: 15 days of metrics
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: echo-observability
+  labels:
+    app: prometheus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

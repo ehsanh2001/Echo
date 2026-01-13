@@ -1,0 +1,11 @@
+# kustomization.yaml
+# Service resources for observability stack
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - otel-collector.yaml
+  - tempo.yaml
+  - loki.yaml
+  - prometheus.yaml
+  - grafana.yaml

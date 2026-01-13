@@ -1,0 +1,60 @@
+# grafana-datasources.yaml
+# Grafana datasources provisioning configuration
+# Links Loki, Tempo, and Prometheus with trace-to-logs correlation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: echo-observability
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      # Loki - Log aggregation
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        isDefault: true
+        uid: loki
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            # Link logs to traces via trace_id field
+            - datasourceUid: tempo
+              matcherRegex: '"trace_id":"([a-f0-9]+)"'
+              name: TraceID
+              url: "$${__value.raw}"
+
+      # Tempo - Distributed tracing
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo:3200
+        uid: tempo
+        jsonData:
+          httpMethod: GET
+          tracesToLogs:
+            datasourceUid: loki
+            tags: ["service.name"]
+            filterByTraceID: true
+            lokiSearch: true
+          tracesToMetrics:
+            datasourceUid: prometheus
+            tags: [{ key: "service.name", value: "service" }]
+          serviceMap:
+            datasourceUid: prometheus
+          nodeGraph:
+            enabled: true
+
+      # Prometheus - Metrics storage and querying
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        uid: prometheus
+        jsonData:
+          httpMethod: POST
+          exemplarTraceIdDestinations:
+            - name: trace_id
+              datasourceUid: tempo

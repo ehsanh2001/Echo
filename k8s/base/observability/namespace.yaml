@@ -1,0 +1,10 @@
+# namespace.yaml
+# Dedicated namespace for observability stack
+# Separates monitoring infrastructure from application workloads
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: echo-observability
+  labels:
+    app.kubernetes.io/name: echo-observability
+    app.kubernetes.io/part-of: echo-platform

@@ -15,9 +15,9 @@ This directory contains all files needed for running Echo services in a local Mi
 │  │  │  PostgreSQL  │  │    Redis     │  │  RabbitMQ    │  │MailHog  │  │    │
 │  │  │  Port: 5433  │  │  Port: 6379  │  │  Port: 5672  │  │Port:1025│  │    │
 │  │  │              │  │              │  │  UI: 15672   │  │UI: 8025 │  │    │
-│  │  │  3 Databases │  │  Password    │  │              │  │         │  │    │
-│  │  │  - users_db  │  │  protected   │  │  Mgmt UI     │  │  Email  │  │    │
-│  │  │  - wc_db     │  │              │  │  enabled     │  │  Test   │  │    │
+│  │  │  3 Databases │  │  Password    │  │  Metrics:    │  │         │  │    │
+│  │  │  - users_db  │  │  protected   │  │  15692       │  │  Email  │  │    │
+│  │  │  - wc_db     │  │              │  │              │  │  Test   │  │    │
 │  │  │  - msg_db    │  │              │  │              │  │         │  │    │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────┘  │    │
 │  │         │                 │                 │               │       │    │
@@ -29,17 +29,36 @@ This directory contains all files needed for running Echo services in a local Mi
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                         MINIKUBE CLUSTER                            │    │
+│  │                                                                     │    │
 │  │  ┌────────────────────────────────────────────────────────────────┐ │    │
-│  │  │                    Application Services                        │ │    │
+│  │  │              echo namespace (Application Services)             │ │    │
 │  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │ │    │
 │  │  │  │Frontend │ │  BFF    │ │  User   │ │Workspace│ │ Message │   │ │    │
 │  │  │  │ :3000   │ │ :8004   │ │ :8001   │ │ :8002   │ │ :8003   │   │ │    │
-│  │  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘   │ │    │
-│  │  │                                                                │ │    │
-│  │  │                    ┌───────────────────┐                       │ │    │
-│  │  │                    │  Notification     │                       │ │    │
-│  │  │                    │  :8005            │                       │ │    │
-│  │  │                    └───────────────────┘                       │ │    │
+│  │  │  └─────────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘   │ │    │
+│  │  │                   │           │           │           │        │ │    │
+│  │  │              ┌────┴───────────┴───────────┴───────────┘        │ │    │
+│  │  │              │    ┌───────────────────┐                        │ │    │
+│  │  │              │    │  Notification     │                        │ │    │
+│  │  │              │    │  :8005            │                        │ │    │
+│  │  │              │    └─────────┬─────────┘                        │ │    │
+│  │  └──────────────┼──────────────┼──────────────────────────────────┘ │    │
+│  │                 │              │                                    │    │
+│  │                 │    OTLP Traces (/metrics endpoints)               │    │
+│  │                 ▼              ▼                                    │    │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │    │
+│  │  │          echo-observability namespace (Observability Stack)    │ │    │
+│  │  │  ┌─────────────┐ ┌─────────┐ ┌─────────┐ ┌──────────────────┐  │ │    │
+│  │  │  │OTel Collector│ │Prometheus│ │  Loki   │ │     Tempo       │  │ │    │
+│  │  │  │ :4317/:4318 │ │  :9090  │ │ :3100   │ │     :3200       │  │ │    │
+│  │  │  └──────┬──────┘ └────┬────┘ └────┬────┘ └────────┬────────┘  │ │    │
+│  │  │         │             │           │               │           │ │    │
+│  │  │         └─────────────┴───────────┴───────────────┘           │ │    │
+│  │  │                              │                                 │ │    │
+│  │  │                       ┌──────┴──────┐                          │ │    │
+│  │  │                       │   Grafana   │                          │ │    │
+│  │  │                       │    :3000    │                          │ │    │
+│  │  │                       └─────────────┘                          │ │    │
 │  │  └────────────────────────────────────────────────────────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -323,6 +342,145 @@ Once deployed and DNS configured:
 | Frontend    | http://echo.local     | Main application UI       |
 | BFF API     | http://api.echo.local | Backend API and WebSocket |
 
+### 10. Deploy Observability Stack (Phase 6)
+
+The observability stack (Prometheus, Loki, Tempo, Grafana, OpenTelemetry Collector) is deployed into a separate `echo-observability` namespace. Since it uses a different namespace from the application, it must be deployed separately.
+
+#### Deploy Observability
+
+```bash
+# Navigate to echo directory
+cd echo
+
+# Preview observability manifests (dry run)
+kubectl kustomize k8s/base/observability
+
+# Apply observability stack
+kubectl apply -k k8s/base/observability
+
+# Watch pods come up
+kubectl get pods -n echo-observability -w
+```
+
+#### Verify Observability Deployment
+
+```bash
+# Check observability pods are running
+kubectl get pods -n echo-observability
+
+# Expected output:
+# NAME                              READY   STATUS    RESTARTS   AGE
+# grafana-xxxxx                     1/1     Running   0          1m
+# loki-xxxxx                        1/1     Running   0          1m
+# otel-collector-xxxxx              1/1     Running   0          1m
+# prometheus-xxxxx                  1/1     Running   0          1m
+# tempo-xxxxx                       1/1     Running   0          1m
+
+# Check PVCs are bound
+kubectl get pvc -n echo-observability
+
+# Expected output:
+# NAME              STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS
+# loki-data         Bound    pvc-xxxx       10Gi       RWO            standard
+# prometheus-data   Bound    pvc-xxxx       10Gi       RWO            standard
+# tempo-data        Bound    pvc-xxxx       10Gi       RWO            standard
+
+# Check services
+kubectl get svc -n echo-observability
+```
+
+#### Configure DNS for Grafana
+
+Add Grafana hostname to your hosts file:
+
+**Windows:** Edit `C:\Windows\System32\drivers\etc\hosts`  
+**Linux/Mac:** Edit `/etc/hosts`
+
+```bash
+# Add to hosts file (same IP as echo.local):
+<minikube-ip> echo.local api.echo.local grafana.echo.local
+```
+
+#### Access Observability UIs
+
+| Tool       | URL                       | Credentials      | Description                       |
+| ---------- | ------------------------- | ---------------- | --------------------------------- |
+| Grafana    | http://grafana.echo.local | admin / admin123 | Dashboards, logs, traces, metrics |
+| Prometheus | Port-forward (see below)  | N/A              | Metrics query and targets         |
+| Loki       | Port-forward (see below)  | N/A              | Log query (use via Grafana)       |
+| Tempo      | Port-forward (see below)  | N/A              | Trace query (use via Grafana)     |
+
+#### Port-Forward for Direct Access
+
+```bash
+# Grafana (if ingress not working)
+kubectl port-forward -n echo-observability svc/grafana 3001:3000
+# Access: http://localhost:3001
+
+# Prometheus (check targets)
+kubectl port-forward -n echo-observability svc/prometheus 9090:9090
+# Access: http://localhost:9090/targets
+
+# Loki (debug)
+kubectl port-forward -n echo-observability svc/loki 3100:3100
+
+# Tempo (debug)
+kubectl port-forward -n echo-observability svc/tempo 3200:3200
+```
+
+#### Verify Prometheus Targets
+
+1. Port-forward Prometheus: `kubectl port-forward -n echo-observability svc/prometheus 9090:9090`
+2. Open http://localhost:9090/targets
+3. All targets should show **UP** status:
+   - `prometheus` (self)
+   - `otel-collector`
+   - `user-service`
+   - `workspace-channel-service`
+   - `message-service`
+   - `bff-service`
+   - `notification-service`
+   - `rabbitmq`
+
+#### Using Grafana
+
+After login (admin / admin123):
+
+1. **Explore Logs**: Click "Explore" → Select "Loki" datasource → Query logs
+2. **Explore Traces**: Click "Explore" → Select "Tempo" datasource → Search for traces
+3. **Explore Metrics**: Click "Explore" → Select "Prometheus" datasource → Run PromQL queries
+
+**Example Queries:**
+
+```promql
+# Request rate per service
+sum(rate(http_requests_total[5m])) by (service)
+
+# 99th percentile latency
+histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))
+```
+
+**Loki Log Query:**
+
+```logql
+{service="user-service"} |= "error"
+```
+
+#### Troubleshooting Observability
+
+```bash
+# Check OTel Collector logs (should show traces received)
+kubectl logs -n echo-observability -l app=otel-collector -f
+
+# Check if services are sending traces
+# Look for OTEL_EXPORTER_OTLP_ENDPOINT in echo config
+kubectl describe configmap echo-config -n echo | grep OTEL
+
+# If PVCs are stuck in Pending, enable storage provisioner
+minikube addons enable storage-provisioner
+minikube addons enable default-storageclass
+```
+
 ## Service Access
 
 ### From Host Machine
@@ -486,30 +644,38 @@ minikube ssh "nc -zv host.minikube.internal 5672"
 
 ## Files in This Directory
 
-| File                     | Description                                        |
-| ------------------------ | -------------------------------------------------- |
-| docker-compose.infra.yml | Infrastructure services for Minikube               |
-| init-databases.sql       | PostgreSQL initialization script                   |
-| .env.infra               | Default environment variables for infrastructure   |
-| build-and-push.sh        | Build and push Docker images to Docker Hub         |
-| kustomization.yaml       | Kustomize overlay for local environment            |
-| secrets/                 | Generated secrets directory (gitignored)           |
-| ingress.yaml             | NGINX Ingress configuration with WebSocket support |
-| README.md                | This file                                          |
+| File                     | Description                                               |
+| ------------------------ | --------------------------------------------------------- |
+| docker-compose.infra.yml | Infrastructure services for Minikube                      |
+| init-databases.sql       | PostgreSQL initialization script                          |
+| .env.infra               | Default environment variables for infrastructure          |
+| build-and-push.sh        | Build and push Docker images to Docker Hub                |
+| kustomization.yaml       | Kustomize overlay for local environment                   |
+| secrets/                 | Generated secrets directory (gitignored)                  |
+| ingress.yaml             | NGINX Ingress configuration with WebSocket support        |
+| ../base/observability/   | Observability stack manifests (Grafana, Prometheus, etc.) |
+| README.md                | This file                                                 |
 
 ## Kubernetes Commands Reference
 
 ### Deployment Management
 
 ```bash
-# Apply/update all manifests
+# Apply/update all application manifests
 kubectl apply -k k8s/local
 
-# Delete all resources
+# Apply/update observability stack
+kubectl apply -k k8s/base/observability
+
+# Delete all application resources
 kubectl delete -k k8s/local
 
-# Or delete entire namespace (removes everything)
+# Delete observability resources
+kubectl delete -k k8s/base/observability
+
+# Or delete entire namespaces (removes everything)
 kubectl delete namespace echo
+kubectl delete namespace echo-observability
 
 # Restart a deployment (pulls new images)
 kubectl rollout restart deployment/user-service -n echo
@@ -564,6 +730,6 @@ After application is deployed:
 3. ✅ Phase 3: Deploy application to Minikube (completed)
 4. ✅ Phase 4: Configure Kubernetes Secrets (completed)
 5. ✅ Phase 5: Ingress & External Access (completed)
-6. Phase 6: Deploy observability stack (Grafana, Prometheus, Loki, Tempo)
+6. ✅ Phase 6: Deploy observability stack (completed)
 7. Phase 7: Set up CI/CD pipeline
 8. Phase 8: AWS Production Deployment

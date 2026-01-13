@@ -1,0 +1,17 @@
+# loki.yaml
+# Loki service - exposes log query and push endpoints
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: echo-observability
+  labels:
+    app: loki
+spec:
+  type: ClusterIP
+  selector:
+    app: loki
+  ports:
+    - name: http
+      port: 3100
+      targetPort: 3100

@@ -1,0 +1,17 @@
+# tempo-pvc.yaml
+# Persistent storage for Tempo trace data
+# Retention: 7 days of traces
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tempo-data
+  namespace: echo-observability
+  labels:
+    app: tempo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
