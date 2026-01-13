@@ -42,7 +42,10 @@ const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max,
   message: "Too many requests from this IP, please try again later.",
-  skip: (req) => req.path === "/metrics", // Skip rate limiting for metrics
+  skip: (req) =>
+    req.path === "/metrics" ||
+    req.path.startsWith("/health") ||
+    req.path.endsWith("/health"), // Skip rate limiting for metrics and health checks
 });
 app.use(limiter);
 

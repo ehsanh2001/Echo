@@ -88,7 +88,10 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === "/metrics", // Skip rate limiting for metrics
+  skip: (req) =>
+    req.path === "/metrics" ||
+    req.path.startsWith("/health") ||
+    req.path.endsWith("/health"), // Skip rate limiting for metrics and health checks
 });
 app.use(limiter);
 

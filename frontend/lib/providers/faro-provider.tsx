@@ -19,9 +19,8 @@ import { TracingInstrumentation } from "@grafana/faro-web-tracing";
  */
 
 // Environment configuration
-const FARO_COLLECTOR_URL =
-  process.env.NEXT_PUBLIC_FARO_COLLECTOR_URL ||
-  "http://localhost:12347/collect";
+const FARO_COLLECTOR_URL = process.env.NEXT_PUBLIC_FARO_COLLECTOR_URL || "";
+const FARO_ENABLED = !!FARO_COLLECTOR_URL; // Only enable if URL is explicitly set
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "echo-frontend";
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0";
 const APP_ENVIRONMENT =
@@ -42,9 +41,10 @@ let originalConsole: {
 /**
  * Suppress browser console output while sending logs to Faro
  * Console methods are replaced with Faro log pushes
+ * Only runs when Faro is enabled
  */
 function suppressConsoleOutput() {
-  if (typeof window === "undefined" || originalConsole) {
+  if (typeof window === "undefined" || originalConsole || !FARO_ENABLED) {
     return;
   }
 
@@ -104,9 +104,16 @@ function suppressConsoleOutput() {
 /**
  * Initialize Grafana Faro SDK
  * Must only be called once on the client side
+ * Only initializes if NEXT_PUBLIC_FARO_COLLECTOR_URL is set
  */
 function initFaro() {
   if (faroInitialized || typeof window === "undefined") {
+    return;
+  }
+
+  // Skip Faro initialization if collector URL is not configured
+  if (!FARO_ENABLED) {
+    console.debug("[Faro] Disabled - NEXT_PUBLIC_FARO_COLLECTOR_URL not set");
     return;
   }
 

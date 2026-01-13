@@ -9,7 +9,7 @@
 #
 # This script generates Kubernetes secrets that match the passwords configured
 # in docker-compose.infra.yml. Infrastructure services (PostgreSQL, Redis,
-# RabbitMQ) run in Docker and are accessible from Minikube via host.minikube.internal.
+# RabbitMQ) run in Docker and are accessible from Minikube via host.docker.internal.
 #
 # ⚠️  IMPORTANT: The passwords below MUST match those in docker-compose.infra.yml
 # If you change passwords here, you must also update docker-compose.infra.yml
@@ -30,8 +30,10 @@ NC='\033[0m'
 # Configuration - MUST match docker-compose.infra.yml
 # =============================================================================
 
-# Infrastructure host (from Minikube's perspective)
-INFRA_HOST="host.minikube.internal"
+# Infrastructure host (from Minikube's perspective using Docker Desktop)
+# On Docker Desktop (Mac/Windows), use host.docker.internal
+# On Linux with native Docker, you may need to use the host's IP instead
+INFRA_HOST="host.docker.internal"
 
 # PostgreSQL (running on port 5433 to avoid conflict with dev environment)
 # These credentials MUST match POSTGRES_PASSWORD in docker-compose.infra.yml
@@ -80,7 +82,7 @@ cat > "${OUTPUT_FILE}" << EOF
 # ⚠️  DO NOT COMMIT TO GIT - This file is in .gitignore
 #
 # These values MUST match the passwords in docker-compose.infra.yml
-# Infrastructure services run in Docker and are accessible via host.minikube.internal
+# Infrastructure services run in Docker and are accessible via host.docker.internal
 # PostgreSQL: port ${POSTGRES_PORT}
 # Redis: port ${REDIS_PORT}
 # RabbitMQ: port ${RABBITMQ_PORT}
@@ -104,6 +106,7 @@ stringData:
 
   # Redis URL (for caching and Socket.IO adapter)
   REDIS_URL: "${REDIS_URL}"
+  REDIS_PASSWORD: "${REDIS_PASSWORD}"
 
   # RabbitMQ URL (for async messaging)
   RABBITMQ_URL: "${RABBITMQ_URL}"

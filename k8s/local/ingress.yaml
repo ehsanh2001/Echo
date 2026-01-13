@@ -32,14 +32,6 @@ metadata:
     # WebSocket support for BFF service (Socket.IO)
     nginx.ingress.kubernetes.io/websocket-services: "bff-service"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
-
-    # HTTP/1.1 for WebSocket upgrade support
-    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-
-    # Connection upgrade headers for WebSocket
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "upgrade";
 spec:
   ingressClassName: nginx
   rules:

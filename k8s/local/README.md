@@ -88,16 +88,23 @@ docker-compose -f docker-compose.infra.yml ps
 ### 2. Start Minikube
 
 ```bash
-# Start Minikube with Docker driver
-minikube start --driver=docker
+# Start Minikube with Docker driver (allocate sufficient resources)
+minikube start --driver=docker --memory=8100 --cpus=2
 
-# Verify host.minikube.internal is accessible
-minikube ssh "ping -c 3 host.minikube.internal"
+# Enable required addons
+minikube addons enable ingress
+minikube addons enable metrics-server
+
+# Verify host.docker.internal is accessible (used to reach host services)
+kubectl run test-dns --rm -it --restart=Never --image=busybox -n default -- nslookup host.docker.internal
 ```
+
+> **Note:** Services running in Docker on your host (PostgreSQL, Redis, RabbitMQ) are accessible
+> from Minikube pods via `host.docker.internal` on Docker Desktop (Mac/Windows).
 
 ### 3. Run Database Migrations
 
-Before deploying services, run Prisma migrations:
+Before deploying services, run Prisma migrations to set up the database schema:
 
 ```bash
 # From the echo directory
@@ -113,11 +120,25 @@ cd services/workspace-channel-service
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/workspace_channels_db" npx prisma migrate deploy
 cd ../..
 
-# Message Service
+# Message Service (uses db push to create all tables)
 cd services/message-service
-DATABASE_URL="postgresql://postgres:postgres@localhost:5433/message_db" npx prisma migrate deploy
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/message_db" npx prisma db push
 cd ../..
 ```
+
+#### Create Message Service SQL Function
+
+The message-service requires a PostgreSQL function for atomic message numbering:
+
+```bash
+# Run the SQL function script (requires psql)
+cd services/message-service
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d message_db -f prisma/migrations/get_next_message_no_function.sql
+cd ../..
+```
+
+> **Note:** If you don't have `psql` installed, you can run the SQL manually using any PostgreSQL client.
+> The script is located at `services/message-service/prisma/migrations/get_next_message_no_function.sql`
 
 ### 4. Build and Push Docker Images (Phase 2)
 
@@ -199,14 +220,15 @@ After pushing, verify your images at:
 - https://hub.docker.com/r/ehosseinipbox/echo-message
 - https://hub.docker.com/r/ehosseinipbox/echo-notification
 
-### 5. Enable Minikube Ingress Addon
+### 5. Verify Ingress Controller
+
+The ingress controller was enabled in Step 2. Verify it's running:
 
 ```bash
-# Enable NGINX Ingress Controller
-minikube addons enable ingress
-
 # Verify ingress controller is running
 kubectl get pods -n ingress-nginx
+
+# Should show controller pod in Running state
 ```
 
 ### 6. Generate Secrets (Phase 4)
@@ -277,25 +299,27 @@ kubectl describe pod -n echo -l app=user-service
 
 Add entries to your hosts file to access the application via hostname:
 
-**Windows:** Edit `C:\Windows\System32\drivers\etc\hosts`  
-**Linux/Mac:** Edit `/etc/hosts`
+**Windows:** Edit `C:\Windows\System32\drivers\etc\hosts` (as Administrator)  
+**Linux/Mac:** Edit `/etc/hosts` (with sudo)
 
-```bash
-# Get Minikube IP
-minikube ip
-
-# Add to hosts file (replace <minikube-ip> with actual IP):
-<minikube-ip> echo.local api.echo.local
-```
-
-**Alternative: Use Minikube Tunnel**
+#### Recommended: Use Minikube Tunnel (simplest approach)
 
 ```bash
 # In a separate terminal, start tunnel (requires admin/sudo)
 minikube tunnel
 
-# Then add to hosts file:
-127.0.0.1 echo.local api.echo.local
+# Keep the tunnel terminal open, then add to hosts file:
+127.0.0.1 echo.local api.echo.local grafana.echo.local
+```
+
+#### Alternative: Use Minikube IP directly
+
+```bash
+# Get Minikube IP
+minikube ip
+
+# Add to hosts file (replace <minikube-ip> with actual IP, e.g., 192.168.49.2):
+<minikube-ip> echo.local api.echo.local grafana.echo.local
 ```
 
 ### 8. Verify Ingress & External Access (Phase 5)

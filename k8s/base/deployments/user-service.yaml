@@ -53,7 +53,7 @@ spec:
                 configMapKeyRef:
                   name: echo-config
                   key: BCRYPT_SALT_ROUNDS
-            - name: FRONTEND_BASE_URL
+            - name: FRONTEND_URL
               valueFrom:
                 configMapKeyRef:
                   name: echo-config
@@ -74,6 +74,11 @@ spec:
                 secretKeyRef:
                   name: echo-secrets
                   key: REDIS_URL
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echo-secrets
+                  key: REDIS_PASSWORD
             - name: RABBITMQ_URL
               valueFrom:
                 secretKeyRef:
