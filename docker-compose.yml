@@ -42,7 +42,7 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./O11y/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     env_file:
       - .env
     restart: unless-stopped
@@ -223,29 +223,16 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        # Build-time variables (NEXT_PUBLIC_* must be available during build)
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-        - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL}
-        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
-        - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=${NEXT_PUBLIC_MAX_MESSAGE_LENGTH}
-        - NEXT_PUBLIC_FARO_COLLECTOR_URL=${NEXT_PUBLIC_FARO_COLLECTOR_URL}
-        - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
-        - NEXT_PUBLIC_APP_ENVIRONMENT=${NEXT_PUBLIC_APP_ENVIRONMENT}
+      # Build args with defaults in Dockerfile - uncomment to override:
+      # args:
+      #   - NEXT_PUBLIC_BFF_URL=http://production-url:8004
     container_name: echo-frontend
     ports:
       - "3000:3000"
     env_file:
       - .env
-    environment:
-      # Runtime environment (can override build-time values if needed)
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL}
-      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
-      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=${NEXT_PUBLIC_MAX_MESSAGE_LENGTH}
-      - NEXT_PUBLIC_FARO_COLLECTOR_URL=${NEXT_PUBLIC_FARO_COLLECTOR_URL}
-      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
-      - NEXT_PUBLIC_APP_ENVIRONMENT=${NEXT_PUBLIC_APP_ENVIRONMENT}
+      - ./frontend/.env.local
+    # NEXT_PUBLIC_ vars are baked in at build time - no runtime environment needed
     depends_on:
       - bff-service
       - alloy
@@ -307,7 +294,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
-      - ./infra/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - ./O11y/loki/loki-config.yaml:/etc/loki/loki-config.yaml
       - loki_data:/loki
     restart: unless-stopped
     healthcheck:
@@ -333,7 +320,7 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3001
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - ./O11y/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       loki:
         condition: service_healthy
@@ -347,7 +334,7 @@ services:
     container_name: echo-tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ./infra/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - ./O11y/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
       - tempo_data:/var/tempo
     ports:
       - "3200:3200" # Tempo HTTP API
@@ -373,7 +360,7 @@ services:
     container_name: echo-otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./infra/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./O11y/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
       - "4317:4317" # OTLP gRPC receiver
       - "4318:4318" # OTLP HTTP receiver
@@ -408,7 +395,7 @@ services:
       - "--web.enable-lifecycle"
       - "--web.enable-remote-write-receiver"
     volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./O11y/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -439,7 +426,7 @@ services:
       - "--server.http.listen-addr=0.0.0.0:12345"
       - "/etc/alloy/config.alloy"
     volumes:
-      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./O11y/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro # For Docker log collection
     ports:
       - "12345:12345" # Alloy UI

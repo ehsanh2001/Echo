@@ -16,16 +16,16 @@ COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build arguments for NEXT_PUBLIC_ variables (required at build time)
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_BFF_URL
-ARG NEXT_PUBLIC_APP_NAME
-ARG NEXT_PUBLIC_MAX_MESSAGE_LENGTH
-ARG NEXT_PUBLIC_FARO_COLLECTOR_URL
-ARG NEXT_PUBLIC_APP_VERSION
-ARG NEXT_PUBLIC_APP_ENVIRONMENT
+# Build arguments with default values (can be overridden in docker-compose if needed)
+ARG NEXT_PUBLIC_API_URL=http://localhost:8004
+ARG NEXT_PUBLIC_BFF_URL=http://localhost:8004
+ARG NEXT_PUBLIC_APP_NAME=Echo
+ARG NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
+ARG NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect
+ARG NEXT_PUBLIC_APP_VERSION=1.0.0
+ARG NEXT_PUBLIC_APP_ENVIRONMENT=development
 
-# Set as environment variables for the build
+# Set as environment variables for the build (baked into Next.js bundle)
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_BFF_URL=$NEXT_PUBLIC_BFF_URL
 ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
