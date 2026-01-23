@@ -99,7 +99,7 @@ describe("RabbitMQConsumer", () => {
 
     // Mock amqp.connect
     (amqp.connect as jest.Mock<() => Promise<any>>).mockResolvedValue(
-      mockConnection
+      mockConnection,
     );
 
     // Create mock invite event handler
@@ -107,15 +107,23 @@ describe("RabbitMQConsumer", () => {
       handleWorkspaceInviteCreated: jest.fn(),
     } as any;
 
+    // Create mock password reset event handler
+    const mockPasswordResetEventHandler = {
+      handlePasswordResetRequested: jest.fn(),
+    } as any;
+
     // Create consumer instance
-    rabbitMQConsumer = new RabbitMQConsumer(mockInviteEventHandler);
+    rabbitMQConsumer = new RabbitMQConsumer(
+      mockInviteEventHandler,
+      mockPasswordResetEventHandler,
+    );
   });
 
   describe("routeEvent()", () => {
     it("should route workspace.invite.created to correct handler", async () => {
       // Arrange
       mockInviteEventHandler.handleWorkspaceInviteCreated.mockResolvedValue(
-        undefined
+        undefined,
       );
 
       const event: WorkspaceInviteCreatedEvent = {
@@ -147,7 +155,7 @@ describe("RabbitMQConsumer", () => {
 
       // Assert
       expect(
-        mockInviteEventHandler.handleWorkspaceInviteCreated
+        mockInviteEventHandler.handleWorkspaceInviteCreated,
       ).toHaveBeenCalledWith(event);
     });
 
@@ -168,7 +176,7 @@ describe("RabbitMQConsumer", () => {
 
       // Act & Assert - should not throw
       await expect(
-        (rabbitMQConsumer as any).routeEvent(unknownEvent)
+        (rabbitMQConsumer as any).routeEvent(unknownEvent),
       ).resolves.not.toThrow();
     });
   });
@@ -182,7 +190,7 @@ describe("RabbitMQConsumer", () => {
     it("should acknowledge message after successful processing", async () => {
       // Arrange
       mockInviteEventHandler.handleWorkspaceInviteCreated.mockResolvedValue(
-        undefined
+        undefined,
       );
       const message = createMockMessage("workspace.invite.created");
 
@@ -197,7 +205,7 @@ describe("RabbitMQConsumer", () => {
     it("should nack message when handler throws error", async () => {
       // Arrange
       mockInviteEventHandler.handleWorkspaceInviteCreated.mockRejectedValue(
-        new Error("Handler error")
+        new Error("Handler error"),
       );
       const message = createMockMessage("workspace.invite.created");
 
@@ -226,17 +234,17 @@ describe("RabbitMQConsumer", () => {
       expect(mockChannel.nack).toHaveBeenCalledWith(
         invalidMessage,
         false,
-        false
+        false,
       );
       expect(
-        mockInviteEventHandler.handleWorkspaceInviteCreated
+        mockInviteEventHandler.handleWorkspaceInviteCreated,
       ).not.toHaveBeenCalled();
     });
 
     it("should handle null message", async () => {
       // Act & Assert - should not throw
       await expect(
-        (rabbitMQConsumer as any).handleMessage(null)
+        (rabbitMQConsumer as any).handleMessage(null),
       ).resolves.not.toThrow();
 
       expect(mockChannel.ack).not.toHaveBeenCalled();
@@ -248,7 +256,7 @@ describe("RabbitMQConsumer", () => {
     it("should mask password in URL", () => {
       // Act
       const masked = (rabbitMQConsumer as any).maskRabbitMQUrl(
-        "amqp://user:secret123@localhost:5672"
+        "amqp://user:secret123@localhost:5672",
       );
 
       // Assert
@@ -259,7 +267,7 @@ describe("RabbitMQConsumer", () => {
     it("should handle URL without password", () => {
       // Act
       const masked = (rabbitMQConsumer as any).maskRabbitMQUrl(
-        "amqp://localhost:5672"
+        "amqp://localhost:5672",
       );
 
       // Assert

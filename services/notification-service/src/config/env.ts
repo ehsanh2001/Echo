@@ -42,12 +42,15 @@ const getOptionalEnv = (key: string, defaultValue: string): string => {
   if (!value) {
     // Module-load-time logging - cannot use contextual logger here
     console.log(
-      `Environment variable ${key} not set, using default: ${defaultValue}`
+      `Environment variable ${key} not set, using default: ${defaultValue}`,
     );
     return defaultValue;
   }
   return value;
 };
+
+/** Email service type: 'MailHog' for local testing, 'Gmail' for production */
+export type EmailServiceName = "MailHog" | "Gmail";
 
 /**
  * Application configuration object with strict environment variable validation
@@ -56,7 +59,7 @@ const getOptionalEnv = (key: string, defaultValue: string): string => {
  */
 export const config = {
   // Server Configuration
-  port: parseInt(getOptionalEnv("PORT", "8004")),
+  port: parseInt(getOptionalEnv("PORT", "8005")),
   nodeEnv: getOptionalEnv("NODE_ENV", "development"),
 
   // Service Configuration
@@ -72,20 +75,25 @@ export const config = {
     queue: getOptionalEnv("RABBITMQ_QUEUE", "notification_service_queue"),
   },
 
-  // Email Provider Configuration
+  // Email Configuration
   email: {
-    // Resend (production)
-    resendApiKey: getOptionalEnv("RESEND_API_KEY", ""),
-    // SMTP (testing with MailHog)
-    useSmtp: getOptionalEnv("USE_SMTP", "false") === "true",
-    smtpHost: getOptionalEnv("SMTP_HOST", "localhost"),
-    smtpPort: parseInt(getOptionalEnv("SMTP_PORT", "1025")),
-    smtpSecure: getOptionalEnv("SMTP_SECURE", "false") === "true",
-    smtpUser: getOptionalEnv("SMTP_USER", ""),
-    smtpPassword: getOptionalEnv("SMTP_PASSWORD", ""),
-    // Common settings
-    fromAddress: getOptionalEnv("EMAIL_FROM_ADDRESS", "onboarding@resend.dev"),
-    fromName: getOptionalEnv("EMAIL_FROM_NAME", "Echo Workspace"),
+    /** Which email service to use: 'MailHog' or 'Gmail' */
+    serviceName: getOptionalEnv(
+      "EMAIL_SERVICE_NAME",
+      "MailHog",
+    ) as EmailServiceName,
+    /** Common "from" name for all emails */
+    fromName: getOptionalEnv("EMAIL_FROM_NAME", "Echo App"),
+    // MailHog Configuration
+    mailhog: {
+      host: getOptionalEnv("MAILHOG_HOST", "localhost"),
+      port: parseInt(getOptionalEnv("MAILHOG_PORT", "1025")),
+    },
+    // Gmail Configuration
+    gmail: {
+      user: getOptionalEnv("GMAIL_USER", ""),
+      appPassword: getOptionalEnv("GMAIL_APP_PASSWORD", ""),
+    },
   },
 
   // Frontend URL Configuration

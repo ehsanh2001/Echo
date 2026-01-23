@@ -7,7 +7,6 @@ import { InviteEventHandler } from "./handlers/InviteEventHandler";
 import { IPasswordResetEventHandler } from "./interfaces/handlers/IPasswordResetEventHandler";
 import { PasswordResetEventHandler } from "./handlers/PasswordResetEventHandler";
 import { IEmailService } from "./interfaces/services/IEmailService";
-import { EmailService } from "./services/EmailService";
 import { SmtpEmailService } from "./services/SmtpEmailService";
 import { ITemplateService } from "./interfaces/services/ITemplateService";
 import { TemplateService } from "./services/TemplateService";
@@ -23,27 +22,21 @@ import { config } from "./config/env";
 
 // ===== SERVICES =====
 
-// Register EmailService or SmtpEmailService based on configuration
-if (config.email.useSmtp) {
-  container.registerSingleton<IEmailService>("IEmailService", SmtpEmailService);
-  // Module-load-time logging - cannot use contextual logger here
-  console.log("📧 Using SMTP Email Service (MailHog)");
-} else {
-  container.registerSingleton<IEmailService>("IEmailService", EmailService);
-  // Module-load-time logging - cannot use contextual logger here
-  console.log("📧 Using Resend Email Service");
-}
+// Register SmtpEmailService (supports both MailHog and Gmail via config)
+container.registerSingleton<IEmailService>("IEmailService", SmtpEmailService);
+// Module-load-time logging - cannot use contextual logger here
+console.log(`📧 Using SMTP Email Service (${config.email.serviceName})`);
 
 // Register TemplateService as ITemplateService implementation
 container.registerSingleton<ITemplateService>(
   "ITemplateService",
-  TemplateService
+  TemplateService,
 );
 
 // Register UserServiceClient as IUserServiceClient implementation
 container.registerSingleton<IUserServiceClient>(
   "IUserServiceClient",
-  UserServiceClient
+  UserServiceClient,
 );
 
 // ===== HANDLERS =====
@@ -51,13 +44,13 @@ container.registerSingleton<IUserServiceClient>(
 // Register InviteEventHandler as IInviteEventHandler implementation
 container.registerSingleton<IInviteEventHandler>(
   "IInviteEventHandler",
-  InviteEventHandler
+  InviteEventHandler,
 );
 
 // Register PasswordResetEventHandler as IPasswordResetEventHandler implementation
 container.registerSingleton<IPasswordResetEventHandler>(
   "IPasswordResetEventHandler",
-  PasswordResetEventHandler
+  PasswordResetEventHandler,
 );
 
 // ===== WORKERS =====
@@ -65,7 +58,7 @@ container.registerSingleton<IPasswordResetEventHandler>(
 // Register RabbitMQConsumer as IRabbitMQConsumer implementation
 container.registerSingleton<IRabbitMQConsumer>(
   "IRabbitMQConsumer",
-  RabbitMQConsumer
+  RabbitMQConsumer,
 );
 
 export { container };

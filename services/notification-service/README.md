@@ -1,10 +1,10 @@
 # Notification Service
 
-Email notification service for the Echo Slack MVP application. Consumes workspace events from RabbitMQ and sends emails via Resend.
+Email notification service for the Echo Slack MVP application. Consumes workspace events from RabbitMQ and sends emails via SMTP (MailHog for development, Gmail for production).
 
 ## Features
 
-- 📧 Email notifications via Resend API
+- 📧 Email notifications via SMTP (MailHog/Gmail)
 - 🐰 RabbitMQ event consumer
 - 📝 Handlebars email templates
 - 🔍 Winston logging
@@ -26,7 +26,9 @@ Email notification service for the Echo Slack MVP application. Consumes workspac
    ```
 
    Update `.env` with your configuration:
-   - `RESEND_API_KEY`: Get from https://resend.com/api-keys
+   - `EMAIL_SERVICE_NAME`: Set to `MailHog` for development or `Gmail` for production
+   - `GMAIL_USER`: Your Gmail address (required for Gmail)
+   - `GMAIL_APP_PASSWORD`: Your Gmail App Password (required for Gmail)
    - `RABBITMQ_URL`: RabbitMQ connection string
    - `FRONTEND_BASE_URL`: Frontend application URL
 
@@ -47,10 +49,12 @@ Email notification service for the Echo Slack MVP application. Consumes workspac
 | Variable             | Description                             | Default                      |
 | -------------------- | --------------------------------------- | ---------------------------- |
 | `NODE_ENV`           | Environment (development/production)    | `development`                |
-| `PORT`               | Service port                            | `8004`                       |
-| `RESEND_API_KEY`     | Resend API key (required)               | -                            |
-| `EMAIL_FROM_ADDRESS` | Sender email address                    | `onboarding@resend.dev`      |
-| `EMAIL_FROM_NAME`    | Sender name                             | `Echo Workspace`             |
+| `EMAIL_SERVICE_NAME` | Email service: `MailHog` or `Gmail`     | `MailHog`                    |
+| `EMAIL_FROM_NAME`    | Sender display name                     | `Echo App`                   |
+| `MAILHOG_HOST`       | MailHog SMTP host (for MailHog)         | `localhost`                  |
+| `MAILHOG_PORT`       | MailHog SMTP port (for MailHog)         | `1025`                       |
+| `GMAIL_USER`         | Gmail address (required for Gmail)      | -                            |
+| `GMAIL_APP_PASSWORD` | Gmail App Password (required for Gmail) | -                            |
 | `RABBITMQ_URL`       | RabbitMQ connection URL (required)      | -                            |
 | `RABBITMQ_EXCHANGE`  | Exchange name (set in project .env)     | `echo.events`                |
 | `RABBITMQ_QUEUE`     | Queue name                              | `notification_service_queue` |
@@ -100,7 +104,7 @@ EventHandler (workers/)
     ↓
 EmailService (services/)
     ↓
-Resend API → Email Delivered
+SMTP (MailHog/Gmail) → Email Delivered
 ```
 
 ## Testing
@@ -122,25 +126,34 @@ npm run test:coverage
 2. Consumer picks up event from `notification_service_queue`
 3. Event handler validates and processes the event
 4. Template service renders email HTML from Handlebars template
-5. Email service sends email via Resend API
+5. Email service sends email via SMTP (MailHog or Gmail)
 6. Logs success/failure
 
-## Resend Configuration
+## Email Configuration
 
-For development, you can use Resend's test email addresses:
+### MailHog (Development)
 
-- **From:** `onboarding@resend.dev`
-- **To:** `delivered@resend.dev`
+MailHog is used for local development and testing. It provides a web UI to view sent emails at `http://localhost:8025`.
 
-Free tier limits:
+Set `EMAIL_SERVICE_NAME=MailHog` in your environment.
 
-- 100 emails/day
-- 3,000 emails/month
+### Gmail (Production)
+
+For production, use Gmail with an App Password:
+
+1. Enable 2-Step Verification in your Google Account
+2. Generate an App Password: Google Account → Security → 2-Step Verification → App passwords
+3. Set environment variables:
+   ```
+   EMAIL_SERVICE_NAME=Gmail
+   GMAIL_USER=your-email@gmail.com
+   GMAIL_APP_PASSWORD=your-app-password
+   ```
 
 ## Next Steps (Phases 2-7)
 
 - [ ] Phase 2: Implement RabbitMQ consumer
-- [ ] Phase 3: Implement Email service with Resend
+- [ ] Phase 3: Implement Email service with SMTP
 - [ ] Phase 4: Create event handlers
 - [ ] Phase 5: Docker deployment
 - [ ] Phase 6: Testing suite

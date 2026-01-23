@@ -1,7 +1,7 @@
 {
   "name": "notification-service",
   "version": "1.0.0",
-  "description": "Echo notification service - handles email notifications via Resend",
+  "description": "Echo notification service - handles email notifications via SMTP (MailHog/Gmail)",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsup",
@@ -19,7 +19,8 @@
   "keywords": [
     "notification",
     "email",
-    "resend",
+    "smtp",
+    "gmail",
     "rabbitmq",
     "microservice"
   ],
@@ -38,7 +39,6 @@
     "morgan": "^1.10.1",
     "nodemailer": "^7.0.11",
     "reflect-metadata": "^0.2.1",
-    "resend": "^4.0.0",
     "tsyringe": "^4.8.0",
     "uuid": "^13.0.0",
     "winston": "^3.11.0"

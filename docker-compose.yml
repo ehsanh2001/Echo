@@ -183,7 +183,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Notification Service - Handles email notifications via Resend or SMTP
+  # Notification Service - Handles email notifications via SMTP (MailHog/Gmail)
   notification-service:
     build:
       context: .
@@ -200,10 +200,13 @@ services:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
       # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
-      # SMTP via MailHog container
-      - USE_SMTP=false
-      # - SMTP_HOST=mailhog
-      # - SMTP_PORT=1025
+      # Email Configuration - use 'MailHog' for testing, 'Gmail' for production
+      - EMAIL_SERVICE_NAME=Gmail
+      # - MAILHOG_HOST=mailhog
+      # - MAILHOG_PORT=1025
+      # Gmail credentials (uncomment and set for production)
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
 
       # OpenTelemetry
       - OTEL_SERVICE_NAME=notification-service
