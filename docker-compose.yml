@@ -201,9 +201,10 @@ services:
       # Internal service URLs (Docker networking)
       - USER_SERVICE_URL=http://user-service:8001
       # SMTP via MailHog container
-      - USE_SMTP=true
-      - SMTP_HOST=mailhog
-      - SMTP_PORT=1025
+      - USE_SMTP=false
+      # - SMTP_HOST=mailhog
+      # - SMTP_PORT=1025
+
       # OpenTelemetry
       - OTEL_SERVICE_NAME=notification-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

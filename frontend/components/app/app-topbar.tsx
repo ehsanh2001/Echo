@@ -50,10 +50,10 @@ export function AppTopBar({
 
   // Get workspace and channel display names from Zustand store
   const selectedWorkspaceDisplayName = useWorkspaceStore(
-    (state) => state.selectedWorkspaceDisplayName
+    (state) => state.selectedWorkspaceDisplayName,
   );
   const selectedChannelDisplayName = useWorkspaceStore(
-    (state) => state.selectedChannelDisplayName
+    (state) => state.selectedChannelDisplayName,
   );
 
   // Get avatar initials from display name or username
@@ -70,7 +70,7 @@ export function AppTopBar({
 
   const avatarInitials = getInitials(
     currentUser?.displayName,
-    currentUser?.username
+    currentUser?.username,
   );
 
   const handleLogout = () => {
@@ -190,10 +190,6 @@ export function AppTopBar({
               {currentUser?.email || ""}
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Logout</span>

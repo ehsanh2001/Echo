@@ -56,12 +56,12 @@ interface AppSidebarProps {
   selectedChannel: string | null;
   onSelectChannel: (
     channelId: string | null,
-    displayName?: string | null
+    displayName?: string | null,
   ) => void;
   onWorkspaceCreated?: (workspaceId: string) => void | Promise<void>;
   onChannelCreated?: (
     channelId: string,
-    channelName?: string
+    channelName?: string,
   ) => void | Promise<void>;
 }
 
@@ -97,13 +97,13 @@ export function AppSidebar({
 
   // Get UI state from Zustand
   const selectedWorkspaceId = useWorkspaceStore(
-    (state) => state.selectedWorkspaceId
+    (state) => state.selectedWorkspaceId,
   );
   const setSelectedWorkspace = useWorkspaceStore(
-    (state) => state.setSelectedWorkspace
+    (state) => state.setSelectedWorkspace,
   );
   const getStoredChannelForWorkspace = useWorkspaceStore(
-    (state) => state.getStoredChannelForWorkspace
+    (state) => state.getStoredChannelForWorkspace,
   );
   const setMainPanelView = useWorkspaceStore((state) => state.setMainPanelView);
 
@@ -117,7 +117,7 @@ export function AppSidebar({
       ?.filter(
         (channel) =>
           channel.type === ChannelType.PUBLIC ||
-          channel.type === ChannelType.PRIVATE
+          channel.type === ChannelType.PRIVATE,
       )
       .map((channel) => ({
         ...channel,
@@ -145,13 +145,13 @@ export function AppSidebar({
       const workspace = workspaces.find((w) => w.id === workspaceId);
       const generalChannel = workspace?.channels?.find(
         (ch) =>
-          ch.name.toLowerCase() === "general" && ch.type === ChannelType.PUBLIC
+          ch.name.toLowerCase() === "general" && ch.type === ChannelType.PUBLIC,
       );
 
       if (generalChannel) {
         onSelectChannel(
           generalChannel.id,
-          generalChannel.displayName || generalChannel.name
+          generalChannel.displayName || generalChannel.name,
         );
       } else {
         // No general channel, clear selection
@@ -171,13 +171,13 @@ export function AppSidebar({
     // If the deleted channel was selected, redirect to general channel
     if (selectedChannel === deletedChannelId && selectedWorkspaceId) {
       const generalChannel = channels.find(
-        (ch) => ch.name.toLowerCase() === "general"
+        (ch) => ch.name.toLowerCase() === "general",
       );
 
       if (generalChannel) {
         onSelectChannel(
           generalChannel.id,
-          generalChannel.displayName || generalChannel.name
+          generalChannel.displayName || generalChannel.name,
         );
       } else {
         // Fallback: clear selection
@@ -344,7 +344,7 @@ export function AppSidebar({
                               onClick={() =>
                                 handleSelectWorkspace(
                                   workspace.id,
-                                  workspace.displayName || workspace.name
+                                  workspace.displayName || workspace.name,
                                 )
                               }
                               className="flex-1 px-4 py-2 flex items-center gap-2 text-sidebar-foreground transition-colors text-sm"
@@ -392,10 +392,6 @@ export function AppSidebar({
                                     <DropdownMenuSeparator />
                                   </>
                                 )}
-                                <DropdownMenuItem disabled>
-                                  <Settings className="mr-2 h-4 w-4" />
-                                  Workspace Settings
-                                </DropdownMenuItem>
                                 {workspace.userRole === WorkspaceRole.OWNER && (
                                   <>
                                     <DropdownMenuSeparator />
@@ -524,7 +520,7 @@ export function AppSidebar({
                               onClick={() =>
                                 onSelectChannel(
                                   channel.id,
-                                  channel.displayName || channel.name
+                                  channel.displayName || channel.name,
                                 )
                               }
                               className="flex-1 px-4 py-2 flex items-center gap-2"
