@@ -27,6 +27,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: echo-postgres
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -118,16 +120,17 @@ services:
     image: ehosseinipbox/echo-user:latest
     container_name: echo-user-service
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8001
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${USERS_DB_NAME:-users_db}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
       - RABBITMQ_EXCHANGE=echo.events
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_TOKEN_EXPIRY_SECONDS=${JWT_ACCESS_TOKEN_EXPIRY_SECONDS:-900}
       - JWT_REFRESH_TOKEN_EXPIRY_SECONDS=${JWT_REFRESH_TOKEN_EXPIRY_SECONDS:-604800}
-      - FRONTEND_BASE_URL=http://${EC2_PUBLIC_IP:-localhost}
+      - FRONTEND_URL=http://${EC2_PUBLIC_IP:-localhost}
       # Disable telemetry
       - OTEL_SDK_DISABLED=true
     depends_on:
@@ -148,10 +151,11 @@ services:
     image: ehosseinipbox/echo-workspace-channel:latest
     container_name: echo-workspace-channel-service
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8002
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
       - RABBITMQ_EXCHANGE=echo.events
       - USER_SERVICE_URL=http://user-service:8001
@@ -179,10 +183,11 @@ services:
     image: ehosseinipbox/echo-message:latest
     container_name: echo-message-service
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8003
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${MESSAGE_DB_NAME:-message_db}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
       - RABBITMQ_EXCHANGE=echo.events
       - USER_SERVICE_URL=http://user-service:8001
@@ -212,7 +217,7 @@ services:
     image: ehosseinipbox/echo-notification:latest
     container_name: echo-notification-service
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8005
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
       - RABBITMQ_EXCHANGE=echo.events
@@ -241,9 +246,10 @@ services:
     image: ehosseinipbox/echo-bff:latest
     container_name: echo-bff-service
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8004
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
       - RABBITMQ_EXCHANGE=echo.events
       - USER_SERVICE_URL=http://user-service:8001
@@ -272,11 +278,6 @@ services:
     container_name: echo-frontend
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_BFF_URL=http://${EC2_PUBLIC_IP:-localhost}/api
-      - NEXT_PUBLIC_APP_NAME=Echo
-      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
-      - NEXT_PUBLIC_FARO_COLLECTOR_URL=
-      - NEXT_PUBLIC_APP_ENVIRONMENT=production
     depends_on:
       - bff-service
     restart: unless-stopped
