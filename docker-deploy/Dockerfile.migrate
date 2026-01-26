@@ -1,0 +1,46 @@
+# =============================================================================
+# Database Migration Container
+# =============================================================================
+# This container runs Prisma migrations for all services and then exits.
+# It ensures the database schema is up-to-date before services start.
+# =============================================================================
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install postgresql-client for database checks
+RUN apk add --no-cache postgresql-client
+
+# Copy shared packages
+COPY services/shared ./services/shared/
+
+# Install shared package dependencies
+RUN cd services/shared/telemetry && npm install
+RUN cd services/shared/logger && npm install
+RUN cd services/shared/metrics && npm install
+RUN cd services/shared/http-client && npm install
+
+# Copy user-service for migrations
+COPY services/user-service/package*.json ./services/user-service/
+COPY services/user-service/prisma ./services/user-service/prisma/
+RUN cd services/user-service && npm install --omit=dev
+
+# Copy workspace-channel-service for migrations
+COPY services/workspace-channel-service/package*.json ./services/workspace-channel-service/
+COPY services/workspace-channel-service/prisma ./services/workspace-channel-service/prisma/
+RUN cd services/workspace-channel-service && npm install --omit=dev
+
+# Copy message-service for migrations
+COPY services/message-service/package*.json ./services/message-service/
+COPY services/message-service/prisma ./services/message-service/prisma/
+RUN cd services/message-service && npm install --omit=dev
+
+# Copy the SQL function file
+COPY services/message-service/prisma/migrations/get_next_message_no_function.sql ./get_next_message_no_function.sql
+
+# Copy migration script
+COPY docker-deploy/run-migrations.sh ./run-migrations.sh
+RUN chmod +x ./run-migrations.sh
+
+CMD ["./run-migrations.sh"]

@@ -1,0 +1,318 @@
+# =============================================================================
+# Echo Demo Deployment - Single EC2 Instance
+# =============================================================================
+# This docker-compose is optimized for running on a single small EC2 instance.
+# All services including PostgreSQL run in Docker containers.
+# Uses pre-built images from Docker Hub for fast deployment.
+#
+# Requirements:
+#   - Docker and Docker Compose
+#   - ~1-2GB RAM (t2.micro/t3.small)
+#   - Set environment variables before running (see .env.example)
+#
+# Usage:
+#   export GMAIL_USER=your-email@gmail.com
+#   export GMAIL_APP_PASSWORD=your-app-password
+#   export JWT_SECRET=your-super-secret-key
+#   docker-compose pull
+#   docker-compose up -d
+# =============================================================================
+
+services:
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+
+  # PostgreSQL - Shared database for all services
+  postgres:
+    image: postgres:16-alpine
+    container_name: echo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_MULTIPLE_DATABASES: ${USERS_DB_NAME:-users_db},${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db},${MESSAGE_DB_NAME:-message_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    # Memory limit for 1GB instance
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Redis - For caching and Socket.IO adapter
+  redis:
+    image: redis:7-alpine
+    container_name: echo-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis123} --maxmemory 64mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # RabbitMQ - Message broker for async events
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    container_name: echo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq123}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ==========================================================================
+  # Database Migrations
+  # ==========================================================================
+
+  # Run Prisma migrations for all services
+  db-migrate:
+    build:
+      context: ..
+      dockerfile: docker-deploy/Dockerfile.migrate
+    container_name: echo-db-migrate
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      USERS_DB_NAME: ${USERS_DB_NAME:-users_db}
+      WORKSPACE_CHANNELS_DB_NAME: ${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
+      MESSAGE_DB_NAME: ${MESSAGE_DB_NAME:-message_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ==========================================================================
+  # Application Services
+  # ==========================================================================
+
+  # User Service - Authentication & user management
+  user-service:
+    image: ehosseinipbox/echo-user:latest
+    container_name: echo-user-service
+    environment:
+      - NODE_ENV=production
+      - PORT=8001
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${USERS_DB_NAME:-users_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
+      - RABBITMQ_EXCHANGE=echo.events
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_TOKEN_EXPIRY_SECONDS=${JWT_ACCESS_TOKEN_EXPIRY_SECONDS:-900}
+      - JWT_REFRESH_TOKEN_EXPIRY_SECONDS=${JWT_REFRESH_TOKEN_EXPIRY_SECONDS:-604800}
+      - FRONTEND_BASE_URL=http://${EC2_PUBLIC_IP:-localhost}
+      # Disable telemetry
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Workspace-Channel Service - Workspaces, channels, memberships
+  workspace-channel-service:
+    image: ehosseinipbox/echo-workspace-channel:latest
+    container_name: echo-workspace-channel-service
+    environment:
+      - NODE_ENV=production
+      - PORT=8002
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
+      - RABBITMQ_EXCHANGE=echo.events
+      - USER_SERVICE_URL=http://user-service:8001
+      - FRONTEND_BASE_URL=http://${EC2_PUBLIC_IP:-localhost}
+      - JWT_SECRET=${JWT_SECRET}
+      # Disable telemetry
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Message Service - Messages, threads, reactions
+  message-service:
+    image: ehosseinipbox/echo-message:latest
+    container_name: echo-message-service
+    environment:
+      - NODE_ENV=production
+      - PORT=8003
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${MESSAGE_DB_NAME:-message_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
+      - RABBITMQ_EXCHANGE=echo.events
+      - USER_SERVICE_URL=http://user-service:8001
+      - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
+      - JWT_SECRET=${JWT_SECRET}
+      # Disable telemetry
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      workspace-channel-service:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Notification Service - Email notifications via Gmail
+  notification-service:
+    image: ehosseinipbox/echo-notification:latest
+    container_name: echo-notification-service
+    environment:
+      - NODE_ENV=production
+      - PORT=8005
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
+      - RABBITMQ_EXCHANGE=echo.events
+      - USER_SERVICE_URL=http://user-service:8001
+      - FRONTEND_BASE_URL=http://${EC2_PUBLIC_IP:-localhost}
+      # Gmail SMTP configuration
+      - EMAIL_SERVICE_NAME=Gmail
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+      - EMAIL_FROM_NAME=Echo App
+      # Disable telemetry
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # BFF Service - Backend for Frontend with WebSocket
+  bff-service:
+    image: ehosseinipbox/echo-bff:latest
+    container_name: echo-bff-service
+    environment:
+      - NODE_ENV=production
+      - PORT=8004
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-rabbitmq123}@rabbitmq:5672
+      - RABBITMQ_EXCHANGE=echo.events
+      - USER_SERVICE_URL=http://user-service:8001
+      - WORKSPACE_CHANNEL_SERVICE_URL=http://workspace-channel-service:8002
+      - MESSAGE_SERVICE_URL=http://message-service:8003
+      - FRONTEND_BASE_URL=http://${EC2_PUBLIC_IP:-localhost}
+      - JWT_SECRET=${JWT_SECRET}
+      # Disable telemetry
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      message-service:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Frontend - Next.js application
+  frontend:
+    image: ehosseinipbox/echo-frontend:latest
+    container_name: echo-frontend
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BFF_URL=http://${EC2_PUBLIC_IP:-localhost}/api
+      - NEXT_PUBLIC_APP_NAME=Echo
+      - NEXT_PUBLIC_MAX_MESSAGE_LENGTH=5000
+      - NEXT_PUBLIC_FARO_COLLECTOR_URL=
+      - NEXT_PUBLIC_APP_ENVIRONMENT=production
+    depends_on:
+      - bff-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ==========================================================================
+  # Reverse Proxy
+  # ==========================================================================
+
+  # Nginx - Reverse proxy and static file serving
+  nginx:
+    image: nginx:alpine
+    container_name: echo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - bff-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
