@@ -273,6 +273,9 @@ services:
           memory: 128M
 
   # Frontend - Next.js application
+  # NOTE: NEXT_PUBLIC_* variables are baked in at BUILD TIME by GitHub Actions
+  # The CI/CD pipeline passes EC2_PUBLIC_IP via build-args when building the image
+  # See .github/workflows/cd.yml for the build configuration
   frontend:
     image: ehosseinipbox/echo-frontend:latest
     container_name: echo-frontend

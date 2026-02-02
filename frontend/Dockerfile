@@ -16,9 +16,10 @@ COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build arguments with default values (can be overridden in docker-compose if needed)
-ARG NEXT_PUBLIC_API_URL=http://localhost
-ARG NEXT_PUBLIC_BFF_URL=http://localhost
+# Build arguments with default values for LOCAL DEVELOPMENT
+# Production values are set via GitHub Actions build-args during CI/CD
+ARG NEXT_PUBLIC_API_URL=http://localhost:8004
+ARG NEXT_PUBLIC_BFF_URL=http://localhost:8004
 ARG NEXT_PUBLIC_APP_NAME=Echo
 ARG NEXT_PUBLIC_MAX_MESSAGE_LENGTH=1000
 ARG NEXT_PUBLIC_FARO_COLLECTOR_URL=http://localhost:12347/collect

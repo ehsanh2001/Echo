@@ -1,15 +1,39 @@
 services:
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+
+  # PostgreSQL - Shared database for all services
+  postgres:
+    image: postgres:16-alpine
+    container_name: echo-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   # Redis - For event bus, caching, and sessions
   redis:
     image: redis:7-alpine
     container_name: echo-redis
     ports:
       - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-dev-redis-password}
     volumes:
       - redis_data:/data
     env_file:
-      - .env
+      - ../.env
     restart: unless-stopped
     healthcheck:
       test:
@@ -21,7 +45,7 @@ services:
           "-p",
           "6379",
           "-a",
-          "${REDIS_PASSWORD}",
+          "${REDIS_PASSWORD:-dev-redis-password}",
           "ping",
         ]
       interval: 5s
@@ -38,13 +62,13 @@ services:
       - "15672:15672" # Management UI port
       - "15692:15692" # Prometheus metrics port
     environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-dev-rabbitmq-password}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./O11y/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ../O11y/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     env_file:
-      - .env
+      - ../.env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -76,21 +100,40 @@ services:
       retries: 3
       start_period: 5s
 
+  # Database Migrations - Runs Prisma migrations for all services
+  db-migrate:
+    build:
+      context: ..
+      dockerfile: docker-deploy/Dockerfile.migrate
+    container_name: echo-db-migrate
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      USERS_DB_NAME: ${USERS_DB_NAME:-users_db}
+      WORKSPACE_CHANNELS_DB_NAME: ${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
+      MESSAGE_DB_NAME: ${MESSAGE_DB_NAME:-message_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   # User Service - Handles authentication, user profiles
   user-service:
     build:
-      context: .
+      context: ..
       dockerfile: ./services/user-service/Dockerfile
     container_name: echo-user-service
     ports:
       - "8001:8001"
     env_file:
-      - .env
+      - ../.env
       - .env.docker
-      - ./services/user-service/.env
+      - ../services/user-service/.env
     environment:
-      # Docker-specific database URL (host.docker.internal for PostgreSQL on host)
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${USERS_DB_NAME}
+      # Docker-specific database URL
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USERS_DB_NAME:-users_db}
       # Constructed URLs for Docker networking
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
@@ -98,6 +141,8 @@ services:
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       rabbitmq:
@@ -105,24 +150,22 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   # Workspace-Channel Service - Handles workspaces, channels, and memberships
   workspace-channel-service:
     build:
-      context: .
+      context: ..
       dockerfile: ./services/workspace-channel-service/Dockerfile
     container_name: echo-workspace-channel-service
     ports:
       - "8002:8002"
     env_file:
-      - .env
+      - ../.env
       - .env.docker
-      - ./services/workspace-channel-service/.env
+      - ../services/workspace-channel-service/.env
     environment:
       # Docker-specific database URL
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${WORKSPACE_CHANNELS_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
       # Constructed URLs for Docker networking
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
@@ -132,6 +175,8 @@ services:
       - OTEL_SERVICE_NAME=workspace-channel-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       rabbitmq:
@@ -141,24 +186,22 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   # Message Service - Handles messages, threads, reactions, and mentions
   message-service:
     build:
-      context: .
+      context: ..
       dockerfile: ./services/message-service/Dockerfile
     container_name: echo-message-service
     ports:
       - "8003:8003"
     env_file:
-      - .env
+      - ../.env
       - .env.docker
-      - ./services/message-service/.env
+      - ../services/message-service/.env
     environment:
       # Docker-specific database URL
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT}/${MESSAGE_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${MESSAGE_DB_NAME:-message_db}
       # Constructed URLs for Docker networking
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
@@ -169,6 +212,8 @@ services:
       - OTEL_SERVICE_NAME=message-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       rabbitmq:
@@ -180,21 +225,19 @@ services:
       otel-collector:
         condition: service_healthy
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   # Notification Service - Handles email notifications via SMTP (MailHog/Gmail)
   notification-service:
     build:
-      context: .
+      context: ..
       dockerfile: ./services/notification-service/Dockerfile
     container_name: echo-notification-service
     ports:
       - "8005:8005"
     env_file:
-      - .env
+      - ../.env
       - .env.docker
-      - ./services/notification-service/.env
+      - ../services/notification-service/.env
     environment:
       # Constructed URLs for Docker networking
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:${RABBITMQ_PORT}
@@ -223,20 +266,22 @@ services:
     restart: unless-stopped
 
   # Frontend - Next.js application
+  # NOTE: NEXT_PUBLIC_* variables are baked in at BUILD TIME
+  # For local development: http://localhost:8004 (direct to BFF)
+  # For production: http://{EC2_IP} (via nginx on port 80) - set by GitHub Actions
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
-      # Build args with defaults in Dockerfile - uncomment to override:
-      # args:
-      #   - NEXT_PUBLIC_BFF_URL=http://production-url:8004
+      args:
+        - NEXT_PUBLIC_BFF_URL=http://localhost:8004
+        - NEXT_PUBLIC_API_URL=http://localhost:8004
     container_name: echo-frontend
     ports:
       - "3000:3000"
     env_file:
-      - .env
-      - ./frontend/.env.local
-    # NEXT_PUBLIC_ vars are baked in at build time - no runtime environment needed
+      - ../.env
+      - ../frontend/.env.local
     depends_on:
       - bff-service
       - alloy
@@ -259,15 +304,15 @@ services:
   # BFF Service - Backend for Frontend with real-time WebSocket support
   bff-service:
     build:
-      context: .
+      context: ..
       dockerfile: ./services/bff-service/Dockerfile
     container_name: echo-bff-service
     ports:
       - "8004:8004"
     env_file:
-      - .env
+      - ../.env
       - .env.docker
-      - ./services/bff-service/.env
+      - ../services/bff-service/.env
     environment:
       # Constructed URLs for Docker networking
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
@@ -298,7 +343,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
-      - ./O11y/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - ../O11y/loki/loki-config.yaml:/etc/loki/loki-config.yaml
       - loki_data:/loki
     restart: unless-stopped
     healthcheck:
@@ -324,7 +369,7 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3001
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./O11y/grafana/provisioning:/etc/grafana/provisioning
+      - ../O11y/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       loki:
         condition: service_healthy
@@ -338,7 +383,7 @@ services:
     container_name: echo-tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ./O11y/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - ../O11y/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
       - tempo_data:/var/tempo
     ports:
       - "3200:3200" # Tempo HTTP API
@@ -364,7 +409,7 @@ services:
     container_name: echo-otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./O11y/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ../O11y/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
       - "4317:4317" # OTLP gRPC receiver
       - "4318:4318" # OTLP HTTP receiver
@@ -399,7 +444,7 @@ services:
       - "--web.enable-lifecycle"
       - "--web.enable-remote-write-receiver"
     volumes:
-      - ./O11y/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../O11y/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -430,7 +475,7 @@ services:
       - "--server.http.listen-addr=0.0.0.0:12345"
       - "/etc/alloy/config.alloy"
     volumes:
-      - ./O11y/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../O11y/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro # For Docker log collection
     ports:
       - "12345:12345" # Alloy UI
@@ -457,6 +502,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
+    driver: local
   redis_data:
     driver: local
   rabbitmq_data:
