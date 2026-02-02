@@ -1,0 +1,120 @@
+name: E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Test suite to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - message-workflow
+          - invite-workflow
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Create .env file for E2E
+        run: |
+          cat > .env << EOF
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          REDIS_PASSWORD=redis123
+          RABBITMQ_USER=admin
+          RABBITMQ_PASSWORD=rabbitmq123
+          JWT_SECRET=e2e-test-jwt-secret-minimum-32-characters
+          GMAIL_USER=test@example.com
+          GMAIL_APP_PASSWORD=dummy
+          EC2_PUBLIC_IP=localhost
+          EOF
+
+      - name: Start infrastructure with Docker Compose
+        run: |
+          docker compose -f docker-compose.yml up -d \
+            postgres redis rabbitmq mailhog
+
+      - name: Wait for infrastructure
+        run: |
+          echo "Waiting for PostgreSQL..."
+          until docker exec echo-postgres pg_isready -U postgres; do sleep 2; done
+          echo "Waiting for Redis..."
+          until docker exec echo-redis redis-cli ping; do sleep 2; done
+          echo "Waiting for RabbitMQ..."
+          sleep 30  # RabbitMQ needs extra time
+
+      - name: Create databases
+        run: |
+          docker exec echo-postgres psql -U postgres -c "CREATE DATABASE users_db;"
+          docker exec echo-postgres psql -U postgres -c "CREATE DATABASE workspace_channels_db;"
+          docker exec echo-postgres psql -U postgres -c "CREATE DATABASE message_db;"
+
+      - name: Install shared dependencies
+        run: |
+          cd services/shared/logger && npm ci
+          cd ../telemetry && npm ci
+          cd ../metrics && npm ci
+          cd ../http-client && npm ci
+
+      - name: Run migrations
+        run: |
+          cd services/user-service && npm ci && npx prisma migrate deploy
+          cd ../workspace-channel-service && npm ci && npx prisma migrate deploy
+          cd ../message-service && npm ci && npx prisma migrate deploy
+          docker exec echo-postgres psql -U postgres -d message_db -f /dev/stdin < services/message-service/prisma/migrations/get_next_message_no_function.sql
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_db
+
+      - name: Start application services
+        run: |
+          # Start each service in background
+          cd services/user-service && npm run start &
+          sleep 5
+          cd services/workspace-channel-service && npm run start &
+          sleep 5
+          cd services/message-service && npm run start &
+          sleep 5
+          cd services/bff-service && npm run start &
+          sleep 10
+        env:
+          NODE_ENV: test
+          JWT_SECRET: e2e-test-jwt-secret-minimum-32-characters
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_db
+          REDIS_URL: redis://:redis123@localhost:6379
+          RABBITMQ_URL: amqp://admin:rabbitmq123@localhost:5672
+
+      - name: Install E2E test dependencies
+        run: |
+          cd system-tests/api-e2e
+          npm ci
+
+      - name: Run E2E tests
+        run: |
+          cd system-tests/api-e2e
+          if [ "${{ inputs.test }}" == "all" ]; then
+            npm test
+          else
+            npm test -- --testNamePattern="${{ inputs.test }}"
+          fi
+        env:
+          USER_SERVICE_URL: http://localhost:8001
+          WORKSPACE_CHANNEL_SERVICE_URL: http://localhost:8002
+          MESSAGE_SERVICE_URL: http://localhost:8003
+          BFF_SERVICE_URL: http://localhost:8004
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

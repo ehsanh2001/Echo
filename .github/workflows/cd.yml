@@ -1,0 +1,186 @@
+name: CD Pipeline
+
+"on":
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - docs/**
+      - .github/CODEOWNERS
+
+env:
+  DOCKER_HUB_USERNAME: ehosseinipbox
+
+jobs:
+  # ============================================
+  # Build and Push Backend Services (Parallel)
+  # ============================================
+  build-backend-services:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: user-service
+            image: echo-user
+            dockerfile: services/user-service/Dockerfile
+          - name: message-service
+            image: echo-message
+            dockerfile: services/message-service/Dockerfile
+          - name: workspace-channel-service
+            image: echo-workspace-channel
+            dockerfile: services/workspace-channel-service/Dockerfile
+          - name: notification-service
+            image: echo-notification
+            dockerfile: services/notification-service/Dockerfile
+          - name: bff-service
+            image: echo-bff
+            dockerfile: services/bff-service/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "sha_tag=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ matrix.service.image }}:latest
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ matrix.service.image }}:${{ steps.tags.outputs.sha_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+
+  # ============================================
+  # Build and Push Frontend (with EC2 IP)
+  # ============================================
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "sha_tag=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_USERNAME }}/echo-frontend:latest
+            ${{ env.DOCKER_HUB_USERNAME }}/echo-frontend:${{ steps.tags.outputs.sha_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+            NEXT_PUBLIC_API_URL=http://${{ secrets.EC2_PUBLIC_IP }}
+            NEXT_PUBLIC_BFF_URL=http://${{ secrets.EC2_PUBLIC_IP }}
+
+  # ============================================
+  # Deploy to EC2 (After all images are built)
+  # ============================================
+  deploy:
+    needs:
+      - build-backend-services
+      - build-frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_PUBLIC_IP }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/echo
+
+            echo "=========================================="
+            echo "Pulling latest code from GitHub..."
+            echo "=========================================="
+            git pull origin main
+
+            echo "=========================================="
+            echo "Recording deployment version..."
+            echo "=========================================="
+            cat > docker-deploy/DEPLOYED_VERSION << EOF
+            Deployed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            Git SHA: $(git rev-parse HEAD)
+            Git SHA (short): $(git rev-parse --short=7 HEAD)
+            Branch: main
+            Docker images: ehosseinipbox/echo-*:$(git rev-parse --short=7 HEAD)
+            EOF
+            cat docker-deploy/DEPLOYED_VERSION
+
+            cd docker-deploy
+
+            echo "=========================================="
+            echo "Pulling latest Docker images..."
+            echo "=========================================="
+            docker compose pull
+
+            echo "=========================================="
+            echo "Rebuilding migration container..."
+            echo "=========================================="
+            docker compose build db-migrate
+
+            echo "=========================================="
+            echo "Running database migrations..."
+            echo "=========================================="
+            docker compose up db-migrate
+
+            echo "=========================================="
+            echo "Restarting application containers..."
+            echo "=========================================="
+            docker compose up -d --force-recreate
+
+            echo "=========================================="
+            echo "Waiting for services to be healthy..."
+            echo "=========================================="
+            sleep 30
+
+            echo "=========================================="
+            echo "Verifying deployment..."
+            echo "=========================================="
+            docker compose ps
+
+            echo "=========================================="
+            echo "Health check..."
+            echo "=========================================="
+            curl -f http://localhost/health || exit 1
+
+            echo "=========================================="
+            echo "✅ Deployment successful!"
+            echo "=========================================="

@@ -1,0 +1,279 @@
+name: CI + Integration Tests (PR to main)
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/CODEOWNERS"
+
+env:
+  NODE_VERSION: "22"
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+
+jobs:
+  # ============================================
+  # Full CI for all services
+  # ============================================
+  ci-all-services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install shared dependencies
+        run: |
+          cd services/shared/logger && npm ci
+          cd ../telemetry && npm ci
+          cd ../metrics && npm ci
+          cd ../http-client && npm ci
+
+      - name: CI - User Service
+        run: |
+          cd services/user-service && npm ci
+          npm run lint --workspace=services/user-service
+          npm run build:tsc --workspace=services/user-service
+          npm run test:unit --workspace=services/user-service
+
+      - name: CI - Message Service
+        run: |
+          cd services/message-service && npm ci
+          npm run lint --workspace=services/message-service
+          npm run build:tsc --workspace=services/message-service
+          npm run test:unit --workspace=services/message-service
+
+      - name: CI - Workspace-Channel Service
+        run: |
+          cd services/workspace-channel-service && npm ci
+          npm run lint --workspace=services/workspace-channel-service
+          npm run build:tsc --workspace=services/workspace-channel-service
+          npm run test:unit --workspace=services/workspace-channel-service
+
+      - name: CI - Notification Service
+        run: |
+          cd services/notification-service && npm ci
+          npm run lint --workspace=services/notification-service
+          npm run test:unit --workspace=services/notification-service
+
+      - name: CI - BFF Service
+        run: |
+          cd services/bff-service && npm ci
+          npm run lint --workspace=services/bff-service
+          npm run build:tsc --workspace=services/bff-service
+
+      - name: CI - Frontend
+        run: |
+          cd frontend && npm ci
+          npm run lint
+          npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+          NEXT_PUBLIC_BFF_URL: http://localhost:8004
+
+  # ============================================
+  # Integration Tests - Run in PARALLEL
+  # (Jest --maxWorkers=1 ensures sequential tests within each service)
+  # ============================================
+  integration-user-service:
+    needs: ci-all-services
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: users_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - name: Install shared dependencies
+        run: |
+          cd services/shared/logger && npm ci
+          cd ../telemetry && npm ci
+          cd ../metrics && npm ci
+          cd ../http-client && npm ci
+      - name: Install & Migrate
+        run: |
+          cd services/user-service
+          npm ci
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_db
+      - name: Run Integration Tests
+        run: npm run test:integration --workspace=services/user-service
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_db
+          REDIS_URL: redis://localhost:6379
+          RABBITMQ_URL: amqp://localhost:5672
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline
+
+  integration-workspace-channel-service:
+    needs: ci-all-services # Parallel with other integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workspace_channels_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - name: Install shared dependencies
+        run: |
+          cd services/shared/logger && npm ci
+          cd ../telemetry && npm ci
+          cd ../metrics && npm ci
+          cd ../http-client && npm ci
+      - name: Install & Migrate
+        run: |
+          cd services/workspace-channel-service
+          npm ci
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workspace_channels_db
+      - name: Run Integration Tests
+        run: npm run test:integration --workspace=services/workspace-channel-service
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workspace_channels_db
+          REDIS_URL: redis://localhost:6379
+          RABBITMQ_URL: amqp://localhost:5672
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline
+
+  integration-message-service:
+    needs: ci-all-services # Parallel with other integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: message_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - name: Install shared dependencies
+        run: |
+          cd services/shared/logger && npm ci
+          cd ../telemetry && npm ci
+          cd ../metrics && npm ci
+          cd ../http-client && npm ci
+      - name: Install & Migrate
+        run: |
+          cd services/message-service
+          npm ci
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/message_db
+      - name: Apply SQL functions
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d message_db \
+            -f services/message-service/prisma/migrations/get_next_message_no_function.sql
+      - name: Run Integration Tests
+        run: npm run test:integration --workspace=services/message-service
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/message_db
+          REDIS_URL: redis://localhost:6379
+          RABBITMQ_URL: amqp://localhost:5672
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline
