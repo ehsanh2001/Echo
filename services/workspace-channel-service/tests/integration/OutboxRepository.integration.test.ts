@@ -24,7 +24,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
     outboxRepository =
       container.resolve<IOutboxRepository>("IOutboxRepository");
     workspaceRepository = container.resolve<IWorkspaceRepository>(
-      "IWorkspaceRepository"
+      "IWorkspaceRepository",
     );
     prisma = new PrismaClient();
   });
@@ -125,20 +125,27 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       createdEventIds.push(result.id);
     });
 
-    it("should create event with invalid workspaceId", async () => {
-      // Arrange
+    it("should create event with non-existent workspaceId (no FK constraint)", async () => {
+      // Arrange - OutboxEvent intentionally has no FK constraints
+      // The workspace/channel may be deleted before the event is published
+      const nonExistentWorkspaceId = randomUUID();
       const eventData: CreateOutboxEventData = {
-        workspaceId: randomUUID(), // Non-existent workspace - should fail
+        workspaceId: nonExistentWorkspaceId, // This is allowed - just routing metadata
         aggregateType: "workspace",
         aggregateId: randomUUID(),
         eventType: "test.event",
         payload: { test: "data" },
       };
 
-      // Act & Assert
-      await expect(outboxRepository.create(eventData)).rejects.toThrow(
-        WorkspaceChannelServiceError
-      );
+      // Act - should succeed since workspaceId is just metadata
+      const result = await outboxRepository.create(eventData);
+
+      // Assert
+      expect(result.workspaceId).toBe(nonExistentWorkspaceId);
+      expect(result.status).toBe(OutboxStatus.pending);
+
+      // Cleanup
+      createdEventIds.push(result.id);
     });
   });
 
@@ -156,13 +163,13 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
 
       // Assert
       const testEvents = result.filter((event) =>
-        [event1.id, event2.id].includes(event.id)
+        [event1.id, event2.id].includes(event.id),
       );
       expect(testEvents).toHaveLength(2);
 
       // Should be ordered by producedAt (oldest first)
       const sortedTestEvents = testEvents.sort(
-        (a, b) => a.producedAt.getTime() - b.producedAt.getTime()
+        (a, b) => a.producedAt.getTime() - b.producedAt.getTime(),
       );
       expect(sortedTestEvents.length).toBeGreaterThan(0);
       expect(sortedTestEvents[0]?.id).toBe(event1.id);
@@ -190,7 +197,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       const pendingEvent = await createTestOutboxEvent(workspace.id, "pending");
       const publishedEvent = await createTestOutboxEvent(
         workspace.id,
-        "published"
+        "published",
       );
 
       // Mark one event as published
@@ -288,7 +295,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       const pendingEvent = await createTestOutboxEvent(workspace.id, "pending");
       const publishedEvent = await createTestOutboxEvent(
         workspace.id,
-        "published"
+        "published",
       );
 
       await prisma.$transaction(async (tx) => {
@@ -330,7 +337,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
         expect(updatedEvent!.status).toBe(OutboxStatus.published);
         expect(updatedEvent!.publishedAt).not.toBeNull();
         expect(updatedEvent!.publishedAt!.getTime()).toBeGreaterThanOrEqual(
-          beforePublish.getTime()
+          beforePublish.getTime(),
         );
       } finally {
         await checkPrisma.$disconnect();
@@ -342,7 +349,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       await expect(
         prisma.$transaction(async (tx) => {
           return await outboxRepository.markPublished(tx, randomUUID());
-        })
+        }),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
   });
@@ -377,7 +384,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       await expect(
         prisma.$transaction(async (tx) => {
           return await outboxRepository.markFailed(tx, randomUUID());
-        })
+        }),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -435,9 +442,8 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
       // Act
-      const deletedCount = await outboxRepository.deleteOldPublished(
-        cutoffDate
-      );
+      const deletedCount =
+        await outboxRepository.deleteOldPublished(cutoffDate);
 
       // Assert
       expect(deletedCount).toBeGreaterThan(0);
@@ -477,9 +483,8 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       const cutoffDate = new Date();
 
       // Act
-      const deletedCount = await outboxRepository.deleteOldPublished(
-        cutoffDate
-      );
+      const deletedCount =
+        await outboxRepository.deleteOldPublished(cutoffDate);
 
       // Assert - Should not delete pending or failed events
       const { PrismaClient } = await import("@prisma/client");
@@ -509,23 +514,23 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       const event1 = await createTestOutboxEvent(
         workspace.id,
         "event1",
-        aggregateId
+        aggregateId,
       );
       const event2 = await createTestOutboxEvent(
         workspace.id,
         "event2",
-        aggregateId
+        aggregateId,
       );
       const otherEvent = await createTestOutboxEvent(
         workspace.id,
         "other",
-        randomUUID()
+        randomUUID(),
       );
 
       // Act
       const result = await outboxRepository.findByAggregate(
         "workspace",
-        aggregateId
+        aggregateId,
       );
 
       // Assert
@@ -538,7 +543,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       // Should be ordered by producedAt
       expect(result.length).toBeGreaterThan(1);
       expect(result[0]?.producedAt.getTime()).toBeLessThanOrEqual(
-        result[1]?.producedAt.getTime() ?? 0
+        result[1]?.producedAt.getTime() ?? 0,
       );
     });
 
@@ -546,7 +551,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
       // Act
       const result = await outboxRepository.findByAggregate(
         "workspace",
-        randomUUID()
+        randomUUID(),
       );
 
       // Assert
@@ -564,7 +569,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
         ownerId: randomUUID(),
         settings: {},
       },
-      randomUUID()
+      randomUUID(),
     );
 
     createdWorkspaceIds.push(workspace.id);
@@ -574,7 +579,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
   async function createTestOutboxEvent(
     workspaceId: string,
     eventType: string,
-    aggregateId?: string
+    aggregateId?: string,
   ) {
     const eventData: CreateOutboxEventData = {
       workspaceId,
@@ -625,7 +630,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
             instance1Prisma.$transaction(async (tx1) => {
               const locked = await outboxRepository.findPending(tx1, 3);
               const ourEvents = locked.filter((e) =>
-                events.some((evt) => evt.id === e.id)
+                events.some((evt) => evt.id === e.id),
               );
 
               // Simulate processing delay to ensure overlap
@@ -646,7 +651,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
 
               const locked = await outboxRepository.findPending(tx2, 3);
               const ourEvents = locked.filter((e) =>
-                events.some((evt) => evt.id === e.id)
+                events.some((evt) => evt.id === e.id),
               );
 
               // Simulate processing delay
@@ -680,7 +685,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
           expect(result2.length).toBeGreaterThan(0);
 
           console.log(
-            `✅ Multi-instance test: Instance 1 processed ${result1.length}, Instance 2 processed ${result2.length}`
+            `✅ Multi-instance test: Instance 1 processed ${result1.length}, Instance 2 processed ${result2.length}`,
           );
         } finally {
           await instance1Prisma.$disconnect();
@@ -717,10 +722,10 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
               const locked = await outboxRepository.findFailedForRetry(
                 tx,
                 3,
-                10
+                10,
               );
               const ourEvents = locked.filter((e) =>
-                failedEvents.some((evt) => evt.id === e.id)
+                failedEvents.some((evt) => evt.id === e.id),
               );
 
               await new Promise((resolve) => setTimeout(resolve, 30));
@@ -736,10 +741,10 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
               const locked = await outboxRepository.findFailedForRetry(
                 tx,
                 3,
-                10
+                10,
               );
               const ourEvents = locked.filter((e) =>
-                failedEvents.some((evt) => evt.id === e.id)
+                failedEvents.some((evt) => evt.id === e.id),
               );
 
               await new Promise((resolve) => setTimeout(resolve, 30));
@@ -760,7 +765,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
           expect(uniqueProcessed.size).toBe(failedEvents.length);
 
           console.log(
-            `✅ Concurrent retry test: Instance 1 processed ${processed1.length}, Instance 2 processed ${processed2.length}`
+            `✅ Concurrent retry test: Instance 1 processed ${processed1.length}, Instance 2 processed ${processed2.length}`,
           );
         } finally {
           await instance1.$disconnect();
@@ -787,7 +792,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
 
             // Find our test events
             const testEvents = lockedEvents.filter((event: OutboxEvent) =>
-              [event1.id, event2.id].includes(event.id)
+              [event1.id, event2.id].includes(event.id),
             );
 
             // Process one event (mark as published) within the same transaction
@@ -822,10 +827,10 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
           let lockWasEffective = false;
 
           await testPrisma.$transaction(async (tx) => {
-            // Lock the event
-            const lockedEvents = await outboxRepository.findPending(tx, 1);
+            // Lock pending events - use larger limit to ensure we get our event
+            const lockedEvents = await outboxRepository.findPending(tx, 100);
             const testEvent = lockedEvents.find(
-              (e: OutboxEvent) => e.id === event.id
+              (e: OutboxEvent) => e.id === event.id,
             );
 
             if (testEvent) {
@@ -848,7 +853,7 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
         const workspace = await createTestWorkspace();
         const failedEvent = await createTestOutboxEvent(
           workspace.id,
-          "failed.tx"
+          "failed.tx",
         );
 
         // Mark as failed first (automatically increments to 1)
@@ -872,12 +877,12 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
             const lockedEvents = await outboxRepository.findFailedForRetry(
               tx,
               3,
-              10
+              10,
             );
 
             // Find our test event
             const testEvent = lockedEvents.find(
-              (e: OutboxEvent) => e.id === failedEvent.id
+              (e: OutboxEvent) => e.id === failedEvent.id,
             );
 
             // Process the failed event within the same transaction (mark failed again)
@@ -1030,12 +1035,12 @@ describe("OutboxRepository Transaction-Aware Integration Tests", () => {
           // Assert - All events should have been processed
           const finalStates = await Promise.all(
             events.map((e) =>
-              testPrisma.outboxEvent.findUnique({ where: { id: e.id } })
-            )
+              testPrisma.outboxEvent.findUnique({ where: { id: e.id } }),
+            ),
           );
 
           const publishedCount = finalStates.filter(
-            (e) => e?.status === "published"
+            (e) => e?.status === "published",
           ).length;
           expect(publishedCount).toBeGreaterThan(0);
           expect(processedEvents.length).toBeGreaterThan(0);

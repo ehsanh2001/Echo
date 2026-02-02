@@ -1,4 +1,10 @@
 import "reflect-metadata";
+
+// Mock uuid before importing modules that use it
+jest.mock("uuid", () => ({
+  v4: jest.fn(() => "mock-uuid-v4"),
+}));
+
 import { RabbitMQConsumer } from "../../src/workers/RabbitMQConsumer";
 import { IInviteEventHandler } from "../../src/interfaces/handlers/IInviteEventHandler";
 import {

@@ -4,6 +4,7 @@ import { WorkspaceService } from "../../src/services/WorkspaceService";
 import { IWorkspaceRepository } from "../../src/interfaces/repositories/IWorkspaceRepository";
 import { IChannelRepository } from "../../src/interfaces/repositories/IChannelRepository";
 import { IInviteRepository } from "../../src/interfaces/repositories/IInviteRepository";
+import { IOutboxService } from "../../src/interfaces/services/IOutboxService";
 import { UserServiceClient } from "../../src/services/userServiceClient";
 import { CreateWorkspaceRequest, UserInfo } from "../../src/types";
 import { WorkspaceChannelServiceError } from "../../src/utils/errors";
@@ -15,6 +16,7 @@ describe("WorkspaceService (Unit Tests)", () => {
   let mockWorkspaceRepository: jest.Mocked<IWorkspaceRepository>;
   let mockChannelRepository: jest.Mocked<IChannelRepository>;
   let mockInviteRepository: jest.Mocked<IInviteRepository>;
+  let mockOutboxService: jest.Mocked<IOutboxService>;
   let mockUserServiceClient: jest.Mocked<UserServiceClient>;
   let mockPrisma: jest.Mocked<PrismaClient>;
 
@@ -77,6 +79,15 @@ describe("WorkspaceService (Unit Tests)", () => {
       checkUserExistsById: jest.fn(),
     } as any;
 
+    mockOutboxService = {
+      createInviteEvent: jest.fn(),
+      createWorkspaceMemberJoinedEvent: jest.fn(),
+      createChannelMemberJoinedEvent: jest.fn(),
+      createChannelCreatedEvent: jest.fn(),
+      createChannelDeletedEvent: jest.fn(),
+      createWorkspaceDeletedEvent: jest.fn(),
+    } as any;
+
     mockPrisma = {
       $transaction: jest.fn((callback: any) => callback(mockPrisma)),
     } as any;
@@ -87,7 +98,8 @@ describe("WorkspaceService (Unit Tests)", () => {
       mockChannelRepository,
       mockInviteRepository,
       mockUserServiceClient,
-      mockPrisma
+      mockOutboxService,
+      mockPrisma,
     );
 
     // Reset all mocks
@@ -109,12 +121,12 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.createWorkspace(
         "user-123",
-        validRequest
+        validRequest,
       );
 
       // Assert
       expect(mockUserServiceClient.checkUserExistsById).toHaveBeenCalledWith(
-        "user-123"
+        "user-123",
       );
       expect(mockWorkspaceRepository.create).toHaveBeenCalledWith(
         {
@@ -124,7 +136,7 @@ describe("WorkspaceService (Unit Tests)", () => {
           ownerId: "user-123",
           settings: {},
         },
-        "user-123"
+        "user-123",
       );
       expect(result).toEqual({
         id: mockWorkspace.id,
@@ -158,7 +170,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.createWorkspace(
         "user-123",
-        minimalRequest
+        minimalRequest,
       );
 
       // Assert
@@ -170,7 +182,7 @@ describe("WorkspaceService (Unit Tests)", () => {
           ownerId: "user-123",
           settings: {},
         },
-        "user-123"
+        "user-123",
       );
       expect(result.displayName).toBe("Minimal Workspace");
       expect(result.description).toBeNull();
@@ -193,7 +205,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           name: "my-workspace", // Trimmed and lowercased
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -208,7 +220,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       await workspaceService.createWorkspace(
         "user-123",
-        requestWithoutDisplayName
+        requestWithoutDisplayName,
       );
 
       // Assert
@@ -216,7 +228,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "My Awesome Workspace Name", // Converted dots/underscores to spaces, title case
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -237,7 +249,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "Custom Display Name", // Uses provided, not generated
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -253,7 +265,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       await workspaceService.createWorkspace(
         "user-123",
-        requestWithEmptyDescription
+        requestWithEmptyDescription,
       );
 
       // Assert
@@ -261,7 +273,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           description: null, // Empty string becomes null
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -273,7 +285,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", invalidRequest)
+        workspaceService.createWorkspace("user-123", invalidRequest),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -285,7 +297,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", invalidRequest)
+        workspaceService.createWorkspace("user-123", invalidRequest),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -297,12 +309,12 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.createWorkspace(
         "user-123",
-        validRequest
+        validRequest,
       );
 
       // Assert
       expect(mockUserServiceClient.checkUserExistsById).toHaveBeenCalledWith(
-        "user-123"
+        "user-123",
       );
       expect(mockWorkspaceRepository.create).toHaveBeenCalled(); // Should proceed anyway
       expect(result).toBeDefined();
@@ -311,12 +323,12 @@ describe("WorkspaceService (Unit Tests)", () => {
     it("should throw error when user does not exist", async () => {
       // Arrange
       mockUserServiceClient.checkUserExistsById.mockRejectedValue(
-        WorkspaceChannelServiceError.notFound("User not found", "user")
+        WorkspaceChannelServiceError.notFound("User not found", "user"),
       );
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("invalid-user", validRequest)
+        workspaceService.createWorkspace("invalid-user", validRequest),
       ).rejects.toThrow(WorkspaceChannelServiceError);
       expect(mockWorkspaceRepository.create).not.toHaveBeenCalled();
     });
@@ -325,12 +337,12 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Arrange
       mockUserServiceClient.checkUserExistsById.mockResolvedValue(mockUserInfo);
       mockWorkspaceRepository.create.mockRejectedValue(
-        new Error("Database error")
+        new Error("Database error"),
       );
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", validRequest)
+        workspaceService.createWorkspace("user-123", validRequest),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -338,14 +350,14 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Arrange
       const customError = WorkspaceChannelServiceError.conflict(
         "Workspace name already exists",
-        { field: "name", value: "test-workspace" }
+        { field: "name", value: "test-workspace" },
       );
       mockUserServiceClient.checkUserExistsById.mockResolvedValue(mockUserInfo);
       mockWorkspaceRepository.create.mockRejectedValue(customError);
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", validRequest)
+        workspaceService.createWorkspace("user-123", validRequest),
       ).rejects.toThrow(customError);
     });
   });
@@ -360,7 +372,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(mockWorkspaceRepository.findByName).toHaveBeenCalledWith(
-        "new-workspace"
+        "new-workspace",
       );
       expect(result).toBe(true);
     });
@@ -374,7 +386,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(mockWorkspaceRepository.findByName).toHaveBeenCalledWith(
-        "test-workspace"
+        "test-workspace",
       );
       expect(result).toBe(false);
     });
@@ -388,19 +400,19 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(mockWorkspaceRepository.findByName).toHaveBeenCalledWith(
-        "test-workspace" // Trimmed and lowercased
+        "test-workspace", // Trimmed and lowercased
       );
     });
 
     it("should throw database error when repository fails", async () => {
       // Arrange
       mockWorkspaceRepository.findByName.mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       // Act & Assert
       await expect(
-        workspaceService.isNameAvailable("test-workspace")
+        workspaceService.isNameAvailable("test-workspace"),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
   });
@@ -423,7 +435,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "My Awesome Workspace",
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -443,7 +455,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "My Awesome Workspace",
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -463,7 +475,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "My Awesome Workspace",
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -483,7 +495,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "My Awesome Workspace Name",
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -503,7 +515,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "Workspace", // Capitalized
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -524,7 +536,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           displayName: "Custom Name", // Trimmed
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -538,7 +550,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", request)
+        workspaceService.createWorkspace("user-123", request),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       // Should not reach repository because validation fails
@@ -563,7 +575,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           settings: {}, // Always present
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -583,7 +595,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           ownerId: "user-456",
         }),
-        "user-456"
+        "user-456",
       );
     });
 
@@ -604,7 +616,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           description: null, // Whitespace-only description becomes null
         }),
-        "user-123"
+        "user-123",
       );
     });
 
@@ -625,7 +637,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         expect.objectContaining({
           description: "A real description", // Trimmed but preserved
         }),
-        "user-123"
+        "user-123",
       );
     });
   });
@@ -638,12 +650,12 @@ describe("WorkspaceService (Unit Tests)", () => {
       };
       mockUserServiceClient.checkUserExistsById.mockResolvedValue(mockUserInfo);
       mockWorkspaceRepository.create.mockRejectedValue(
-        new Error("Unexpected database error")
+        new Error("Unexpected database error"),
       );
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", request)
+        workspaceService.createWorkspace("user-123", request),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -653,14 +665,14 @@ describe("WorkspaceService (Unit Tests)", () => {
         name: "test-workspace",
       };
       const originalError = WorkspaceChannelServiceError.conflict(
-        "Name already exists"
+        "Name already exists",
       );
       mockUserServiceClient.checkUserExistsById.mockResolvedValue(mockUserInfo);
       mockWorkspaceRepository.create.mockRejectedValue(originalError);
 
       // Act & Assert
       await expect(
-        workspaceService.createWorkspace("user-123", request)
+        workspaceService.createWorkspace("user-123", request),
       ).rejects.toBe(originalError); // Same error instance
     });
   });
@@ -687,7 +699,7 @@ describe("WorkspaceService (Unit Tests)", () => {
     it("should return workspace details with user role and member count for active member", async () => {
       // Arrange
       mockWorkspaceRepository.findById.mockResolvedValue(
-        mockWorkspaceWithSettings
+        mockWorkspaceWithSettings,
       );
       mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
       mockWorkspaceRepository.countActiveMembers.mockResolvedValue(5);
@@ -695,19 +707,19 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
       expect(mockWorkspaceRepository.findById).toHaveBeenCalledWith(
-        "workspace-123"
+        "workspace-123",
       );
       expect(mockWorkspaceRepository.getMembership).toHaveBeenCalledWith(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
       expect(mockWorkspaceRepository.countActiveMembers).toHaveBeenCalledWith(
-        "workspace-123"
+        "workspace-123",
       );
       expect(result).toEqual({
         id: mockWorkspaceWithSettings.id,
@@ -740,7 +752,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
@@ -756,15 +768,15 @@ describe("WorkspaceService (Unit Tests)", () => {
       await expect(
         workspaceService.getWorkspaceDetails(
           "user-123",
-          "nonexistent-workspace"
-        )
+          "nonexistent-workspace",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.getWorkspaceDetails(
           "user-123",
-          "nonexistent-workspace"
-        )
+          "nonexistent-workspace",
+        ),
       ).rejects.toMatchObject({
         statusCode: 404,
         message: expect.stringContaining("Workspace"),
@@ -782,11 +794,17 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(
-        workspaceService.getWorkspaceDetails("non-member-user", "workspace-123")
+        workspaceService.getWorkspaceDetails(
+          "non-member-user",
+          "workspace-123",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.getWorkspaceDetails("non-member-user", "workspace-123")
+        workspaceService.getWorkspaceDetails(
+          "non-member-user",
+          "workspace-123",
+        ),
       ).rejects.toMatchObject({
         statusCode: 403,
         message: "You are not a member of this workspace",
@@ -804,16 +822,16 @@ describe("WorkspaceService (Unit Tests)", () => {
       };
       mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
       mockWorkspaceRepository.getMembership.mockResolvedValue(
-        inactiveMembership
+        inactiveMembership,
       );
 
       // Act & Assert
       await expect(
-        workspaceService.getWorkspaceDetails("user-123", "workspace-123")
+        workspaceService.getWorkspaceDetails("user-123", "workspace-123"),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
-        workspaceService.getWorkspaceDetails("user-123", "workspace-123")
+        workspaceService.getWorkspaceDetails("user-123", "workspace-123"),
       ).rejects.toMatchObject({
         statusCode: 403,
         message: "Your membership in this workspace is inactive",
@@ -835,7 +853,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         settings: customSettings,
       };
       mockWorkspaceRepository.findById.mockResolvedValue(
-        workspaceWithCustomSettings
+        workspaceWithCustomSettings,
       );
       mockWorkspaceRepository.getMembership.mockResolvedValue(mockMembership);
       mockWorkspaceRepository.countActiveMembers.mockResolvedValue(8);
@@ -843,7 +861,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
@@ -859,7 +877,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
@@ -879,7 +897,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
@@ -903,7 +921,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         async () => {
           callOrder.push("countActiveMembers");
           return 5;
-        }
+        },
       );
 
       // Act
@@ -926,7 +944,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Act
       const result = await workspaceService.getWorkspaceDetails(
         "user-123",
-        "workspace-123"
+        "workspace-123",
       );
 
       // Assert
@@ -1026,10 +1044,10 @@ describe("WorkspaceService (Unit Tests)", () => {
         mockChannel2,
       ]);
       mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
-        mockMembershipResult
+        mockMembershipResult,
       );
       mockChannelRepository.addOrReactivateMember.mockResolvedValue(
-        mockChannelMembershipResult
+        mockChannelMembershipResult,
       );
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
@@ -1037,52 +1055,52 @@ describe("WorkspaceService (Unit Tests)", () => {
       const result = await workspaceService.acceptInvite(
         "valid-token-123",
         "user-789",
-        "test@example.com"
+        "test@example.com",
       );
 
       // Assert - Initial lookups happen outside transaction
       expect(mockInviteRepository.findByToken).toHaveBeenCalledWith(
-        "valid-token-123"
+        "valid-token-123",
       );
       expect(mockWorkspaceRepository.findById).toHaveBeenCalledWith(
-        "workspace-123"
+        "workspace-123",
       );
 
       // Transaction operations
       expect(
-        mockWorkspaceRepository.addOrReactivateMember
+        mockWorkspaceRepository.addOrReactivateMember,
       ).toHaveBeenCalledWith(
         "workspace-123",
         "user-789",
         "member",
         "inviter-456",
-        mockPrisma
+        mockPrisma,
       );
       expect(mockInviteRepository.markAsAccepted).toHaveBeenCalledWith(
         "invite-123",
         "user-789",
         expect.any(Date),
-        mockPrisma
+        mockPrisma,
       );
       expect(
-        mockChannelRepository.findPublicChannelsByWorkspace
+        mockChannelRepository.findPublicChannelsByWorkspace,
       ).toHaveBeenCalledWith("workspace-123", mockPrisma);
       expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledTimes(
-        2
+        2,
       );
       expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
         "channel-1",
         "user-789",
         "inviter-456",
         "member",
-        mockPrisma
+        mockPrisma,
       );
       expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
         "channel-2",
         "user-789",
         "inviter-456",
         "member",
-        mockPrisma
+        mockPrisma,
       );
 
       // Verify response structure
@@ -1103,16 +1121,16 @@ describe("WorkspaceService (Unit Tests)", () => {
         workspaceService.acceptInvite(
           "invalid-token",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.acceptInvite(
           "invalid-token",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toMatchObject({
         statusCode: 404,
         code: "NOT_FOUND",
@@ -1132,16 +1150,16 @@ describe("WorkspaceService (Unit Tests)", () => {
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toMatchObject({
         statusCode: 400,
         code: "BAD_REQUEST",
@@ -1161,16 +1179,16 @@ describe("WorkspaceService (Unit Tests)", () => {
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toMatchObject({
         statusCode: 410,
         code: "EXPIRED",
@@ -1187,16 +1205,16 @@ describe("WorkspaceService (Unit Tests)", () => {
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toMatchObject({
         statusCode: 404,
         code: "NOT_FOUND",
@@ -1217,16 +1235,16 @@ describe("WorkspaceService (Unit Tests)", () => {
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toThrow(WorkspaceChannelServiceError);
 
       await expect(
         workspaceService.acceptInvite(
           "valid-token-123",
           "user-789",
-          "test@example.com"
-        )
+          "test@example.com",
+        ),
       ).rejects.toMatchObject({
         statusCode: 403,
         code: "FORBIDDEN",
@@ -1239,7 +1257,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       mockWorkspaceRepository.findById.mockResolvedValue(mockWorkspace);
       mockChannelRepository.findPublicChannelsByWorkspace.mockResolvedValue([]);
       mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
-        mockMembershipResult
+        mockMembershipResult,
       );
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
@@ -1247,12 +1265,12 @@ describe("WorkspaceService (Unit Tests)", () => {
       const result = await workspaceService.acceptInvite(
         "valid-token-123",
         "user-789",
-        "test@example.com"
+        "test@example.com",
       );
 
       // Assert
       expect(
-        mockChannelRepository.addOrReactivateMember
+        mockChannelRepository.addOrReactivateMember,
       ).not.toHaveBeenCalled();
       expect(result.workspace.id).toBe(mockWorkspace.id);
       expect(result.workspace.name).toBe(mockWorkspace.name);
@@ -1271,10 +1289,10 @@ describe("WorkspaceService (Unit Tests)", () => {
         mockChannel1,
       ]);
       mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
-        mockMembershipResult
+        mockMembershipResult,
       );
       mockChannelRepository.addOrReactivateMember.mockResolvedValue(
-        mockChannelMembershipResult
+        mockChannelMembershipResult,
       );
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
@@ -1282,25 +1300,25 @@ describe("WorkspaceService (Unit Tests)", () => {
       await workspaceService.acceptInvite(
         "valid-token-123",
         "user-789",
-        "test@example.com"
+        "test@example.com",
       );
 
       // Assert - Should use userId when inviterId is null
       expect(
-        mockWorkspaceRepository.addOrReactivateMember
+        mockWorkspaceRepository.addOrReactivateMember,
       ).toHaveBeenCalledWith(
         "workspace-123",
         "user-789",
         "member",
         "user-789", // userId used as fallback
-        mockPrisma
+        mockPrisma,
       );
       expect(mockChannelRepository.addOrReactivateMember).toHaveBeenCalledWith(
         "channel-1",
         "user-789",
         "user-789", // userId used as fallback
         "member",
-        mockPrisma
+        mockPrisma,
       );
     });
 
@@ -1312,10 +1330,10 @@ describe("WorkspaceService (Unit Tests)", () => {
         mockChannel1,
       ]);
       mockWorkspaceRepository.addOrReactivateMember.mockResolvedValue(
-        mockMembershipResult
+        mockMembershipResult,
       );
       mockChannelRepository.addOrReactivateMember.mockResolvedValue(
-        mockChannelMembershipResult
+        mockChannelMembershipResult,
       );
       mockInviteRepository.markAsAccepted.mockResolvedValue(mockUpdatedInvite);
 
@@ -1323,13 +1341,13 @@ describe("WorkspaceService (Unit Tests)", () => {
       await workspaceService.acceptInvite(
         "valid-token-123",
         "user-789",
-        "test@example.com"
+        "test@example.com",
       );
 
       // Assert - Verify transaction was used
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
-        expect.any(Function)
+        expect.any(Function),
       );
     });
   });
@@ -1414,7 +1432,7 @@ describe("WorkspaceService (Unit Tests)", () => {
     it("should return user memberships without channels when includeChannels is false", async () => {
       // Arrange
       mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
-        mockWorkspacesData
+        mockWorkspacesData,
       );
 
       // Act
@@ -1422,10 +1440,10 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(
-        mockWorkspaceRepository.findWorkspacesByUserId
+        mockWorkspaceRepository.findWorkspacesByUserId,
       ).toHaveBeenCalledWith(userId);
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).not.toHaveBeenCalled();
 
       expect(result.workspaces).toHaveLength(2);
@@ -1453,7 +1471,7 @@ describe("WorkspaceService (Unit Tests)", () => {
         firstWorkspace,
       ]);
       mockChannelRepository.getChannelMembershipsByUserId.mockResolvedValue(
-        mockChannelMemberships
+        mockChannelMemberships,
       );
 
       // Act
@@ -1461,10 +1479,10 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(
-        mockWorkspaceRepository.findWorkspacesByUserId
+        mockWorkspaceRepository.findWorkspacesByUserId,
       ).toHaveBeenCalledWith(userId);
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).toHaveBeenCalledWith(userId, "workspace-1");
 
       expect(result.workspaces).toHaveLength(1);
@@ -1481,7 +1499,7 @@ describe("WorkspaceService (Unit Tests)", () => {
     it("should default to includeChannels=false when parameter is not provided", async () => {
       // Arrange
       mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
-        mockWorkspacesData
+        mockWorkspacesData,
       );
 
       // Act
@@ -1489,7 +1507,7 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).not.toHaveBeenCalled();
       expect(result.workspaces[0]?.channels).toBeUndefined();
     });
@@ -1504,7 +1522,7 @@ describe("WorkspaceService (Unit Tests)", () => {
       // Assert
       expect(result.workspaces).toHaveLength(0);
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).not.toHaveBeenCalled();
     });
 
@@ -1533,10 +1551,10 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Act & Assert
       await expect(workspaceService.getUserMemberships(userId)).rejects.toThrow(
-        WorkspaceChannelServiceError
+        WorkspaceChannelServiceError,
       );
       expect(
-        mockWorkspaceRepository.findWorkspacesByUserId
+        mockWorkspaceRepository.findWorkspacesByUserId,
       ).toHaveBeenCalledWith(userId);
     });
 
@@ -1550,22 +1568,22 @@ describe("WorkspaceService (Unit Tests)", () => {
       ]);
       const error = new Error("Channel query failed");
       mockChannelRepository.getChannelMembershipsByUserId.mockRejectedValue(
-        error
+        error,
       );
 
       // Act & Assert
       await expect(
-        workspaceService.getUserMemberships(userId, true)
+        workspaceService.getUserMemberships(userId, true),
       ).rejects.toThrow(WorkspaceChannelServiceError);
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).toHaveBeenCalledWith(userId, "workspace-1");
     });
 
     it("should call getChannelMembershipsByUserId for each workspace when includeChannels is true", async () => {
       // Arrange
       mockWorkspaceRepository.findWorkspacesByUserId.mockResolvedValue(
-        mockWorkspacesData
+        mockWorkspacesData,
       );
       mockChannelRepository.getChannelMembershipsByUserId
         .mockResolvedValueOnce([]) // workspace-1
@@ -1576,13 +1594,13 @@ describe("WorkspaceService (Unit Tests)", () => {
 
       // Assert
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).toHaveBeenCalledTimes(2);
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).toHaveBeenCalledWith(userId, "workspace-1");
       expect(
-        mockChannelRepository.getChannelMembershipsByUserId
+        mockChannelRepository.getChannelMembershipsByUserId,
       ).toHaveBeenCalledWith(userId, "workspace-2");
     });
   });

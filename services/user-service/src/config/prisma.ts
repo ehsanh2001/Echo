@@ -1,3 +1,5 @@
+// Import env first to ensure DATABASE_URL is set correctly
+import "./env";
 import { PrismaClient } from "@prisma/client";
 
 // Global Prisma client instance for development

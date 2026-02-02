@@ -25,6 +25,8 @@ describe("UserService (Unit Tests with Mocks)", () => {
       findById: jest.fn(),
       updateLastSeen: jest.fn(),
       findByEmail: jest.fn(),
+      findByIds: jest.fn(),
+      updatePassword: jest.fn(),
     };
 
     // Create service with mocked repository
@@ -63,7 +65,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
       // Arrange
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockResolvedValue(
-        "$2b$10$hashedpassword" as never
+        "$2b$10$hashedpassword" as never,
       );
       mockUserRepository.create.mockResolvedValue(mockUser);
 
@@ -73,7 +75,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
       // Assert
       expect(mockUserRepository.findByEmailOrUsername).toHaveBeenCalledWith(
         registerData.email,
-        registerData.username
+        registerData.username,
       );
       expect(mockBcrypt.hash).toHaveBeenCalledWith(registerData.password, 12);
       expect(mockUserRepository.create).toHaveBeenCalledWith({
@@ -120,7 +122,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
 
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockResolvedValue(
-        "$2b$10$hashedpassword" as never
+        "$2b$10$hashedpassword" as never,
       );
       mockUserRepository.create.mockResolvedValue(minimalUser);
 
@@ -152,16 +154,16 @@ describe("UserService (Unit Tests with Mocks)", () => {
 
       // Act & Assert
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        "Email already exists"
+        "Email already exists",
       );
 
       // Verify repository methods were called correctly
       expect(mockUserRepository.findByEmailOrUsername).toHaveBeenCalledWith(
         registerData.email,
-        registerData.username
+        registerData.username,
       );
       expect(mockBcrypt.hash).not.toHaveBeenCalled();
       expect(mockUserRepository.create).not.toHaveBeenCalled();
@@ -178,16 +180,16 @@ describe("UserService (Unit Tests with Mocks)", () => {
 
       // Act & Assert
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        "Username already exists"
+        "Username already exists",
       );
 
       // Verify repository methods were called correctly
       expect(mockUserRepository.findByEmailOrUsername).toHaveBeenCalledWith(
         registerData.email,
-        registerData.username
+        registerData.username,
       );
       expect(mockBcrypt.hash).not.toHaveBeenCalled();
       expect(mockUserRepository.create).not.toHaveBeenCalled();
@@ -197,15 +199,15 @@ describe("UserService (Unit Tests with Mocks)", () => {
       // Arrange
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockRejectedValue(
-        new Error("Hashing failed") as never
+        new Error("Hashing failed") as never,
       );
 
       // Act & Assert
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        "Failed to process password"
+        "Failed to process password",
       );
 
       expect(mockUserRepository.create).not.toHaveBeenCalled();
@@ -215,16 +217,16 @@ describe("UserService (Unit Tests with Mocks)", () => {
       // Arrange
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockResolvedValue(
-        "$2b$10$hashedpassword" as never
+        "$2b$10$hashedpassword" as never,
       );
       mockUserRepository.create.mockRejectedValue(new Error("Database error"));
 
       // Act & Assert
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(userService.registerUser(registerData)).rejects.toThrow(
-        "Failed to register user"
+        "Failed to register user",
       );
     });
 
@@ -256,7 +258,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
       // Arrange
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockResolvedValue(
-        "$2b$10$hashedpassword" as never
+        "$2b$10$hashedpassword" as never,
       );
       mockUserRepository.create.mockResolvedValue(mockUser);
 
@@ -318,7 +320,7 @@ describe("UserService (Unit Tests with Mocks)", () => {
       };
 
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(
-        existingEmailUser
+        existingEmailUser,
       );
 
       try {
@@ -396,10 +398,10 @@ describe("UserService (Unit Tests with Mocks)", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(UserServiceError);
         expect((error as UserServiceError).message).toBe(
-          "Failed to retrieve user profile"
+          "Failed to retrieve user profile",
         );
         expect((error as UserServiceError).code).toBe(
-          "PROFILE_RETRIEVAL_FAILED"
+          "PROFILE_RETRIEVAL_FAILED",
         );
         expect((error as UserServiceError).statusCode).toBe(500);
       }
@@ -440,26 +442,25 @@ describe("UserService (Unit Tests with Mocks)", () => {
     it("should validate email format and call repository with lowercase email", async () => {
       mockUserRepository.findByEmail.mockResolvedValue(mockUser as never);
 
-      const result = await userService.getPublicProfileByEmail(
-        "JANE@EXAMPLE.COM"
-      );
+      const result =
+        await userService.getPublicProfileByEmail("JANE@EXAMPLE.COM");
 
       // Should normalize email to lowercase before calling repository
       expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(
-        "jane@example.com"
+        "jane@example.com",
       );
       expect(result).toBeDefined();
     });
 
     it("should throw UserServiceError for invalid email format", async () => {
       await expect(
-        userService.getPublicProfileByEmail("invalid-email")
+        userService.getPublicProfileByEmail("invalid-email"),
       ).rejects.toThrow(
         expect.objectContaining({
           message: "Invalid email format",
           code: "INVALID_EMAIL",
           statusCode: 400,
-        })
+        }),
       );
 
       // Should not call repository for invalid email
@@ -470,22 +471,21 @@ describe("UserService (Unit Tests with Mocks)", () => {
       mockUserRepository.findByEmail.mockResolvedValue(null as never);
 
       await expect(
-        userService.getPublicProfileByEmail("notfound@example.com")
+        userService.getPublicProfileByEmail("notfound@example.com"),
       ).rejects.toThrow(
         expect.objectContaining({
           message: "User not found",
           code: "USER_NOT_FOUND",
           statusCode: 404,
-        })
+        }),
       );
     });
 
     it("should properly format user profile response", async () => {
       mockUserRepository.findByEmail.mockResolvedValue(mockUser as never);
 
-      const result = await userService.getPublicProfileByEmail(
-        "jane@example.com"
-      );
+      const result =
+        await userService.getPublicProfileByEmail("jane@example.com");
 
       // Verify proper formatting (excludes sensitive fields)
       expect(result).toEqual({
@@ -512,13 +512,13 @@ describe("UserService (Unit Tests with Mocks)", () => {
       mockUserRepository.findByEmail.mockRejectedValue(dbError as never);
 
       await expect(
-        userService.getPublicProfileByEmail("jane@example.com")
+        userService.getPublicProfileByEmail("jane@example.com"),
       ).rejects.toThrow(
         expect.objectContaining({
           message: "Failed to retrieve user profile",
           code: "PROFILE_RETRIEVAL_FAILED",
           statusCode: 500,
-        })
+        }),
       );
     });
   });

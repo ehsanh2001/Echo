@@ -1,5 +1,30 @@
 import "reflect-metadata";
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+
+// Mock config module before importing AuthService
+jest.mock("../../src/config/env", () => ({
+  config: {
+    database: {
+      url: "postgresql://postgres:postgres@localhost:5432/users_db_test",
+    },
+    jwt: {
+      secret: "test-jwt-secret",
+      accessTokenExpirySeconds: 900,
+      refreshTokenExpirySeconds: 604800,
+    },
+    service: {
+      name: "user-service",
+      port: 8001,
+    },
+    redis: {
+      url: "redis://localhost:6379",
+    },
+    security: {
+      bcryptSaltRounds: 10,
+    },
+  },
+}));
+
 import { AuthService } from "../../src/services/authService";
 import { IUserRepository } from "../../src/interfaces/repositories/IUserRepository";
 import { User } from "../../src/types/user.types";
@@ -31,6 +56,8 @@ describe("AuthService (Unit Tests with Mocks)", () => {
       findById: jest.fn(),
       updateLastSeen: jest.fn(),
       findByEmail: jest.fn(),
+      findByIds: jest.fn(),
+      updatePassword: jest.fn(),
     };
 
     // Create service with mocked repository
@@ -79,19 +106,19 @@ describe("AuthService (Unit Tests with Mocks)", () => {
       // Assert
       expect(mockUserRepository.findByEmailOrUsername).toHaveBeenCalledWith(
         loginData.identifier,
-        loginData.identifier
+        loginData.identifier,
       );
       expect(mockBcrypt.compare).toHaveBeenCalledWith(
         loginData.password,
-        mockUser.passwordHash
+        mockUser.passwordHash,
       );
       expect(mockJWTService.generateTokenPair).toHaveBeenCalled();
       expect(mockRedisService.storeRefreshToken).toHaveBeenCalledWith(
         mockUser.id,
-        "refresh.token.here"
+        "refresh.token.here",
       );
       expect(mockUserRepository.updateLastSeen).toHaveBeenCalledWith(
-        mockUser.id
+        mockUser.id,
       );
 
       expect(result).toEqual({
@@ -118,10 +145,10 @@ describe("AuthService (Unit Tests with Mocks)", () => {
 
       // Act & Assert
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        "Invalid credentials"
+        "Invalid credentials",
       );
 
       expect(mockBcrypt.compare).not.toHaveBeenCalled();
@@ -135,15 +162,15 @@ describe("AuthService (Unit Tests with Mocks)", () => {
 
       // Act & Assert
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        "Invalid credentials"
+        "Invalid credentials",
       );
 
       expect(mockBcrypt.compare).toHaveBeenCalledWith(
         loginData.password,
-        mockUser.passwordHash
+        mockUser.passwordHash,
       );
       expect(mockRedisService.storeRefreshToken).not.toHaveBeenCalled();
     });
@@ -152,15 +179,15 @@ describe("AuthService (Unit Tests with Mocks)", () => {
       // Arrange
       mockUserRepository.findByEmailOrUsername.mockResolvedValue(mockUser);
       (mockBcrypt.compare as jest.Mock).mockRejectedValue(
-        new Error("Bcrypt error") as never
+        new Error("Bcrypt error") as never,
       );
 
       // Act & Assert
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(authService.loginUser(loginData)).rejects.toThrow(
-        "Login failed"
+        "Login failed",
       );
     });
   });
@@ -182,15 +209,15 @@ describe("AuthService (Unit Tests with Mocks)", () => {
       // Arrange
       const userId = "test-user-id";
       mockRedisService.removeRefreshToken.mockRejectedValue(
-        new Error("Redis error") as never
+        new Error("Redis error") as never,
       );
 
       // Act & Assert
       await expect(authService.logoutUser(userId)).rejects.toThrow(
-        UserServiceError
+        UserServiceError,
       );
       await expect(authService.logoutUser(userId)).rejects.toThrow(
-        "Logout failed"
+        "Logout failed",
       );
     });
   });

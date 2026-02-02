@@ -6,9 +6,12 @@ import { WorkspaceRole } from "@prisma/client";
  * Load environment variables from multiple sources
  * 1. Load project-level .env first (shared defaults)
  * 2. Load service-level .env (overrides project-level)
+ *
+ * Note: Uses process.cwd() for consistent behavior when running via Jest
  */
-dotenv.config({ path: path.resolve(__dirname, "../../../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+// Use override: true to ensure service-level values take precedence
+dotenv.config({ path: path.resolve(process.cwd(), ".env"), override: true });
 
 /**
  * Retrieves a required environment variable
@@ -45,7 +48,7 @@ const getOptionalEnv = (key: string, defaultValue: string): string => {
   if (!value) {
     // Note: console.log is acceptable here - runs at module load time before logger is initialized
     console.log(
-      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`
+      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`,
     );
     return defaultValue;
   }
@@ -120,7 +123,7 @@ export const config = {
   invites: {
     // Configurable via environment (with sensible defaults)
     defaultExpirationDays: parseInt(
-      getOptionalEnv("INVITE_DEFAULT_EXPIRATION_DAYS", "7")
+      getOptionalEnv("INVITE_DEFAULT_EXPIRATION_DAYS", "7"),
     ),
 
     // Business rules (constants - rarely change)
@@ -136,14 +139,14 @@ export const config = {
     // Configurable via environment (with sensible defaults)
     maxBatchSize: parseInt(getOptionalEnv("OUTBOX_MAX_BATCH_SIZE", "50")),
     maxRetryAttempts: parseInt(
-      getOptionalEnv("OUTBOX_MAX_RETRY_ATTEMPTS", "3")
+      getOptionalEnv("OUTBOX_MAX_RETRY_ATTEMPTS", "3"),
     ),
     retryDelayMs: parseInt(getOptionalEnv("OUTBOX_RETRY_DELAY_MS", "5000")), // 5 seconds
     cleanupIntervalMs: parseInt(
-      getOptionalEnv("OUTBOX_CLEANUP_INTERVAL_MS", "3600000")
+      getOptionalEnv("OUTBOX_CLEANUP_INTERVAL_MS", "3600000"),
     ), // 1 hour
     cleanupRetentionDays: parseInt(
-      getOptionalEnv("OUTBOX_CLEANUP_RETENTION_DAYS", "7")
+      getOptionalEnv("OUTBOX_CLEANUP_RETENTION_DAYS", "7"),
     ), // Keep published events for 7 days
   },
 
@@ -188,14 +191,14 @@ export function validateConfig() {
         "your-super-secure-jwt-secret-key-change-this-in-production-make-it-at-least-32-chars"
     ) {
       errors.push(
-        "JWT_SECRET must be changed from default value in production"
+        "JWT_SECRET must be changed from default value in production",
       );
     }
 
     // Check for weak JWT secret length
     if (config.jwt.secret.length < 32) {
       errors.push(
-        "JWT_SECRET must be at least 32 characters long in production"
+        "JWT_SECRET must be at least 32 characters long in production",
       );
     }
 
@@ -245,17 +248,17 @@ export function validateConfig() {
     throw new Error(
       `❌ Configuration validation failed:\n${errors
         .map((err) => `  • ${err}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
   // Note: console.log is acceptable here - runs at module load time before logger is initialized
   // Log successful configuration
   console.log(
-    `Config loaded - Environment: ${config.nodeEnv}, Port: ${config.port}`
+    `Config loaded - Environment: ${config.nodeEnv}, Port: ${config.port}`,
   );
   console.log(
-    `Security: JWT secret length: ${config.jwt.secret.length} characters.`
+    `Security: JWT secret length: ${config.jwt.secret.length} characters.`,
   );
   console.log(`Service: ${config.service.name}`);
   console.log(`User Service URL: ${config.service.userServiceUrl}`);
@@ -264,7 +267,7 @@ export function validateConfig() {
   // Parse and display database connection details (safely, without credentials)
   const dbUrl = new URL(config.database.url);
   console.log(
-    `Database: ${dbUrl.protocol}//${dbUrl.hostname}:${dbUrl.port}${dbUrl.pathname}`
+    `Database: ${dbUrl.protocol}//${dbUrl.hostname}:${dbUrl.port}${dbUrl.pathname}`,
   );
 
   // Parse and display RabbitMQ connection details (safely, without credentials)
@@ -273,12 +276,12 @@ export function validateConfig() {
     console.log(
       `RabbitMQ: ${rabbitUrl.protocol}//${rabbitUrl.hostname}:${
         rabbitUrl.port || 5672
-      }`
+      }`,
     );
     console.log(`RabbitMQ Exchange: ${config.rabbitmq.exchange}`);
   } catch {
     console.log(
-      `RabbitMQ: ${config.rabbitmq.url.split("@")[1] || config.rabbitmq.url}`
+      `RabbitMQ: ${config.rabbitmq.url.split("@")[1] || config.rabbitmq.url}`,
     );
   }
 }

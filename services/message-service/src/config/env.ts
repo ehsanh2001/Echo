@@ -5,9 +5,11 @@ import path from "path";
  * Load environment variables from multiple sources
  * 1. Load project-level .env first (shared defaults)
  * 2. Load service-level .env (overrides project-level)
+ *
+ * Note: Uses process.cwd() for consistent behavior when running via Jest
  */
-const projectEnvPath = path.resolve(__dirname, "../../../../.env");
-const serviceEnvPath = path.resolve(__dirname, "../../.env");
+const projectEnvPath = path.resolve(process.cwd(), "../../.env");
+const serviceEnvPath = path.resolve(process.cwd(), ".env");
 
 // Note: Logger not available here - runs at module load time
 console.log("Loading project .env from:", projectEnvPath);
@@ -45,7 +47,7 @@ const getOptionalEnv = (key: string, defaultValue: string): string => {
     // Note: Logger not available here as this runs at module load time
     // Using console for environment variable defaults is acceptable
     console.log(
-      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`
+      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`,
     );
     return defaultValue;
   }
@@ -94,7 +96,7 @@ export const config = {
     userServiceUrl: getOptionalEnv("USER_SERVICE_URL", "http://localhost:8001"),
     workspaceChannelServiceUrl: getOptionalEnv(
       "WORKSPACE_CHANNEL_SERVICE_URL",
-      "http://localhost:8002"
+      "http://localhost:8002",
     ),
   },
 
@@ -132,7 +134,7 @@ export const config = {
   message: {
     maxLength: parseInt(getOptionalEnv("MAX_MESSAGE_LENGTH", "1024")),
     maxAttachmentSize: parseInt(
-      getOptionalEnv("MAX_ATTACHMENT_SIZE", "10485760")
+      getOptionalEnv("MAX_ATTACHMENT_SIZE", "10485760"),
     ), // 10MB
     maxThreadDepth: parseInt(getOptionalEnv("MAX_THREAD_DEPTH", "5")),
   },
@@ -140,13 +142,13 @@ export const config = {
   // Pagination Configuration
   pagination: {
     defaultLimit: parseInt(
-      getOptionalEnv("MESSAGE_PAGINATION_DEFAULT_LIMIT", "50")
+      getOptionalEnv("MESSAGE_PAGINATION_DEFAULT_LIMIT", "50"),
     ),
     minLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MIN_LIMIT", "1")),
     maxLimit: parseInt(getOptionalEnv("MESSAGE_PAGINATION_MAX_LIMIT", "100")),
     // Maximum messages to return on initial load (safety limit for unread messages)
     initialLoadMaxLimit: parseInt(
-      getOptionalEnv("MESSAGE_INITIAL_LOAD_MAX_LIMIT", "200")
+      getOptionalEnv("MESSAGE_INITIAL_LOAD_MAX_LIMIT", "200"),
     ),
   },
 } as const;

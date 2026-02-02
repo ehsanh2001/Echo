@@ -65,17 +65,24 @@ describe("InviteService", () => {
       addOrReactivateMember: jest.fn(),
       findWorkspacesByUserId: jest.fn(),
       getMembers: jest.fn(),
+      deleteWorkspace: jest.fn(),
+      getChannelIds: jest.fn(),
     };
 
     mockOutboxService = {
       createInviteEvent: jest.fn(),
+      createWorkspaceMemberJoinedEvent: jest.fn(),
+      createChannelMemberJoinedEvent: jest.fn(),
+      createChannelCreatedEvent: jest.fn(),
+      createChannelDeletedEvent: jest.fn(),
+      createWorkspaceDeletedEvent: jest.fn(),
     };
 
     // Create service instance with mocks
     inviteService = new InviteService(
       mockInviteRepository,
       mockWorkspaceRepository,
-      mockOutboxService
+      mockOutboxService,
     );
   });
 
@@ -96,7 +103,7 @@ describe("InviteService", () => {
       const result = await inviteService.createWorkspaceInvite(
         "ws-123",
         "user-owner",
-        inviteData
+        inviteData,
       );
 
       // Assert
@@ -121,7 +128,7 @@ describe("InviteService", () => {
       await expect(
         inviteService.createWorkspaceInvite("ws-999", "user-owner", {
           email: "test@example.com",
-        })
+        }),
       ).rejects.toThrow(WorkspaceChannelServiceError);
     });
 
@@ -134,7 +141,7 @@ describe("InviteService", () => {
       await expect(
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "test@example.com",
-        })
+        }),
       ).rejects.toThrow("Cannot create invites for archived workspaces");
     });
 
@@ -146,7 +153,7 @@ describe("InviteService", () => {
       await expect(
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "invalid-email",
-        })
+        }),
       ).rejects.toThrow("Invalid email format");
     });
 
@@ -158,7 +165,7 @@ describe("InviteService", () => {
       await expect(
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "   ",
-        })
+        }),
       ).rejects.toThrow("Email cannot be empty");
     });
 
@@ -171,7 +178,7 @@ describe("InviteService", () => {
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "test@example.com",
           role: "superadmin" as any,
-        })
+        }),
       ).rejects.toThrow("Invalid role");
     });
 
@@ -190,7 +197,7 @@ describe("InviteService", () => {
       expect(mockInviteRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           role: WorkspaceRole.member, // default role
-        })
+        }),
       );
     });
 
@@ -203,7 +210,7 @@ describe("InviteService", () => {
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "test@example.com",
           expiresInDays: 0,
-        })
+        }),
       ).rejects.toThrow("Expiration days must be at least");
     });
 
@@ -216,7 +223,7 @@ describe("InviteService", () => {
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "test@example.com",
           expiresInDays: 31,
-        })
+        }),
       ).rejects.toThrow("Expiration days cannot exceed");
     });
 
@@ -230,7 +237,7 @@ describe("InviteService", () => {
         inviteService.createWorkspaceInvite("ws-123", "user-owner", {
           email: "test@example.com",
           customMessage: longMessage,
-        })
+        }),
       ).rejects.toThrow("Custom message cannot exceed");
     });
 
@@ -249,7 +256,7 @@ describe("InviteService", () => {
       expect(mockInviteRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "test@example.com",
-        })
+        }),
       );
     });
 
@@ -268,7 +275,7 @@ describe("InviteService", () => {
       expect(mockInviteRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           inviteToken: expect.any(String),
-        })
+        }),
       );
 
       const createCall = mockInviteRepository.create.mock.calls[0]?.[0];
@@ -293,7 +300,7 @@ describe("InviteService", () => {
       expect(mockInviteRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: { customMessage },
-        })
+        }),
       );
     });
 
@@ -323,7 +330,7 @@ describe("InviteService", () => {
           inviteUrl: expect.any(String),
           customMessage: undefined,
         }),
-        undefined // correlationId
+        undefined, // correlationId
       );
     });
   });

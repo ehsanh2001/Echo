@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { MessageService } from "../../src/services/MessageService";
 import { IMessageRepository } from "../../src/interfaces/repositories/IMessageRepository";
+import { IReadReceiptRepository } from "../../src/interfaces/repositories/IReadReceiptRepository";
 import { IUserServiceClient } from "../../src/interfaces/external/IUserServiceClient";
 import { IWorkspaceChannelServiceClient } from "../../src/interfaces/external/IWorkspaceChannelServiceClient";
 import { IRabbitMQService } from "../../src/interfaces/services/IRabbitMQService";
@@ -11,6 +12,7 @@ import { config } from "../../src/config/env";
 describe("MessageService - Unit Tests", () => {
   let messageService: MessageService;
   let mockMessageRepository: jest.Mocked<IMessageRepository>;
+  let mockReadReceiptRepository: jest.Mocked<IReadReceiptRepository>;
   let mockUserServiceClient: jest.Mocked<IUserServiceClient>;
   let mockWorkspaceChannelServiceClient: jest.Mocked<IWorkspaceChannelServiceClient>;
   let mockRabbitMQService: jest.Mocked<IRabbitMQService>;
@@ -22,6 +24,23 @@ describe("MessageService - Unit Tests", () => {
     mockMessageRepository = {
       create: jest.fn(),
       getMessagesWithCursor: jest.fn(),
+      getChannelLastMessageNo: jest.fn(),
+      findById: jest.fn(),
+      deleteByChannelId: jest.fn(),
+      deleteByWorkspaceId: jest.fn(),
+      getChannelsLastMessageNos: jest.fn(),
+    } as any;
+
+    mockReadReceiptRepository = {
+      markAsRead: jest.fn(),
+      getLastReadTimestamp: jest.fn(),
+      getUnreadCount: jest.fn(),
+      getReadReceipt: jest.fn(),
+      upsertReadReceipt: jest.fn(),
+      getReadReceiptsForUser: jest.fn(),
+      getUnreadCountsForUser: jest.fn(),
+      deleteByChannelId: jest.fn(),
+      deleteByWorkspaceId: jest.fn(),
     } as any;
 
     mockUserServiceClient = {
@@ -41,9 +60,10 @@ describe("MessageService - Unit Tests", () => {
     // Instantiate service with mocks
     messageService = new MessageService(
       mockMessageRepository,
+      mockReadReceiptRepository,
       mockUserServiceClient,
       mockWorkspaceChannelServiceClient,
-      mockRabbitMQService
+      mockRabbitMQService,
     );
   });
 
@@ -62,8 +82,8 @@ describe("MessageService - Unit Tests", () => {
             channelId,
             userId,
             "",
-            correlationId
-          )
+            correlationId,
+          ),
         ).rejects.toThrow("Message content cannot be empty");
       });
 
@@ -74,8 +94,8 @@ describe("MessageService - Unit Tests", () => {
             channelId,
             userId,
             "   ",
-            correlationId
-          )
+            correlationId,
+          ),
         ).rejects.toThrow("Message content cannot be empty");
       });
 
@@ -87,8 +107,8 @@ describe("MessageService - Unit Tests", () => {
             channelId,
             userId,
             longContent,
-            correlationId
-          )
+            correlationId,
+          ),
         ).rejects.toThrow("Message content exceeds maximum length");
       });
     });
@@ -96,7 +116,7 @@ describe("MessageService - Unit Tests", () => {
     describe("authorization", () => {
       it("should reject if user is not a channel member", async () => {
         mockWorkspaceChannelServiceClient.getChannelMember.mockResolvedValue(
-          null
+          null,
         );
 
         await expect(
@@ -105,8 +125,8 @@ describe("MessageService - Unit Tests", () => {
             channelId,
             userId,
             content,
-            correlationId
-          )
+            correlationId,
+          ),
         ).rejects.toThrow("User is not a member of this channel");
       });
 
@@ -148,7 +168,7 @@ describe("MessageService - Unit Tests", () => {
           channelId,
           userId,
           content,
-          correlationId
+          correlationId,
         );
 
         expect(result).toBeDefined();
@@ -199,7 +219,7 @@ describe("MessageService - Unit Tests", () => {
           channelId,
           userId,
           content,
-          correlationId
+          correlationId,
         );
 
         expect(result.author).toEqual({
@@ -219,8 +239,8 @@ describe("MessageService - Unit Tests", () => {
             channelId,
             userId,
             content,
-            correlationId
-          )
+            correlationId,
+          ),
         ).rejects.toThrow();
       });
     });
@@ -266,7 +286,7 @@ describe("MessageService - Unit Tests", () => {
           channelId,
           userId,
           content,
-          correlationId
+          correlationId,
         );
 
         expect(mockMessageRepository.create).toHaveBeenCalledWith({
@@ -275,6 +295,7 @@ describe("MessageService - Unit Tests", () => {
           userId,
           content,
           contentType: "text",
+          parentMessageId: null,
         });
       });
     });
@@ -320,7 +341,7 @@ describe("MessageService - Unit Tests", () => {
           channelId,
           userId,
           content,
-          correlationId
+          correlationId,
         );
 
         // Give time for async publish to be called
@@ -333,13 +354,13 @@ describe("MessageService - Unit Tests", () => {
               id: "msg-123",
               content,
             }),
-          })
+          }),
         );
       });
 
       it("should not fail if RabbitMQ publish fails", async () => {
         mockRabbitMQService.publishMessageEvent.mockRejectedValue(
-          new Error("RabbitMQ unavailable")
+          new Error("RabbitMQ unavailable"),
         );
 
         const result = await messageService.sendMessage(
@@ -347,7 +368,7 @@ describe("MessageService - Unit Tests", () => {
           channelId,
           userId,
           content,
-          correlationId
+          correlationId,
         );
 
         expect(result).toBeDefined();
@@ -364,7 +385,7 @@ describe("MessageService - Unit Tests", () => {
     const createMockMessage = (
       messageNo: number,
       userId: string,
-      content: string
+      content: string,
     ) => ({
       id: `msg-${messageNo}`,
       messageNo,
@@ -380,21 +401,21 @@ describe("MessageService - Unit Tests", () => {
       threadRootId: null,
       threadDepth: 0,
       createdAt: new Date(
-        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`
+        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`,
       ),
       updatedAt: new Date(
-        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`
+        `2025-10-23T${messageNo.toString().padStart(2, "0")}:00:00Z`,
       ),
     });
 
     describe("authorization", () => {
       it("should reject if user is not a channel member", async () => {
         mockWorkspaceChannelServiceClient.getChannelMember.mockResolvedValue(
-          null
+          null,
         );
 
         await expect(
-          messageService.getMessageHistory(workspaceId, channelId, userId, {})
+          messageService.getMessageHistory(workspaceId, channelId, userId, {}),
         ).rejects.toThrow("User is not a member of this channel");
       });
     });
@@ -407,6 +428,10 @@ describe("MessageService - Unit Tests", () => {
           role: "member",
           isActive: true,
         } as any);
+
+        // Mock read receipt and channel last message for initial load
+        mockReadReceiptRepository.getReadReceipt.mockResolvedValue(null);
+        mockMessageRepository.getChannelLastMessageNo.mockResolvedValue(0);
       });
 
       it("should fetch newest messages when no cursor provided", async () => {
@@ -417,7 +442,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         mockUserServiceClient.getUserProfile.mockImplementation((userId) =>
@@ -426,24 +451,24 @@ describe("MessageService - Unit Tests", () => {
             username: `user-${userId}`,
             displayName: `User ${userId}`,
             avatarUrl: null,
-          } as any)
+          } as any),
         );
 
         const result = await messageService.getMessageHistory(
           workspaceId,
           channelId,
           userId,
-          {}
+          {},
         );
 
         expect(
-          mockMessageRepository.getMessagesWithCursor
+          mockMessageRepository.getMessagesWithCursor,
         ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           Number.MAX_SAFE_INTEGER,
           config.pagination.defaultLimit + 1,
-          PaginationDirection.BEFORE
+          PaginationDirection.BEFORE,
         );
         expect(result.messages).toHaveLength(3);
         expect(result.messages[0]!.messageNo).toBe(8);
@@ -457,17 +482,17 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          {}
+          {},
         );
 
         expect(
-          mockMessageRepository.getMessagesWithCursor
+          mockMessageRepository.getMessagesWithCursor,
         ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           expect.any(Number),
           config.pagination.defaultLimit + 1,
-          expect.any(String)
+          expect.any(String),
         );
       });
     });
@@ -487,7 +512,7 @@ describe("MessageService - Unit Tests", () => {
             username: `user-${userId}`,
             displayName: `User ${userId}`,
             avatarUrl: null,
-          } as any)
+          } as any),
         );
       });
 
@@ -498,7 +523,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -509,29 +534,31 @@ describe("MessageService - Unit Tests", () => {
             cursor: 5,
             limit: 10,
             direction: PaginationDirection.BEFORE,
-          }
+          },
         );
 
         expect(
-          mockMessageRepository.getMessagesWithCursor
+          mockMessageRepository.getMessagesWithCursor,
         ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           5,
           11, // limit + 1
-          PaginationDirection.BEFORE
+          PaginationDirection.BEFORE,
         );
         expect(result.messages).toHaveLength(2);
       });
 
-      it("should fetch newer messages with AFTER direction", async () => {
+      it("should fetch older messages even when AFTER direction is specified (simplified pagination)", async () => {
+        // Note: The service now uses simplified pagination that ignores direction
+        // and always loads older messages (BEFORE direction)
         const mockMessages = [
-          createMockMessage(6, "user-1", "Message 6"),
-          createMockMessage(7, "user-2", "Message 7"),
+          createMockMessage(3, "user-1", "Message 3"),
+          createMockMessage(4, "user-2", "Message 4"),
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -541,18 +568,19 @@ describe("MessageService - Unit Tests", () => {
           {
             cursor: 5,
             limit: 10,
-            direction: PaginationDirection.AFTER,
-          }
+            direction: PaginationDirection.AFTER, // This is ignored by the service
+          },
         );
 
+        // Service always uses BEFORE direction for pagination
         expect(
-          mockMessageRepository.getMessagesWithCursor
+          mockMessageRepository.getMessagesWithCursor,
         ).toHaveBeenCalledWith(
           workspaceId,
           channelId,
           5,
           11,
-          PaginationDirection.AFTER
+          PaginationDirection.BEFORE,
         );
         expect(result.messages).toHaveLength(2);
       });
@@ -573,8 +601,12 @@ describe("MessageService - Unit Tests", () => {
             username: `user-${userId}`,
             displayName: `User ${userId}`,
             avatarUrl: null,
-          } as any)
+          } as any),
         );
+
+        // Mock read receipt and channel last message for initial load
+        mockReadReceiptRepository.getReadReceipt.mockResolvedValue(null);
+        mockMessageRepository.getChannelLastMessageNo.mockResolvedValue(0);
       });
 
       it("should set hasMore=true when repository returns limit+1 messages", async () => {
@@ -586,14 +618,14 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
           workspaceId,
           channelId,
           userId,
-          { limit }
+          { limit },
         );
 
         expect(result.messages).toHaveLength(2); // Trimmed to limit
@@ -604,14 +636,14 @@ describe("MessageService - Unit Tests", () => {
         const mockMessages = [createMockMessage(1, "user-1", "Message 1")];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
           workspaceId,
           channelId,
           userId,
-          { limit: 10 }
+          { limit: 10 },
         );
 
         expect(result.messages).toHaveLength(1);
@@ -633,11 +665,13 @@ describe("MessageService - Unit Tests", () => {
             username: `user-${userId}`,
             displayName: `User ${userId}`,
             avatarUrl: null,
-          } as any)
+          } as any),
         );
       });
 
       it("should calculate cursors correctly for BEFORE direction with hasMore", async () => {
+        // With 3 messages returned but limit=2, the service trims to 2 messages
+        // and sets hasOlderMessages=true
         const mockMessages = [
           createMockMessage(1, "user-1", "Message 1"),
           createMockMessage(2, "user-2", "Message 2"),
@@ -645,7 +679,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -656,22 +690,24 @@ describe("MessageService - Unit Tests", () => {
             cursor: 10,
             limit: 2,
             direction: PaginationDirection.BEFORE,
-          }
+          },
         );
 
-        expect(result.prevCursor).toBe(2); // First message after trim (older)
-        expect(result.nextCursor).toBe(3); // Last visible message (newer)
+        // Simplified pagination: nextCursor is always null, prevCursor = first message's messageNo when hasMore
+        expect(result.prevCursor).toBe(2); // First message after trim
+        expect(result.nextCursor).toBeNull(); // Always null in simplified pagination
       });
 
-      it("should calculate cursors correctly for AFTER direction with more messages", async () => {
+      it("should calculate cursors correctly for pagination with more messages", async () => {
+        // Even with AFTER direction specified, service uses BEFORE
         const mockMessages = [
-          createMockMessage(6, "user-1", "Message 6"),
-          createMockMessage(7, "user-2", "Message 7"),
-          createMockMessage(8, "user-1", "Message 8"),
+          createMockMessage(2, "user-1", "Message 2"),
+          createMockMessage(3, "user-2", "Message 3"),
+          createMockMessage(4, "user-1", "Message 4"),
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -681,22 +717,25 @@ describe("MessageService - Unit Tests", () => {
           {
             cursor: 5,
             limit: 2,
-            direction: PaginationDirection.AFTER,
-          }
+            direction: PaginationDirection.AFTER, // Ignored - service uses BEFORE
+          },
         );
 
-        // When we get 3 messages but limit=2, we trim to [6, 7]
-        // For AFTER direction: prevCursor=first visible, nextCursor=last visible (since hasMore)
-        expect(result.prevCursor).toBe(6); // First visible message (older)
-        expect(result.nextCursor).toBe(7); // Last visible message (indicates more exist)
+        // When limit=2 and we get 3 messages:
+        // - hasOlderMessages = true (3 > 2)
+        // - pageMessages = messages.slice(1) = [msg-3, msg-4]
+        // - prevCursor = first message's messageNo = 3
+        expect(result.prevCursor).toBe(3); // First visible message's messageNo
+        expect(result.nextCursor).toBeNull(); // Always null in simplified pagination
         expect(result.messages).toHaveLength(2); // Trimmed to limit
       });
 
       it("should set prevCursor=null when no more older messages", async () => {
+        // Only 1 message returned, which is less than limit+1, so no hasMore
         const mockMessages = [createMockMessage(1, "user-1", "Message 1")];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -707,18 +746,20 @@ describe("MessageService - Unit Tests", () => {
             cursor: 5,
             limit: 10,
             direction: PaginationDirection.BEFORE,
-          }
+          },
         );
 
+        // No hasMore means prevCursor is null
         expect(result.prevCursor).toBeNull();
-        expect(result.nextCursor).toBe(1);
+        expect(result.nextCursor).toBeNull(); // Always null in simplified pagination
       });
 
-      it("should set nextCursor=null when no more newer messages", async () => {
+      it("should set nextCursor=null (always) in simplified pagination", async () => {
+        // Even with AFTER direction, service uses simplified pagination
         const mockMessages = [createMockMessage(10, "user-1", "Message 10")];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         const result = await messageService.getMessageHistory(
@@ -728,11 +769,13 @@ describe("MessageService - Unit Tests", () => {
           {
             cursor: 5,
             limit: 10,
-            direction: PaginationDirection.AFTER,
-          }
+            direction: PaginationDirection.AFTER, // Ignored
+          },
         );
 
-        expect(result.prevCursor).toBe(10);
+        // Single message, no hasMore - prevCursor is null
+        // nextCursor is always null in simplified pagination
+        expect(result.prevCursor).toBeNull();
         expect(result.nextCursor).toBeNull();
       });
     });
@@ -745,6 +788,10 @@ describe("MessageService - Unit Tests", () => {
           role: "member",
           isActive: true,
         } as any);
+
+        // Mock read receipt and channel last message for initial load
+        mockReadReceiptRepository.getReadReceipt.mockResolvedValue(null);
+        mockMessageRepository.getChannelLastMessageNo.mockResolvedValue(0);
       });
 
       it("should enrich messages with author info", async () => {
@@ -754,7 +801,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         mockUserServiceClient.getUserProfile.mockImplementation((userId) => {
@@ -779,13 +826,13 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          {}
+          {},
         );
 
         expect(result.messages[0]!.author.username).toBe("alice");
         expect(result.messages[1]!.author.username).toBe("bob");
         expect(result.messages[1]!.author.avatarUrl).toBe(
-          "https://example.com/bob.jpg"
+          "https://example.com/bob.jpg",
         );
       });
 
@@ -796,7 +843,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         mockUserServiceClient.getUserProfile.mockImplementation((userId) => {
@@ -815,7 +862,7 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          {}
+          {},
         );
 
         expect(result.messages[0]!.author.username).toBe("alice");
@@ -831,7 +878,7 @@ describe("MessageService - Unit Tests", () => {
         ];
 
         mockMessageRepository.getMessagesWithCursor.mockResolvedValue(
-          mockMessages
+          mockMessages,
         );
 
         mockUserServiceClient.getUserProfile.mockResolvedValue({
@@ -845,7 +892,7 @@ describe("MessageService - Unit Tests", () => {
           workspaceId,
           channelId,
           userId,
-          {}
+          {},
         );
 
         // Should only call getUserProfile twice (user-1 and user-2), not three times

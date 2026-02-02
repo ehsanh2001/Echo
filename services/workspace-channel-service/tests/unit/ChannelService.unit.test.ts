@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { ChannelService } from "../../src/services/ChannelService";
 import { IChannelRepository } from "../../src/interfaces/repositories/IChannelRepository";
 import { IWorkspaceRepository } from "../../src/interfaces/repositories/IWorkspaceRepository";
+import { IOutboxService } from "../../src/interfaces/services/IOutboxService";
+import { UserServiceClient } from "../../src/services/userServiceClient";
 import { PrismaClient } from "@prisma/client";
 import { WorkspaceChannelServiceError } from "../../src/utils/errors";
 import { ChannelType, WorkspaceRole, ChannelRole } from "../../src/types";
@@ -10,6 +12,8 @@ describe("ChannelService - Unit Tests", () => {
   let channelService: ChannelService;
   let mockChannelRepository: jest.Mocked<IChannelRepository>;
   let mockWorkspaceRepository: jest.Mocked<IWorkspaceRepository>;
+  let mockOutboxService: jest.Mocked<IOutboxService>;
+  let mockUserServiceClient: jest.Mocked<UserServiceClient>;
   let mockPrisma: jest.Mocked<PrismaClient>;
 
   beforeEach(() => {
@@ -31,6 +35,24 @@ describe("ChannelService - Unit Tests", () => {
       getMembership: jest.fn(),
       countActiveMembers: jest.fn(),
       addOrReactivateMember: jest.fn(),
+      getMembers: jest.fn(),
+      findWorkspacesByUserId: jest.fn(),
+      deleteWorkspace: jest.fn(),
+      getChannelIds: jest.fn(),
+    } as any;
+
+    mockOutboxService = {
+      createInviteEvent: jest.fn(),
+      createWorkspaceMemberJoinedEvent: jest.fn(),
+      createChannelMemberJoinedEvent: jest.fn(),
+      createChannelCreatedEvent: jest.fn(),
+      createChannelDeletedEvent: jest.fn(),
+      createWorkspaceDeletedEvent: jest.fn(),
+    } as any;
+
+    mockUserServiceClient = {
+      checkUserExistsById: jest.fn(),
+      getUsersByIds: jest.fn(),
     } as any;
 
     mockPrisma = {
@@ -45,7 +67,9 @@ describe("ChannelService - Unit Tests", () => {
     channelService = new ChannelService(
       mockChannelRepository,
       mockWorkspaceRepository,
-      mockPrisma
+      mockOutboxService,
+      mockUserServiceClient,
+      mockPrisma,
     );
   });
 
@@ -59,7 +83,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.public,
             name: "",
-          })
+          }),
         ).rejects.toThrow("Channel name is required for public channels");
       });
 
@@ -68,7 +92,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.private,
             name: "  ",
-          })
+          }),
         ).rejects.toThrow("Channel name is required for private channels");
       });
 
@@ -76,7 +100,7 @@ describe("ChannelService - Unit Tests", () => {
         await expect(
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.direct,
-          })
+          }),
         ).rejects.toThrow("Participants are required for direct channels");
       });
 
@@ -85,7 +109,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.direct,
             participants: ["user-456", "user-789"],
-          })
+          }),
         ).rejects.toThrow("Direct channels must have exactly 1 participant");
       });
 
@@ -94,7 +118,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.group_dm,
             participants: [],
-          })
+          }),
         ).rejects.toThrow("Participants are required for group_dm channels");
       });
 
@@ -103,9 +127,9 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.group_dm,
             participants: ["user-456"],
-          })
+          }),
         ).rejects.toThrow(
-          "Group DM channels must have at least 2 other participants"
+          "Group DM channels must have at least 2 other participants",
         );
       });
     });
@@ -118,7 +142,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.public,
             name: "test-channel",
-          })
+          }),
         ).rejects.toThrow("User is not a member of this workspace");
       });
 
@@ -134,7 +158,7 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.public,
             name: "test-channel",
-          })
+          }),
         ).rejects.toThrow("User is not a member of this workspace");
       });
 
@@ -150,9 +174,9 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.public,
             name: "test-channel",
-          })
+          }),
         ).rejects.toThrow(
-          "Only workspace owners and admins can create public channels"
+          "Only workspace owners and admins can create public channels",
         );
       });
 
@@ -168,9 +192,9 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.private,
             name: "test-channel",
-          })
+          }),
         ).rejects.toThrow(
-          "Only workspace owners and admins can create private channels"
+          "Only workspace owners and admins can create private channels",
         );
       });
 
@@ -182,6 +206,14 @@ describe("ChannelService - Unit Tests", () => {
           isActive: true,
         } as any);
         mockChannelRepository.findByNameInWorkspace.mockResolvedValue(null);
+
+        // Mock getMembers for public channel (returns all workspace members)
+        mockWorkspaceRepository.getMembers.mockResolvedValue([
+          { userId, role: WorkspaceRole.admin, isActive: true },
+        ] as any);
+
+        // Mock getUsersByIds for member enrichment
+        mockUserServiceClient.getUsersByIds.mockResolvedValue(new Map());
 
         const mockChannel = {
           id: "channel-123",
@@ -284,12 +316,20 @@ describe("ChannelService - Unit Tests", () => {
           channelService.createChannel(workspaceId, userId, {
             type: ChannelType.public,
             name: "test-channel",
-          })
+          }),
         ).rejects.toThrow("Channel name 'test-channel' already exists");
       });
 
       it("should allow creation if name is unique", async () => {
         mockChannelRepository.findByNameInWorkspace.mockResolvedValue(null);
+
+        // Mock getMembers for public channel (returns all workspace members)
+        mockWorkspaceRepository.getMembers.mockResolvedValue([
+          { userId, role: WorkspaceRole.admin, isActive: true },
+        ] as any);
+
+        // Mock getUsersByIds for member enrichment
+        mockUserServiceClient.getUsersByIds.mockResolvedValue(new Map());
 
         const mockChannel = {
           id: "channel-123",
@@ -381,7 +421,7 @@ describe("ChannelService - Unit Tests", () => {
             name: expect.stringMatching(/^dm-/),
           }),
           userId,
-          expect.anything()
+          expect.anything(),
         );
       });
     });
@@ -398,6 +438,14 @@ describe("ChannelService - Unit Tests", () => {
       });
 
       it("should create public channel successfully", async () => {
+        // Mock getMembers for public channel (returns all workspace members)
+        mockWorkspaceRepository.getMembers.mockResolvedValue([
+          { userId, role: WorkspaceRole.owner, isActive: true },
+        ] as any);
+
+        // Mock getUsersByIds for member enrichment
+        mockUserServiceClient.getUsersByIds.mockResolvedValue(new Map());
+
         const mockChannel = {
           id: "channel-123",
           workspaceId,
@@ -490,7 +538,7 @@ describe("ChannelService - Unit Tests", () => {
         expect(mockChannelRepository.addMembers).toHaveBeenCalledWith(
           "channel-123",
           [{ userId: "user-456", role: ChannelRole.member, joinedBy: userId }],
-          expect.anything()
+          expect.anything(),
         );
       });
     });

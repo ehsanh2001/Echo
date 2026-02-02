@@ -5,9 +5,15 @@ import path from "path";
  * Load environment variables from multiple sources
  * 1. Load project-level .env first (shared defaults)
  * 2. Load service-level .env (overrides project-level)
+ *
+ * Note: Uses process.cwd() for consistent behavior when running via Jest
  */
-dotenv.config({ path: path.resolve(__dirname, "../../../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+// Load project-level env first (provides shared defaults)
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+
+// Load service-level env (overrides project-level)
+// Use override: true to ensure service-level values take precedence
+dotenv.config({ path: path.resolve(process.cwd(), ".env"), override: true });
 
 /**
  * Retrieves a required environment variable
@@ -45,7 +51,7 @@ const getOptionalEnv = (key: string, defaultValue: string): string => {
     // Note: Logger not available here as this runs at module load time
     // Using console for environment variable defaults is acceptable
     console.log(
-      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`
+      `ℹ️  Environment variable ${key} not set, using default: ${defaultValue}`,
     );
     return defaultValue;
   }
@@ -97,10 +103,10 @@ export const config = {
   jwt: {
     secret: getRequiredEnv("JWT_SECRET"),
     accessTokenExpirySeconds: parseInt(
-      getOptionalEnv("JWT_ACCESS_TOKEN_EXPIRY_SECONDS", "900")
+      getOptionalEnv("JWT_ACCESS_TOKEN_EXPIRY_SECONDS", "900"),
     ), // 15 minutes
     refreshTokenExpirySeconds: parseInt(
-      getOptionalEnv("JWT_REFRESH_TOKEN_EXPIRY_SECONDS", "604800")
+      getOptionalEnv("JWT_REFRESH_TOKEN_EXPIRY_SECONDS", "604800"),
     ), // 7 days
   },
 
@@ -119,11 +125,11 @@ export const config = {
   // Password Reset Configuration
   passwordReset: {
     tokenExpiryMinutes: parseInt(
-      getOptionalEnv("PASSWORD_RESET_TOKEN_EXPIRY_MINUTES", "15")
+      getOptionalEnv("PASSWORD_RESET_TOKEN_EXPIRY_MINUTES", "15"),
     ),
     requestLimit: parseInt(getOptionalEnv("PASSWORD_RESET_REQUEST_LIMIT", "5")),
     rateLimitWindowMinutes: parseInt(
-      getOptionalEnv("PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES", "60")
+      getOptionalEnv("PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES", "60"),
     ),
   },
 
@@ -171,14 +177,14 @@ export function validateConfig() {
       config.jwt.secret === "your-super-secret-jwt-key-change-in-production"
     ) {
       errors.push(
-        "JWT_SECRET must be changed from default value in production"
+        "JWT_SECRET must be changed from default value in production",
       );
     }
 
     // Check for weak JWT secret length
     if (config.jwt.secret.length < 32) {
       errors.push(
-        "JWT_SECRET must be at least 32 characters long in production"
+        "JWT_SECRET must be at least 32 characters long in production",
       );
     }
   }
@@ -188,7 +194,7 @@ export function validateConfig() {
     throw new Error(
       `❌ Configuration validation failed:\n${errors
         .map((err) => `  • ${err}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -196,17 +202,17 @@ export function validateConfig() {
   // Using console for configuration validation is acceptable
   // Log successful configuration
   console.log(
-    `Config loaded - Environment: ${config.nodeEnv}, Port: ${config.port}`
+    `Config loaded - Environment: ${config.nodeEnv}, Port: ${config.port}`,
   );
   console.log(
-    `Security: JWT secret length: ${config.jwt.secret.length} characters.`
+    `Security: JWT secret length: ${config.jwt.secret.length} characters.`,
   );
   console.log(`Redis: ${config.redis.url.substring(0, 20)}...`);
 
   // Parse and display database connection details (safely, without credentials)
   const dbUrl = new URL(config.database.url);
   console.log(
-    `Database: ${dbUrl.protocol}//${dbUrl.hostname}:${dbUrl.port}${dbUrl.pathname}`
+    `Database: ${dbUrl.protocol}//${dbUrl.hostname}:${dbUrl.port}${dbUrl.pathname}`,
   );
 }
 
