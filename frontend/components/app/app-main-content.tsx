@@ -1,12 +1,5 @@
 "use client";
 
-import { Star, UserPlus, Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { useWorkspaceMemberships } from "@/lib/hooks/useWorkspaces";
 import { useState } from "react";
@@ -23,15 +16,15 @@ export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
   const { data } = useWorkspaceMemberships();
   const workspaces = data?.data?.workspaces || [];
   const selectedWorkspaceId = useWorkspaceStore(
-    (state) => state.selectedWorkspaceId
+    (state) => state.selectedWorkspaceId,
   );
   const selectedChannelDisplayName = useWorkspaceStore(
-    (state) => state.selectedChannelDisplayName
+    (state) => state.selectedChannelDisplayName,
   );
   const mainPanelView = useWorkspaceStore((state) => state.mainPanelView);
   const setMainPanelView = useWorkspaceStore((state) => state.setMainPanelView);
   const setSelectedChannel = useWorkspaceStore(
-    (state) => state.setSelectedChannel
+    (state) => state.setSelectedChannel,
   );
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
@@ -132,89 +125,42 @@ export function AppMainContent({ selectedChannelId }: AppMainContentProps) {
   }
 
   return (
-    <TooltipProvider>
-      <main className="flex-1 flex flex-col bg-background h-full overflow-hidden">
-        {/* Channel Header - Shows channel name and action buttons */}
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            {/* Channel Name and Description */}
-            <div>
-              <h1 className="font-semibold text-lg text-foreground">
-                # {selectedChannelDisplayName || selectedChannelId}
-              </h1>
-              <p className="text-sm text-muted-foreground hidden sm:block">
-                For team-wide communication and announcements
-              </p>
-            </div>
-          </div>
-          {/* Channel Action Buttons */}
-          <div className="flex items-center gap-2">
-            {/* Star Channel Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
-                  aria-label="Star channel"
-                >
-                  <Star className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Star Channel</p>
-              </TooltipContent>
-            </Tooltip>
-            {/* Invite Members Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
-                  aria-label="Invite members to channel"
-                >
-                  <UserPlus className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Invite Members</p>
-              </TooltipContent>
-            </Tooltip>
-            {/* Channel Info Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-2 transition-colors"
-                  aria-label="Show channel information"
-                >
-                  <Info className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Channel Info</p>
-              </TooltipContent>
-            </Tooltip>
+    <main className="flex-1 flex flex-col bg-background h-full overflow-hidden">
+      {/* Channel Header */}
+      <div className="px-5 py-4 border-b border-border flex items-center shrink-0">
+        <div className="flex items-center gap-3">
+          {/* Channel Name and Description */}
+          <div>
+            <h1 className="font-semibold text-lg text-foreground">
+              # {selectedChannelDisplayName || selectedChannelId}
+            </h1>
+            <p className="text-sm text-muted-foreground hidden sm:block">
+              For team-wide communication and announcements
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* Messages List - Real-time message display with infinite scroll */}
-        {selectedWorkspaceId && selectedChannelId && (
-          <MessageList
-            workspaceId={selectedWorkspaceId}
-            channelId={selectedChannelId}
-          />
-        )}
+      {/* Messages List - Real-time message display with infinite scroll */}
+      {selectedWorkspaceId && selectedChannelId && (
+        <MessageList
+          workspaceId={selectedWorkspaceId}
+          channelId={selectedChannelId}
+        />
+      )}
 
-        {/* Message Input - Compose and send new messages */}
-        {selectedWorkspaceId && selectedChannelId && (
-          <MessageInput
-            workspaceId={selectedWorkspaceId}
-            channelId={selectedChannelId}
-            channelName={selectedChannelDisplayName || selectedChannelId}
-            onMessageSent={(messageId) => {
-              console.log("Message sent:", messageId);
-              // Will scroll to bottom when we implement message list
-            }}
-          />
-        )}
-      </main>
-    </TooltipProvider>
+      {/* Message Input - Compose and send new messages */}
+      {selectedWorkspaceId && selectedChannelId && (
+        <MessageInput
+          workspaceId={selectedWorkspaceId}
+          channelId={selectedChannelId}
+          channelName={selectedChannelDisplayName || selectedChannelId}
+          onMessageSent={(messageId) => {
+            console.log("Message sent:", messageId);
+            // Will scroll to bottom when we implement message list
+          }}
+        />
+      )}
+    </main>
   );
 }
