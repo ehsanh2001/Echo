@@ -28,7 +28,7 @@ services:
     image: postgres:16-alpine
     container_name: echo-postgres
     ports:
-      - "127.0.0.1:5432:5432"  # Localhost only — for host-side migration scripts
+      - "127.0.0.1:5432:5432" # Localhost only — for host-side migration scripts
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -117,6 +117,14 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Workspace-Channel Service - Workspaces, channels, memberships
+  workspace-channel-service:
     image: ehosseinipbox/echo-workspace-channel:latest
     container_name: echo-workspace-channel-service
     environment:

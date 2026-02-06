@@ -120,6 +120,7 @@ chmod +x run-migrations.sh
 ```
 
 The migration script will:
+
 1. Verify all 3 databases exist (creates them if missing)
 2. Run Prisma migrations for user-service → user/auth tables
 3. Run Prisma migrations for workspace-channel-service → workspace/channel tables
