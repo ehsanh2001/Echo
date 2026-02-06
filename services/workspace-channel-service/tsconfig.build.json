@@ -26,12 +26,6 @@
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true,
-    "paths": {
-      "@echo/telemetry": ["../../shared/telemetry/src/index.ts"],
-      "@echo/logger": ["../../shared/logger/src/index.ts"],
-      "@echo/metrics": ["../../shared/metrics/src/index.ts"],
-      "@echo/http-client": ["../../shared/http-client/src/index.ts"]
-    },
     "baseUrl": "."
   },
   "include": ["src/**/*"],

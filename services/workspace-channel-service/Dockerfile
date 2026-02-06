@@ -8,11 +8,11 @@ WORKDIR /app
 # Copy shared packages (needed for building)
 COPY services/shared ./services/shared/
 
-# Install dependencies for shared packages
-RUN cd services/shared/telemetry && npm install
-RUN cd services/shared/logger && npm install
-RUN cd services/shared/metrics && npm install
-RUN cd services/shared/http-client && npm install
+# Install and build shared packages (tsc needs .d.ts files in dist/)
+RUN cd services/shared/telemetry && npm install && npm run build
+RUN cd services/shared/logger && npm install && npm run build
+RUN cd services/shared/metrics && npm install && npm run build
+RUN cd services/shared/http-client && npm install && npm run build
 
 # Now set up the service
 WORKDIR /app/services/workspace-channel-service
