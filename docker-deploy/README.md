@@ -8,8 +8,8 @@ This deployment setup handles:
 
 - **Infrastructure**: PostgreSQL, Redis, RabbitMQ running in containers
 - **Database Initialization**: Automatic creation of 3 databases on first startup
-- **Schema Migrations**: Prisma migrations run automatically via `db-migrate` container
-- **SQL Functions**: Custom PostgreSQL functions applied after migrations
+- **Schema Migrations**: Run manually via `run-migrations.sh` before first deployment
+- **SQL Functions**: Custom PostgreSQL functions applied by the migration script
 - **Application Services**: Pre-built images pulled from Docker Hub
 - **Reverse Proxy**: Nginx for routing and WebSocket support
 
@@ -17,6 +17,7 @@ This deployment setup handles:
 
 - EC2 instance (t2.micro with 1GB RAM or t3.small with 2GB RAM recommended)
 - Docker and Docker Compose installed
+- Node.js 22+ installed (for running database migrations)
 - Security group allowing inbound traffic on port 80
 - Gmail account with App Password for email notifications (optional)
 
@@ -45,13 +46,21 @@ sudo usermod -aG docker $USER
 # Install Docker Compose
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
+
+# Install Node.js 22 (needed for running migrations)
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -  # Amazon Linux
+# or
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -  # Ubuntu
+sudo yum install -y nodejs  # Amazon Linux
+# or
+sudo apt install -y nodejs  # Ubuntu
 ```
 
 ### 2. Clone Repository
 
 ```bash
-git clone <your-repo-url>
-cd echo/docker-deploy
+git clone <your-repo-url> Echo
+cd Echo/docker-deploy
 ```
 
 ### 3. Set Environment Variables
@@ -94,7 +103,31 @@ docker-compose pull
 # This will download all service images (~500MB total)
 ```
 
-### 5. Deploy
+### 5. First-Time Setup: Run Database Migrations
+
+Before starting application services for the first time, start the infrastructure and run migrations:
+
+```bash
+# Start only infrastructure services (PostgreSQL, Redis, RabbitMQ)
+docker-compose up -d postgres redis rabbitmq
+
+# Wait for PostgreSQL to be healthy
+docker-compose ps  # Verify postgres shows "healthy"
+
+# Run database migrations (creates tables, indexes, SQL functions)
+chmod +x run-migrations.sh
+./run-migrations.sh
+```
+
+The migration script will:
+1. Verify all 3 databases exist (creates them if missing)
+2. Run Prisma migrations for user-service → user/auth tables
+3. Run Prisma migrations for workspace-channel-service → workspace/channel tables
+4. Run Prisma migrations for message-service → message/thread tables
+5. Apply `get_next_message_no` SQL function for atomic message numbering
+6. Print a verification summary of all created tables and functions
+
+### 6. Deploy Application Services
 
 ```bash
 # Start all services
@@ -107,27 +140,22 @@ docker-compose logs -f
 docker-compose ps
 ```
 
-**What happens during first startup:**
+**What happens during startup:**
 
-1. **PostgreSQL starts** and runs `init-scripts/01-create-databases.sh`
+1. **PostgreSQL starts** and runs `init-scripts/create-databases.sh`
    - Creates 3 databases: `users_db`, `workspace_channels_db`, `message_db`
    - Only runs on first startup (data persisted in Docker volume)
 
-2. **db-migrate container** runs after PostgreSQL is healthy
-   - Runs Prisma migrations for user-service → creates user/auth tables
-   - Runs Prisma migrations for workspace-channel-service → creates workspace/channel tables
-   - Runs Prisma migrations for message-service → creates message/thread tables
-   - Applies `get_next_message_no_function.sql` → creates atomic message numbering function
-   - Container exits after successful migration
+2. **Redis & RabbitMQ** start with health checks
 
-3. **Application services** start after migrations complete
+3. **Application services** start after infrastructure is healthy
    - Pull pre-built images from Docker Hub
-   - Connect to initialized databases
+   - Connect to initialized databases (migrations already applied)
    - Begin serving requests
 
 4. **Nginx** starts last and exposes port 80
 
-### 6. Verify Deployment
+### 7. Verify Deployment
 
 ```bash
 # Check all containers are running
@@ -147,12 +175,9 @@ docker exec -it echo-postgres psql -U postgres -d message_db -c "\dt"
 
 # Verify SQL function was created
 docker exec -it echo-postgres psql -U postgres -d message_db -c "\df get_next_message_no"
-
-# Check migration logs
-docker-compose logs db-migrate
 ```
 
-### 7. Access the Application
+### 8. Access the Application
 
 Open your browser and navigate to:
 
@@ -174,7 +199,7 @@ On first PostgreSQL startup, the `init-scripts/01-create-databases.sh` script au
 
 ### Prisma Migrations
 
-The `db-migrate` container runs Prisma migrations for each service:
+The `run-migrations.sh` script runs on the EC2 host and applies Prisma migrations for each service:
 
 ```
 services/user-service/prisma/migrations/
@@ -251,18 +276,20 @@ The services start in this order (managed by Docker Compose health checks):
 
 ```
 1. postgres          (healthcheck: pg_isready)
-   └── 2. db-migrate (runs migrations, then exits)
-       ├── 3. redis          (healthcheck: redis ping)
-       ├── 3. rabbitmq       (healthcheck: rabbitmq-diagnostics ping)
-       │
-       └── 4. user-service
-           └── 5. workspace-channel-service
-               └── 6. message-service
-                   └── 7. notification-service
-                       └── 8. bff-service
-                           └── 9. frontend
-                               └── 10. nginx (exposes port 80)
+   ├── 2. redis          (healthcheck: redis ping)
+   ├── 2. rabbitmq       (healthcheck: rabbitmq-diagnostics ping)
+   │
+   └── 3. user-service
+       └── 4. workspace-channel-service
+           └── 5. message-service
+               └── 6. notification-service
+                   └── 7. bff-service
+                       └── 8. frontend
+                           └── 9. nginx (exposes port 80)
 ```
+
+> **Note:** Database migrations must be run manually via `./run-migrations.sh`
+> before the first deployment. See [Step 5](#5-first-time-setup-run-database-migrations).
 
 ## Commands
 
@@ -291,8 +318,8 @@ docker-compose pull && docker-compose up -d
 # Check resource usage
 docker stats
 
-# Run migrations manually (if needed)
-docker-compose run --rm db-migrate
+# Run migrations manually (if needed after schema changes)
+cd ~/Echo/docker-deploy && ./run-migrations.sh
 
 # Access PostgreSQL
 docker exec -it echo-postgres psql -U postgres
@@ -309,21 +336,22 @@ docker exec -it echo-redis redis-cli -a redis123
 # Check logs
 docker-compose logs -f
 
-# Check if migrations ran successfully
-docker-compose logs db-migrate
+# Check if migrations were applied
+docker exec -it echo-postgres psql -U postgres -d users_db -c "\dt"
 ```
 
 ### Migration failures
 
 ```bash
-# Check migration container logs
-docker-compose logs db-migrate
-
 # Re-run migrations manually
-docker-compose run --rm db-migrate
+cd ~/Echo/docker-deploy
+./run-migrations.sh
 
 # If you need to reset everything (WARNING: destroys all data)
 docker-compose down -v
+docker-compose up -d postgres redis rabbitmq
+# Wait for postgres to be healthy, then:
+./run-migrations.sh
 docker-compose up -d
 ```
 
@@ -356,8 +384,8 @@ docker exec -it echo-postgres psql -U postgres -c "CREATE DATABASE users_db;"
 docker exec -it echo-postgres psql -U postgres -c "CREATE DATABASE workspace_channels_db;"
 docker exec -it echo-postgres psql -U postgres -c "CREATE DATABASE message_db;"
 
-# Then re-run migrations
-docker-compose run --rm db-migrate
+# Then run migrations
+./run-migrations.sh
 ```
 
 ### Out of memory
@@ -394,17 +422,16 @@ docker-compose logs -f
 If there are database schema changes:
 
 ```bash
-# Stop services
-docker-compose down
+# Pull latest code
+cd ~/Echo && git pull origin main
 
-# Pull latest images
+# Run migrations
+cd docker-deploy
+./run-migrations.sh
+
+# Restart services
 docker-compose pull
-
-# Restart (migrations will run automatically via db-migrate container)
 docker-compose up -d
-
-# Check migration logs
-docker-compose logs db-migrate
 ```
 
 ## Complete Reset

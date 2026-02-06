@@ -153,16 +153,6 @@ jobs:
             docker-compose pull
 
             echo "=========================================="
-            echo "Rebuilding migration container..."
-            echo "=========================================="
-            docker-compose build db-migrate
-
-            echo "=========================================="
-            echo "Running database migrations..."
-            echo "=========================================="
-            docker-compose up db-migrate
-
-            echo "=========================================="
             echo "Restarting application containers..."
             echo "=========================================="
             docker-compose up -d --force-recreate

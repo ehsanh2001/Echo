@@ -27,6 +27,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: echo-postgres
+    ports:
+      - "127.0.0.1:5432:5432"  # Localhost only — for host-side migration scripts
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -87,29 +89,6 @@ services:
           memory: 128M
 
   # ==========================================================================
-  # Database Migrations
-  # ==========================================================================
-
-  # Run Prisma migrations for all services
-  db-migrate:
-    build:
-      context: ..
-      dockerfile: docker-deploy/Dockerfile.migrate
-    container_name: echo-db-migrate
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      USERS_DB_NAME: ${USERS_DB_NAME:-users_db}
-      WORKSPACE_CHANNELS_DB_NAME: ${WORKSPACE_CHANNELS_DB_NAME:-workspace_channels_db}
-      MESSAGE_DB_NAME: ${MESSAGE_DB_NAME:-message_db}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-  # ==========================================================================
   # Application Services
   # ==========================================================================
 
@@ -132,20 +111,12 @@ services:
       # Disable telemetry
       - OTEL_SDK_DISABLED=true
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-
-  # Workspace-Channel Service - Workspaces, channels, memberships
-  workspace-channel-service:
     image: ehosseinipbox/echo-workspace-channel:latest
     container_name: echo-workspace-channel-service
     environment:
@@ -162,8 +133,8 @@ services:
       # Disable telemetry
       - OTEL_SDK_DISABLED=true
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
@@ -194,8 +165,8 @@ services:
       # Disable telemetry
       - OTEL_SDK_DISABLED=true
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
