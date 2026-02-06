@@ -124,8 +124,9 @@ jobs:
           host: ${{ secrets.EC2_PUBLIC_IP }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script_stop: true
           script: |
-            cd ~/echo
+            cd ~/Echo
 
             echo "=========================================="
             echo "Pulling latest code from GitHub..."
@@ -149,22 +150,22 @@ jobs:
             echo "=========================================="
             echo "Pulling latest Docker images..."
             echo "=========================================="
-            docker compose pull
+            docker-compose pull
 
             echo "=========================================="
             echo "Rebuilding migration container..."
             echo "=========================================="
-            docker compose build db-migrate
+            docker-compose build db-migrate
 
             echo "=========================================="
             echo "Running database migrations..."
             echo "=========================================="
-            docker compose up db-migrate
+            docker-compose up db-migrate
 
             echo "=========================================="
             echo "Restarting application containers..."
             echo "=========================================="
-            docker compose up -d --force-recreate
+            docker-compose up -d --force-recreate
 
             echo "=========================================="
             echo "Waiting for services to be healthy..."
@@ -174,7 +175,7 @@ jobs:
             echo "=========================================="
             echo "Verifying deployment..."
             echo "=========================================="
-            docker compose ps
+            docker-compose ps
 
             echo "=========================================="
             echo "Health check..."
